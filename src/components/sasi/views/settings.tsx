@@ -1,0 +1,693 @@
+"use client";
+
+import { useState } from "react";
+import {
+  Bell,
+  Camera,
+  CheckCircle2,
+  Database,
+  FileText,
+  Globe,
+  Info,
+  Languages,
+  Lock,
+  MapPin,
+  Minus,
+  Plus,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  User,
+  Download,
+} from "lucide-react";
+import { useSasiStore } from "@/lib/sasi/store";
+import { DEMO_USER, GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
+import { locationLabel } from "@/lib/sasi/utils";
+import {
+  DemoBadge,
+  SectionLabel,
+} from "@/components/sasi/primitives";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { GhostButton, PrimaryButton } from "@/components/sasi/primitives";
+import { cn } from "@/lib/utils";
+
+/* ============================================================
+   SETTINGS — honest, functional where feasible
+   ============================================================ */
+
+type SectionId =
+  | "account"
+  | "privacy"
+  | "notifications"
+  | "location"
+  | "language"
+  | "accessibility"
+  | "ai"
+  | "security"
+  | "data";
+
+const NAV: { id: SectionId; label: string; icon: typeof User }[] = [
+  { id: "account", label: "Account", icon: User },
+  { id: "privacy", label: "Privacy", icon: Lock },
+  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "location", label: "Location", icon: MapPin },
+  { id: "language", label: "Language", icon: Languages },
+  { id: "accessibility", label: "Accessibility", icon: Globe },
+  { id: "ai", label: "AI permissions", icon: Sparkles },
+  { id: "security", label: "Security", icon: ShieldCheck },
+  { id: "data", label: "Data", icon: Database },
+];
+
+const LANGUAGES = [
+  { code: "zu", label: "isiZulu" },
+  { code: "st", label: "Sesotho" },
+  { code: "tn", label: "Setswana" },
+  { code: "nso", label: "Sepedi" },
+  { code: "af", label: "Afrikaans" },
+  { code: "xh", label: "isiXhosa" },
+];
+
+const TEXT_SIZES = [14, 15, 16, 17, 18];
+
+function ToggleRow({
+  title,
+  description,
+  checked,
+  onCheckedChange,
+  disabled = false,
+  tag,
+  subNote,
+}: {
+  title: string;
+  description?: string;
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+  disabled?: boolean;
+  tag?: string;
+  subNote?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-white/5 bg-white/[0.015] p-3.5">
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-zinc-100">
+          {title}
+          {tag && <DemoBadge label={tag} />}
+        </p>
+        {description && (
+          <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{description}</p>
+        )}
+        {subNote && (
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-600">{subNote}</p>
+        )}
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+        aria-label={title}
+        className="mt-0.5 data-[state=checked]:bg-white data-[state=unchecked]:bg-white/15 data-[state=checked]:text-black"
+      />
+    </div>
+  );
+}
+
+export default function SettingsView() {
+  const savedLocation = useSasiStore((s) => s.savedLocation);
+  const setSavedLocation = useSasiStore((s) => s.setSavedLocation);
+  const cases = useSasiStore((s) => s.cases);
+  const evidence = useSasiStore((s) => s.evidence);
+  const navigate = useSasiStore((s) => s.navigate);
+
+  const [active, setActive] = useState<SectionId>("account");
+
+  /* --- privacy --- */
+  const [storeEvidence, setStoreEvidence] = useState(true);
+  const [shareAnonymized, setShareAnonymized] = useState(false);
+  const [exportNote, setExportNote] = useState(false);
+
+  /* --- notifications --- */
+  const [ntfCase, setNtfCase] = useState(true);
+  const [ntfInvestigation, setNtfInvestigation] = useState(true);
+  const [ntfAction, setNtfAction] = useState(true);
+  const [ntfService, setNtfService] = useState(false);
+
+  /* --- location --- */
+  const [municipality, setMunicipality] = useState(DEMO_USER.location.municipality);
+  const [city, setCity] = useState(savedLocation.city);
+
+  /* --- language --- */
+  const [language, setLanguage] = useState("en");
+
+  /* --- accessibility --- */
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [highContrast, setHighContrast] = useState(false);
+  const [sizeIndex, setSizeIndex] = useState(2);
+
+  /* --- ai permissions --- */
+  const [aiPrepare, setAiPrepare] = useState(true);
+  const [aiMonitor, setAiMonitor] = useState(true);
+  const [aiShareEvidence, setAiShareEvidence] = useState(true);
+
+  /* --- data --- */
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+
+  const applyTextSize = (idx: number) => {
+    const clamped = Math.max(0, Math.min(TEXT_SIZES.length - 1, idx));
+    setSizeIndex(clamped);
+    document.documentElement.style.fontSize = `${TEXT_SIZES[clamped]}px`;
+  };
+
+  const toggleReduceMotion = (v: boolean) => {
+    setReduceMotion(v);
+    document.documentElement.classList.toggle("sasi-reduce-motion", v);
+  };
+
+  const toggleHighContrast = (v: boolean) => {
+    setHighContrast(v);
+    document.documentElement.classList.toggle("sasi-hc", v);
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <header className="mb-6">
+        <h1 className="text-lg font-semibold tracking-tight text-white">Settings</h1>
+        <p className="mt-1 text-[13px] text-zinc-500">
+          Preferences for your SASI account. Everything here is local to the demo.
+        </p>
+      </header>
+
+      <div className="flex flex-col gap-6 md:flex-row">
+        {/* ---------- Nav: desktop ---------- */}
+        <nav aria-label="Settings sections" className="hidden md:block md:w-56 md:shrink-0">
+          <ul className="sticky top-6 space-y-1">
+            {NAV.map((item) => (
+              <li key={item.id}>
+                <button
+                  onClick={() => setActive(item.id)}
+                  aria-current={active === item.id ? "page" : undefined}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors",
+                    active === item.id
+                      ? "bg-white/[0.06] font-medium text-white"
+                      : "text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-200"
+                  )}
+                >
+                  <item.icon className="h-3.5 w-3.5" aria-hidden />
+                  {item.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* ---------- Nav: mobile chips ---------- */}
+        <nav
+          aria-label="Settings sections"
+          className="sasi-scroll -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:hidden"
+        >
+          {NAV.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActive(item.id)}
+              aria-current={active === item.id ? "page" : undefined}
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[12.5px] transition-colors",
+                active === item.id
+                  ? "border-white/25 bg-white/[0.08] font-medium text-white"
+                  : "border-white/10 bg-white/[0.02] text-zinc-400"
+              )}
+            >
+              <item.icon className="h-3.5 w-3.5" aria-hidden />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* ---------- Content ---------- */}
+        <div className="min-w-0 flex-1 space-y-4">
+        {active === "account" && (
+          <section aria-labelledby="settings-account" className="sasi-card p-5">
+            <SectionLabel>Account</SectionLabel>
+            <h2 id="settings-account" className="mt-1 text-[15px] font-semibold text-white">Your account</h2>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="account-name" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
+                  Full name
+                </label>
+                <Input id="account-name" value={DEMO_USER.name} readOnly disabled aria-readonly="true" className="text-[13px]" />
+              </div>
+              <div>
+                <label htmlFor="account-email" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
+                  Email
+                </label>
+                <Input id="account-email" type="email" value={DEMO_USER.email} readOnly disabled aria-readonly="true" className="text-[13px]" />
+              </div>
+            </div>
+            <p className="mt-4 flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.02] p-3 text-[12px] text-zinc-400">
+              <Info className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+              Demo account — editing is disabled in demo.
+            </p>
+          </section>
+        )}
+
+        {active === "privacy" && (
+          <section aria-labelledby="settings-privacy" className="space-y-4">
+            <div className="sasi-card p-5">
+              <SectionLabel>Privacy</SectionLabel>
+              <h2 id="settings-privacy" className="mt-1 text-[15px] font-semibold text-white">What SASI stores</h2>
+              <ul className="mt-4 space-y-2.5">
+                {[
+                  { icon: FileText, label: "Your cases and case history" },
+                  { icon: Camera, label: "Evidence you attach — photos, notes, links" },
+                  { icon: MapPin, label: "Your saved location, to localise incidents" },
+                  { icon: Sparkles, label: "AI memory — context that helps investigations continue" },
+                ].map((row) => (
+                  <li key={row.label} className="flex items-center gap-2.5 text-[13px] text-zinc-300">
+                    <row.icon className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+                    {row.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <ToggleRow
+                title="Store evidence locally"
+                description="Keep photos and notes you attach on this device."
+                checked={storeEvidence}
+                onCheckedChange={setStoreEvidence}
+              />
+              <ToggleRow
+                title="Share anonymized incident reports"
+                description="Contribute your report, stripped of personal details, to community incident data."
+                checked={shareAnonymized}
+                onCheckedChange={setShareAnonymized}
+                disabled
+                tag="COMING SOON"
+              />
+            </div>
+
+            <div className="sasi-card p-5">
+              <p className="text-[13px] font-medium text-zinc-100">Export your data</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
+                Download everything SASI holds about your account.
+              </p>
+              <GhostButton
+                onClick={() => setExportNote(true)}
+                className="mt-3"
+                aria-label="Export your data"
+              >
+                <Download className="h-3.5 w-3.5" aria-hidden />
+                Export data
+              </GhostButton>
+              {exportNote && (
+                <p
+                  role="status"
+                  className="mt-3 flex items-center gap-2 rounded-lg border border-[#e3c567]/20 bg-[#e3c567]/5 p-3 text-[12px] text-[#efe0a8]"
+                >
+                  <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Data export is coming soon (demo).
+                </p>
+              )}
+            </div>
+          </section>
+        )}
+
+        {active === "notifications" && (
+          <section aria-labelledby="settings-notifications" className="space-y-4">
+            <div className="sasi-card p-5">
+              <SectionLabel>Notifications</SectionLabel>
+              <h2 id="settings-notifications" className="mt-1 text-[15px] font-semibold text-white">What SASI tells you about</h2>
+              <div className="mt-4 space-y-3">
+                <ToggleRow
+                  title="Case updates"
+                  description="Status changes and new events on your cases."
+                  checked={ntfCase}
+                  onCheckedChange={setNtfCase}
+                />
+                <ToggleRow
+                  title="Investigation findings"
+                  description="When the investigation produces a finding or a recommended next step."
+                  checked={ntfInvestigation}
+                  onCheckedChange={setNtfInvestigation}
+                />
+                <ToggleRow
+                  title="Action approvals"
+                  description="When SASI needs your approval before doing anything on your behalf."
+                  checked={ntfAction}
+                  onCheckedChange={setNtfAction}
+                />
+                <ToggleRow
+                  title="Service alerts"
+                  description="Incidents tracked near your saved location."
+                  checked={ntfService}
+                  onCheckedChange={setNtfService}
+                />
+              </div>
+            </div>
+            <p className="flex items-start gap-2 rounded-lg border border-white/8 bg-white/[0.02] p-3.5 text-[12px] leading-relaxed text-zinc-400">
+              <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+              Calm notifications: SASI batches updates and only interrupts you for approvals and
+              urgent, confirmed incidents.
+            </p>
+          </section>
+        )}
+
+        {active === "location" && (
+          <section aria-labelledby="settings-location" className="space-y-4">
+            <div className="sasi-card p-5">
+              <SectionLabel>Location</SectionLabel>
+              <h2 id="settings-location" className="mt-1 text-[15px] font-semibold text-white">Saved location</h2>
+              <p className="mt-2 flex items-center gap-2 text-[13px] text-zinc-300">
+                <MapPin className="h-3.5 w-3.5 text-[#ef5350]" aria-hidden />
+                {savedLocation.suburb ? `${savedLocation.suburb}, ` : ""}
+                {savedLocation.city}, {savedLocation.province}
+              </p>
+              <p className="mt-1 text-[12px] text-zinc-600">
+                Used to localise incidents and reporting defaults.
+              </p>
+            </div>
+
+            <div className="sasi-card p-5">
+              <p className="text-[13px] font-medium text-zinc-100">Adjust your area</p>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label htmlFor="loc-province" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
+                    Province
+                  </label>
+                  <Input id="loc-province" value="Gauteng" readOnly disabled className="text-[13px]" />
+                </div>
+                <div>
+                  <label htmlFor="loc-municipality" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
+                    Municipality
+                  </label>
+                  <Select value={municipality} onValueChange={(v) => setMunicipality(v)}>
+                    <SelectTrigger id="loc-municipality" className="w-full text-[13px]" aria-label="Municipality">
+                      <SelectValue placeholder="Select municipality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GAUTENG_MUNICIPALITIES.map((m) => (
+                        <SelectItem key={m} value={m} className="text-[13px]">
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label htmlFor="loc-city" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
+                    City or town
+                  </label>
+                  <Input
+                    id="loc-city"
+                    value={city}
+                    onChange={(e) => {
+                      setCity(e.target.value);
+                      setSavedLocation({ city: e.target.value });
+                    }}
+                    className="text-[13px]"
+                  />
+                </div>
+              </div>
+              <p className="mt-4 text-[12px] text-zinc-600">
+                Province is fixed to Gauteng in this demo. Municipality selection is kept for this
+                demo session; city changes save to your location immediately.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {active === "language" && (
+          <section aria-labelledby="settings-language" className="sasi-card p-5">
+            <SectionLabel>Language</SectionLabel>
+            <h2 id="settings-language" className="mt-1 text-[15px] font-semibold text-white">Interface language</h2>
+            <div className="mt-4 max-w-sm">
+              <label htmlFor="language-select" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
+                Language
+              </label>
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger id="language-select" className="w-full text-[13px]" aria-label="Language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en" className="text-[13px]">
+                    English
+                  </SelectItem>
+                  {LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code} disabled className="text-[13px]">
+                      {l.label} — coming soon
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-3 text-[12px] leading-relaxed text-zinc-600">
+                English is the only working language in this demo. Additional South African
+                languages are planned — reports written in them are accepted, translation of the
+                interface is coming soon.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {active === "accessibility" && (
+          <section aria-labelledby="settings-accessibility" className="space-y-3">
+            <div className="sasi-card p-5">
+              <SectionLabel>Accessibility</SectionLabel>
+              <h2 id="settings-accessibility" className="mt-1 text-[15px] font-semibold text-white">Motion and contrast</h2>
+              <div className="mt-4 space-y-3">
+                <ToggleRow
+                  title="Reduce motion"
+                  description="Toggles the sasi-reduce-motion flag on the document. Site animations — pulses, shimmer and transitions — respect this flag, including within this view."
+                  checked={reduceMotion}
+                  onCheckedChange={toggleReduceMotion}
+                />
+                <ToggleRow
+                  title="High contrast"
+                  description="Toggles the sasi-hc flag on the document for stronger text and edge contrast. Full high-contrast styling is coming soon."
+                  checked={highContrast}
+                  onCheckedChange={toggleHighContrast}
+                />
+              </div>
+            </div>
+
+            <div className="sasi-card p-5">
+              <p className="text-[13px] font-medium text-zinc-100">Text size</p>
+              <p className="mt-1 text-[12px] text-zinc-500">
+                Adjusts the base size for the whole app. Currently {TEXT_SIZES[sizeIndex]}px.
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <GhostButton
+                  onClick={() => applyTextSize(sizeIndex - 1)}
+                  disabled={sizeIndex === 0}
+                  className="h-9 w-9 px-0"
+                  aria-label="Decrease text size"
+                >
+                  <Minus className="h-3.5 w-3.5" aria-hidden />
+                </GhostButton>
+                <span
+                  className="min-w-10 text-center font-mono text-[13px] text-zinc-300"
+                  aria-live="polite"
+                >
+                  A
+                </span>
+                <GhostButton
+                  onClick={() => applyTextSize(sizeIndex + 1)}
+                  disabled={sizeIndex === TEXT_SIZES.length - 1}
+                  className="h-9 w-9 px-0"
+                  aria-label="Increase text size"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                </GhostButton>
+                <span className="ml-1 text-[11px] text-zinc-600">
+                  A- / A+ · 14–18px base size
+                </span>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {active === "ai" && (
+          <section aria-labelledby="settings-ai" className="space-y-4">
+            <div className="sasi-card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <SectionLabel>AI permissions</SectionLabel>
+                  <h2 id="settings-ai" className="mt-1 text-[15px] font-semibold text-white">What SASI may do</h2>
+                </div>
+                <DemoBadge label="DEMO SETTINGS" />
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border border-[#66bb6a]/15 bg-[#66bb6a]/[0.03] p-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8ee09a]">
+                    What SASI can do without asking
+                  </p>
+                  <ul className="mt-3 space-y-2.5">
+                    {[
+                      "Understand your reports",
+                      "Research public sources",
+                      "Organize evidence",
+                      "Prepare recommendations",
+                    ].map((item) => (
+                      <li key={item} className="flex items-center gap-2.5 text-[13px] text-zinc-200">
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#66bb6a]" aria-hidden />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-[#e3c567]/15 bg-[#e3c567]/[0.03] p-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#efe0a8]">
+                    What SASI only does with your explicit approval
+                  </p>
+                  <ul className="mt-3 space-y-2.5">
+                    {[
+                      "Submit information externally",
+                      "Contact an organization",
+                      "Share evidence",
+                      "Take consequential action",
+                    ].map((item) => (
+                      <li key={item} className="flex items-center gap-2.5 text-[13px] text-zinc-200">
+                        <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-[#e3c567]" aria-hidden />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <ToggleRow
+                title="Prepare actions for my review"
+                description="SASI drafts submissions and next steps, then waits for you."
+                checked={aiPrepare}
+                onCheckedChange={setAiPrepare}
+              />
+              <ToggleRow
+                title="Monitor cases every 48h"
+                description="Automatic checks for responses and changes related to your open cases."
+                checked={aiMonitor}
+                onCheckedChange={setAiMonitor}
+              />
+              <ToggleRow
+                title="Share evidence with authorities after I approve"
+                description="Evidence you attached is only included in a submission once you have approved that specific action."
+                subNote="You can revoke this per case at any time."
+                checked={aiShareEvidence}
+                onCheckedChange={setAiShareEvidence}
+              />
+            </div>
+          </section>
+        )}
+
+        {active === "security" && (
+          <section aria-labelledby="settings-security" className="sasi-card p-5">
+            <SectionLabel>Security</SectionLabel>
+            <h2 id="settings-security" className="mt-1 text-[15px] font-semibold text-white">How SASI protects your account</h2>
+            <p className="mt-2 max-w-xl text-[12.5px] leading-relaxed text-zinc-400">
+              SASI never submits anything on your behalf without an explicit approval, keeps
+              evidence tied to your account only, and logs every AI action in an audit trail you
+              can review.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <GhostButton onClick={() => navigate("security")} aria-label="Read the security overview">
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                Read the security overview
+              </GhostButton>
+              <GhostButton onClick={() => navigate("privacy")} aria-label="Read the privacy statement">
+                Read the privacy statement
+              </GhostButton>
+            </div>
+          </section>
+        )}
+
+        {active === "data" && (
+          <section aria-labelledby="settings-data" className="space-y-4">
+            <div className="sasi-card p-5">
+              <SectionLabel>Data</SectionLabel>
+              <h2 id="settings-data" className="mt-1 text-[15px] font-semibold text-white">Your data in this demo</h2>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3.5">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-zinc-500">Cases</p>
+                  <p className="mt-1.5 text-[22px] font-semibold text-white">{cases.length}</p>
+                </div>
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3.5">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-zinc-500">Evidence items</p>
+                  <p className="mt-1.5 text-[22px] font-semibold text-white">{evidence.length}</p>
+                </div>
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3.5">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-zinc-500">Saved location</p>
+                  <p className="mt-1.5 text-[13px] font-medium leading-snug text-zinc-200">
+                    {locationLabel({ ...savedLocation }, "full")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="sasi-card border-[#ef5350]/15 p-5">
+              <p className="flex items-center gap-2 text-[13px] font-medium text-[#fda4a0]">
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                Danger zone
+              </p>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-500">
+                Delete all demo data — cases, evidence and AI memory created in this session.
+              </p>
+              {!confirmDelete ? (
+                <GhostButton
+                  onClick={() => setConfirmDelete(true)}
+                  className="mt-3 hover:border-[#ef5350]/40 hover:text-[#fda4a0]"
+                  aria-label="Delete all demo data"
+                >
+                  Delete all demo data
+                </GhostButton>
+              ) : (
+                <div
+                  role="alertdialog"
+                  aria-label="Confirm delete all demo data"
+                  className="mt-3 rounded-lg border border-[#ef5350]/25 bg-[#ef5350]/5 p-3.5"
+                >
+                  <p className="text-[12.5px] font-medium text-[#fda4a0]">
+                    Are you sure? This clears your demo session data.
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <PrimaryButton
+                      onClick={() => {
+                        setDeleted(true);
+                        setConfirmDelete(false);
+                      }}
+                      className="bg-[#ef5350] text-white hover:bg-[#e57373]"
+                    >
+                      Yes, delete
+                    </PrimaryButton>
+                    <GhostButton onClick={() => setConfirmDelete(false)}>Cancel</GhostButton>
+                  </div>
+                </div>
+              )}
+              {deleted && (
+                <p
+                  role="status"
+                  className="mt-3 flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.02] p-3 text-[12px] text-zinc-400"
+                >
+                  <Info className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+                  Demo data resets when the app reloads.
+                </p>
+              )}
+            </div>
+          </section>
+        )}
+        </div>
+      </div>
+    </div>
+  );
+}

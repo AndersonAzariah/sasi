@@ -1,0 +1,421 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   SASI — South African Civic Intelligence Platform
+   Design tokens: BLACK / GREY / WHITE + subtle national LIGHT
+   ============================================================ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* SASI surfaces */
+  --color-bg-0: var(--sasi-bg-0);
+  --color-bg-1: var(--sasi-bg-1);
+  --color-bg-2: var(--sasi-bg-2);
+  --color-surface-1: var(--sasi-surface-1);
+  --color-surface-2: var(--sasi-surface-2);
+  --color-surface-3: var(--sasi-surface-3);
+  --color-surface-4: var(--sasi-surface-4);
+
+  /* SASI national accents (indicator-light variants for dark UI) */
+  --color-sa-red: var(--sa-red);
+  --color-sa-blue: var(--sa-blue);
+  --color-sa-green: var(--sa-green);
+  --color-sa-gold: var(--sa-gold);
+  --color-sa-red-deep: var(--sa-red-deep);
+  --color-sa-blue-deep: var(--sa-blue-deep);
+  --color-sa-green-deep: var(--sa-green-deep);
+  --color-sa-gold-deep: var(--sa-gold-deep);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Base — the platform is permanently dark */
+  --sasi-bg-0: #050505;
+  --sasi-bg-1: #080808;
+  --sasi-bg-2: #0b0b0c;
+  --sasi-surface-1: #101112;
+  --sasi-surface-2: #151617;
+  --sasi-surface-3: #1b1c1e;
+  --sasi-surface-4: #222326;
+
+  /* National accents — deep brand + light indicator variants */
+  --sa-red-deep: #c62828;
+  --sa-blue-deep: #1976d2;
+  --sa-green-deep: #168a45;
+  --sa-gold-deep: #d4af37;
+  --sa-red: #ef5350;
+  --sa-blue: #64b5f6;
+  --sa-green: #66bb6a;
+  --sa-gold: #e3c567;
+
+  /* shadcn mapping (dark values as default) */
+  --background: #050505;
+  --foreground: #ffffff;
+  --card: #101112;
+  --card-foreground: #ffffff;
+  --popover: #101112;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #050505;
+  --secondary: #1b1c1e;
+  --secondary-foreground: #ffffff;
+  --muted: #151617;
+  --muted-foreground: #a1a1aa;
+  --accent: #1b1c1e;
+  --accent-foreground: #ffffff;
+  --destructive: #ef5350;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: rgba(255, 255, 255, 0.22);
+  --chart-1: #ef5350;
+  --chart-2: #64b5f6;
+  --chart-3: #66bb6a;
+  --chart-4: #e3c567;
+  --chart-5: #a1a1aa;
+  --sidebar: #080808;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #050505;
+  --sidebar-accent: #151617;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: rgba(255, 255, 255, 0.22);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+    background: var(--sasi-bg-0);
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: rgba(227, 197, 103, 0.25);
+    color: #fff;
+  }
+  :focus-visible {
+    outline: 1.5px solid rgba(255, 255, 255, 0.55);
+    outline-offset: 2px;
+  }
+}
+
+/* ============================================================
+   SASI GLOW SYSTEM — national colors as light, never as paint
+   ============================================================ */
+
+.sasi-glow-red {
+  box-shadow: 0 0 0 1px rgba(239, 83, 80, 0.18), 0 0 24px -6px rgba(198, 40, 40, 0.45);
+}
+.sasi-glow-blue {
+  box-shadow: 0 0 0 1px rgba(100, 181, 246, 0.18), 0 0 24px -6px rgba(25, 118, 210, 0.45);
+}
+.sasi-glow-green {
+  box-shadow: 0 0 0 1px rgba(102, 187, 106, 0.18), 0 0 24px -6px rgba(22, 138, 69, 0.45);
+}
+.sasi-glow-gold {
+  box-shadow: 0 0 0 1px rgba(227, 197, 103, 0.2), 0 0 24px -6px rgba(212, 175, 55, 0.4);
+}
+.sasi-glow-white {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 0 24px -8px rgba(255, 255, 255, 0.28);
+}
+.sasi-glow-multi {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 20px -8px rgba(229, 72, 77, 0.5),
+    0 0 26px -10px rgba(100, 181, 246, 0.5),
+    0 0 30px -12px rgba(102, 187, 106, 0.45),
+    0 0 30px -12px rgba(227, 197, 103, 0.4);
+}
+
+/* Ambient page glows (very low alpha, behind content) */
+.sasi-ambient {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* ============================================================
+   SASI PULSE — 1px light travelling around a perimeter
+   ============================================================ */
+
+@property --pulse-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.sasi-pulse {
+  position: relative;
+  isolation: isolate;
+}
+.sasi-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--pulse-angle),
+    transparent 0deg,
+    var(--pulse-c1, rgba(227, 197, 103, 0.9)) 40deg,
+    var(--pulse-c2, rgba(100, 181, 246, 0.65)) 80deg,
+    transparent 130deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: sasi-pulse-spin 7s linear infinite;
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 1;
+}
+.sasi-pulse-red {
+  --pulse-c1: rgba(239, 83, 80, 0.85);
+  --pulse-c2: rgba(198, 40, 40, 0.5);
+}
+.sasi-pulse-blue {
+  --pulse-c1: rgba(100, 181, 246, 0.85);
+  --pulse-c2: rgba(25, 118, 210, 0.5);
+}
+.sasi-pulse-green {
+  --pulse-c1: rgba(102, 187, 106, 0.85);
+  --pulse-c2: rgba(22, 138, 69, 0.5);
+}
+.sasi-pulse-gold {
+  --pulse-c1: rgba(227, 197, 103, 0.9);
+  --pulse-c2: rgba(212, 175, 55, 0.5);
+}
+.sasi-pulse-multi {
+  --pulse-c1: rgba(229, 72, 77, 0.7);
+  --pulse-c2: rgba(100, 181, 246, 0.7);
+}
+
+@keyframes sasi-pulse-spin {
+  to {
+    --pulse-angle: 360deg;
+  }
+}
+
+/* AI activity dot — extremely subtle breathing */
+.sasi-breathe {
+  animation: sasi-breathe 2.6s ease-in-out infinite;
+}
+@keyframes sasi-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+/* Shimmer for AI text states */
+.sasi-shimmer-text {
+  background: linear-gradient(
+    100deg,
+    #a1a1aa 20%,
+    #ffffff 40%,
+    #a1a1aa 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sasi-shimmer 2.8s linear infinite;
+}
+@keyframes sasi-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ============================================================
+   SURFACES & HAIRLINES
+   ============================================================ */
+
+.sasi-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%), var(--sasi-surface-1);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.75rem;
+}
+.sasi-card-interactive {
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.25s ease;
+}
+.sasi-card-interactive:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background-color: var(--sasi-surface-2);
+}
+
+/* National light hairline — used above footers / below headers */
+.sasi-hairline-rainbow {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(229, 72, 77, 0.55) 18%,
+    rgba(100, 181, 246, 0.55) 42%,
+    rgba(102, 187, 106, 0.55) 66%,
+    rgba(227, 197, 103, 0.55) 86%,
+    transparent 100%
+  );
+}
+
+/* Subtle grid backdrop for hero / map panels */
+.sasi-grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* ============================================================
+   SCROLLBARS
+   ============================================================ */
+
+.sasi-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+.sasi-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.sasi-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sasi-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+.sasi-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Command bar focus — subtle national light */
+.sasi-command-focus:focus-within {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 0 1px rgba(229, 72, 77, 0.25),
+    0 0 18px -4px rgba(229, 72, 77, 0.28),
+    0 0 22px -6px rgba(100, 181, 246, 0.3),
+    0 0 26px -8px rgba(102, 187, 106, 0.26),
+    0 0 26px -8px rgba(227, 197, 103, 0.24);
+}
+
+/* Map marker pulse ring */
+.sasi-marker-ring {
+  pointer-events: none;
+  animation: sasi-marker-ring 3.2s ease-out infinite;
+}
+@keyframes sasi-marker-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* Timeline rail connector */
+.sasi-rail {
+  position: relative;
+}
+.sasi-rail::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 18px;
+  bottom: -6px;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+}
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .sasi-pulse::before {
+    animation: none;
+    opacity: 0.35;
+  }
+  .sasi-breathe,
+  .sasi-shimmer-text,
+  .sasi-marker-ring {
+    animation: none;
+  }
+  .sasi-shimmer-text {
+    color: #d4d4d8;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
