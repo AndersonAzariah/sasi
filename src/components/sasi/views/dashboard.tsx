@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import { ACTIVITY, DEMO_NOW, DEMO_USER, INCIDENTS } from "@/lib/sasi/data";
 import { SERVICES } from "@/lib/sasi/utils";
 import type { ServiceKey, View } from "@/lib/sasi/types";
@@ -28,17 +29,17 @@ import {
 
 const SHORTCUTS: ServiceKey[] = ["water", "electricity", "roads", "waste"];
 
-const TIPS: { label: string; view: View }[] = [
-  { label: "Report a new issue", view: "report" },
-  { label: "Start an investigation", view: "start-investigation" },
-  { label: "Browse nearby incidents", view: "incidents" },
+const TIPS: { key: "dash.tip.report" | "dash.tip.investigate" | "dash.tip.incidents"; view: View }[] = [
+  { key: "dash.tip.report", view: "report" },
+  { key: "dash.tip.investigate", view: "start-investigation" },
+  { key: "dash.tip.incidents", view: "incidents" },
 ];
 
-function greetingForDemo(): string {
+function greetingKeyForDemo(): "dash.greeting.morning" | "dash.greeting.afternoon" | "dash.greeting.evening" {
   const h = new Date(DEMO_NOW).getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  if (h < 12) return "dash.greeting.morning";
+  if (h < 17) return "dash.greeting.afternoon";
+  return "dash.greeting.evening";
 }
 
 export default function DashboardView() {
@@ -49,6 +50,7 @@ export default function DashboardView() {
   const openService = useSasiStore((s) => s.openService);
   const cases = useSasiStore((s) => s.cases);
   const savedLocation = useSasiStore((s) => s.savedLocation);
+  const t = useT();
 
   const sortedCases = useMemo(
     () => [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
@@ -77,18 +79,18 @@ export default function DashboardView() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-semibold tracking-tight text-white">
-              {greetingForDemo()}, {DEMO_USER.firstName}.
+              {t(greetingKeyForDemo())}, {DEMO_USER.firstName}.
             </h1>
             <DemoBadge />
           </div>
           <p className="mt-1 text-[13px] text-zinc-500">
-            Here is your civic picture for {savedLocation.city},{" "}
+            {t("dash.picture.for")} {savedLocation.city},{" "}
             {savedLocation.province}.
           </p>
         </div>
         <GhostButton onClick={() => navigate("start-investigation")}>
           <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          Start an investigation
+          {t("dash.start-investigation")}
         </GhostButton>
       </div>
 
@@ -102,7 +104,7 @@ export default function DashboardView() {
           >
             <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
             <span className="min-w-0 flex-1 truncate text-[14px] text-zinc-500">
-              What do you need help with?
+              {t("dash.command.placeholder")}
             </span>
           </button>
           <div
@@ -126,13 +128,13 @@ export default function DashboardView() {
 
       {/* ---------- Stat tiles ---------- */}
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Active cases" value={activeCount} tone="default" />
-        <StatTile label="Investigating" value={investigatingCount} tone="blue" />
-        <StatTile label="Action required" value={actionCount} tone="gold" />
+        <StatTile label={t("dash.stat.active-cases")} value={activeCount} tone="default" />
+        <StatTile label={t("dash.stat.investigating")} value={investigatingCount} tone="blue" />
+        <StatTile label={t("dash.stat.action-required")} value={actionCount} tone="gold" />
         <StatTile
-          label="Nearby incidents"
+          label={t("dash.stat.nearby-incidents")}
           value={INCIDENTS.length}
-          hint="Demo dataset"
+          hint={t("dash.hint.demo-dataset")}
           tone="red"
         />
       </div>
@@ -143,11 +145,11 @@ export default function DashboardView() {
         <div className="col-span-12 space-y-7 lg:col-span-8">
           <CityBriefingCard />
 
-          <section aria-label="Current cases">
+          <section aria-label={t("dash.current-cases")}>
             <div className="flex items-center justify-between gap-2">
-              <SectionLabel>Current cases</SectionLabel>
+              <SectionLabel>{t("dash.current-cases")}</SectionLabel>
               <span className="font-mono text-[10px] tracking-wider text-zinc-600">
-                {cases.length} ON RECORD
+                {cases.length} {t("dash.on-record")}
               </span>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -159,14 +161,14 @@ export default function DashboardView() {
               onClick={() => navigate("cases")}
               className="mt-3.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-zinc-500 transition-colors hover:text-white"
             >
-              View all cases
+              {t("dash.view-all-cases")}
               <ChevronRight className="h-3.5 w-3.5" aria-hidden />
             </button>
           </section>
 
-          <section aria-label="Nearby incidents">
+          <section aria-label={t("dash.nearby")}>
             <div className="flex items-center gap-2.5">
-              <SectionLabel>Nearby</SectionLabel>
+              <SectionLabel>{t("dash.nearby")}</SectionLabel>
               <span className="font-mono text-[9.5px] tracking-[0.14em] text-zinc-700">
                 DEMO DATASET
               </span>
@@ -182,9 +184,9 @@ export default function DashboardView() {
             </div>
           </section>
 
-          <section aria-label="Civic intelligence">
+          <section aria-label={t("dash.civic-intelligence")}>
             <div className="flex items-center justify-between gap-2">
-              <SectionLabel>Civic intelligence</SectionLabel>
+              <SectionLabel>{t("dash.civic-intelligence")}</SectionLabel>
               <DemoBadge />
             </div>
             <div className="sasi-card mt-3 divide-y divide-white/[0.04] p-2">
@@ -199,7 +201,7 @@ export default function DashboardView() {
         <div className="col-span-12 space-y-4 lg:col-span-4">
           {/* NEXT STEPS */}
           <SasiPulse color="gold" className="sasi-card p-4">
-            <SectionLabel>Next steps</SectionLabel>
+            <SectionLabel>{t("dash.next-steps")}</SectionLabel>
             {actionPending ? (
               <>
                 <div className="mt-3 flex items-center gap-2">
@@ -208,7 +210,7 @@ export default function DashboardView() {
                     aria-hidden
                   />
                   <p className="text-[13px] font-semibold text-white">
-                    Approval needed
+                    {t("dash.approval-needed")}
                   </p>
                 </div>
                 <p className="mt-2 text-[13.5px] font-medium leading-snug text-zinc-100">
@@ -222,7 +224,7 @@ export default function DashboardView() {
                   className="mt-3.5 h-8 w-full"
                   onClick={() => navigate("case-detail", "case-123")}
                 >
-                  Review
+                  {t("dash.review")}
                 </PrimaryButton>
               </>
             ) : actionRunning ? (
@@ -233,7 +235,7 @@ export default function DashboardView() {
                     aria-hidden
                   />
                   <p className="text-[13px] font-semibold text-white">
-                    Action in progress
+                    {t("dash.action-in-progress")}
                   </p>
                 </div>
                 <p className="mt-2 text-[13.5px] font-medium leading-snug text-zinc-100">
@@ -247,7 +249,7 @@ export default function DashboardView() {
                   className="mt-3.5 h-8 w-full"
                   onClick={() => navigate("case-detail", "case-123")}
                 >
-                  Review
+                  {t("dash.review")}
                 </GhostButton>
               </>
             ) : actionDone ? (
@@ -258,7 +260,7 @@ export default function DashboardView() {
                     aria-hidden
                   />
                   <p className="text-[13px] font-semibold text-white">
-                    Action completed
+                    {t("dash.action-completed")}
                   </p>
                 </div>
                 <p className="mt-2 text-[13.5px] font-medium leading-snug text-zinc-100">
@@ -272,22 +274,22 @@ export default function DashboardView() {
                   className="mt-3.5 h-8 w-full"
                   onClick={() => navigate("case-detail", "case-123")}
                 >
-                  Review
+                  {t("dash.review")}
                 </GhostButton>
               </>
             ) : (
               <>
                 <p className="mt-3 text-[12.5px] leading-relaxed text-zinc-500">
-                  No action is waiting on you right now. A few places to start:
+                  {t("dash.no-action-waiting")}
                 </p>
                 <ul className="mt-2 space-y-0.5">
-                  {TIPS.map((t) => (
-                    <li key={t.label}>
+                  {TIPS.map((tip) => (
+                    <li key={tip.key}>
                       <button
-                        onClick={() => navigate(t.view)}
+                        onClick={() => navigate(tip.view)}
                         className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
                       >
-                        {t.label}
+                        {t(tip.key)}
                         <ArrowUpRight
                           className="h-3.5 w-3.5 text-zinc-600"
                           aria-hidden
@@ -301,9 +303,9 @@ export default function DashboardView() {
           </SasiPulse>
 
           {/* SERVICE SHORTCUTS */}
-          <section aria-label="Service shortcuts" className="sasi-card p-2">
+          <section aria-label={t("dash.service-shortcuts")} className="sasi-card p-2">
             <div className="px-2 pb-1.5 pt-2">
-              <SectionLabel>Service shortcuts</SectionLabel>
+              <SectionLabel>{t("dash.service-shortcuts")}</SectionLabel>
             </div>
             <ul>
               {SHORTCUTS.map((key) => (
@@ -335,9 +337,9 @@ export default function DashboardView() {
           </section>
 
           {/* RECENT ACTIVITY */}
-          <section aria-label="Recent activity" className="sasi-card p-2">
+          <section aria-label={t("dash.recent-activity")} className="sasi-card p-2">
             <div className="px-2 pb-1.5 pt-2">
-              <SectionLabel>Recent activity</SectionLabel>
+              <SectionLabel>{t("dash.recent-activity")}</SectionLabel>
             </div>
             <div className="divide-y divide-white/[0.04]">
               {ACTIVITY.slice(0, 4).map((ev) => (
@@ -348,7 +350,7 @@ export default function DashboardView() {
               onClick={() => navigate("activity")}
               className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg px-2 py-2 text-[12px] text-zinc-500 transition-colors hover:bg-white/[0.03] hover:text-white"
             >
-              View all activity
+              {t("dash.view-all-activity")}
               <ChevronRight className="h-3.5 w-3.5" aria-hidden />
             </button>
           </section>

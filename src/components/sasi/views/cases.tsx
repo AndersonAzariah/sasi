@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, FolderLock, Plus } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import { GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
 import { PRIORITY_META, SERVICES } from "@/lib/sasi/utils";
 import type { Priority } from "@/lib/sasi/types";
@@ -24,13 +25,13 @@ type StatusTab =
   | "WAITING"
   | "RESOLVED";
 
-const STATUS_TABS: { key: StatusTab; label: string }[] = [
-  { key: "ALL", label: "All" },
-  { key: "OPEN", label: "Open" },
-  { key: "INVESTIGATING", label: "Investigating" },
-  { key: "ACTION_REQUIRED", label: "Action required" },
-  { key: "WAITING", label: "Waiting" },
-  { key: "RESOLVED", label: "Resolved" },
+const STATUS_TABS: { key: StatusTab; labelKey: "cases.filter.all" | "cases.filter.open" | "cases.filter.investigating" | "cases.filter.action-required" | "cases.filter.waiting" | "cases.filter.resolved" }[] = [
+  { key: "ALL", labelKey: "cases.filter.all" },
+  { key: "OPEN", labelKey: "cases.filter.open" },
+  { key: "INVESTIGATING", labelKey: "cases.filter.investigating" },
+  { key: "ACTION_REQUIRED", labelKey: "cases.filter.action-required" },
+  { key: "WAITING", labelKey: "cases.filter.waiting" },
+  { key: "RESOLVED", labelKey: "cases.filter.resolved" },
 ];
 
 const PRIORITY_OPTIONS: Priority[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
@@ -73,6 +74,7 @@ export default function CasesView() {
   const navigate = useSasiStore((s) => s.navigate);
   const openCase = useSasiStore((s) => s.openCase);
   const cases = useSasiStore((s) => s.cases);
+  const t = useT();
 
   const [tab, setTab] = useState<StatusTab>("ALL");
   const [service, setService] = useState<string>("ALL");
@@ -145,7 +147,7 @@ export default function CasesView() {
   };
 
   const serviceOptions = [
-    { value: "ALL", label: "All services" },
+    { value: "ALL", label: t("cases.all-services") },
     ...Object.entries(SERVICES).map(([key, meta]) => ({
       value: key,
       label: meta.label,
@@ -153,12 +155,12 @@ export default function CasesView() {
   ];
 
   const locationOptions = [
-    { value: "ALL", label: "All locations" },
+    { value: "ALL", label: t("cases.all-locations") },
     ...GAUTENG_MUNICIPALITIES.map((m) => ({ value: m, label: m })),
   ];
 
   const priorityOptions = [
-    { value: "ALL", label: "All priorities" },
+    { value: "ALL", label: t("cases.all-priorities") },
     ...PRIORITY_OPTIONS.map((p) => ({
       value: p,
       label: PRIORITY_META[p].label,
@@ -172,18 +174,17 @@ export default function CasesView() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-semibold tracking-tight text-white">
-              Cases
+              {t("cases.title")}
             </h1>
             <DemoBadge />
           </div>
           <p className="mt-1 text-[13px] text-zinc-500">
-            Every issue you have reported to SASI, with its investigation
-            state.
+            {t("cases.subtitle")}
           </p>
         </div>
         <PrimaryButton onClick={() => navigate("report")}>
           <Plus className="h-4 w-4" aria-hidden />
-          Report an issue
+          {t("cases.report-issue")}
         </PrimaryButton>
       </div>
 
@@ -193,12 +194,12 @@ export default function CasesView() {
         aria-label="Filter cases by status"
         className="mt-5 flex flex-wrap items-center gap-1 rounded-xl border border-white/8 bg-white/[0.02] p-1"
       >
-        {STATUS_TABS.map((t) => {
-          const active = tab === t.key;
+        {STATUS_TABS.map((tabDef) => {
+          const active = tab === tabDef.key;
           return (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tabDef.key}
+              onClick={() => setTab(tabDef.key)}
               aria-pressed={active}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors",
@@ -207,14 +208,14 @@ export default function CasesView() {
                   : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
               )}
             >
-              {t.label}
+              {t(tabDef.labelKey)}
               <span
                 className={cn(
                   "ml-1.5 font-mono text-[10px]",
                   active ? "text-zinc-400" : "text-zinc-600"
                 )}
               >
-                {counts[t.key]}
+                {counts[tabDef.key]}
               </span>
             </button>
           );
@@ -255,10 +256,12 @@ export default function CasesView() {
         <EmptyState
           className="mt-5"
           icon={FolderLock}
-          title="No cases match these filters"
-          description="Try a different status, service or location — or clear the filters to see every case on record."
+          title={t("cases.empty.title")}
+          description={t("cases.empty.description")}
           action={
-            <GhostButton onClick={clearFilters}>Clear filters</GhostButton>
+            <GhostButton onClick={clearFilters}>
+              {t("cases.clear-filters")}
+            </GhostButton>
           }
         />
       ) : (

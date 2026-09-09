@@ -9,6 +9,8 @@ import type {
   EvidenceItem,
   Finding,
   Lang,
+  NtfPrefs,
+  NotificationKind,
   ProposedAction,
   SasiCase,
   View,
@@ -103,6 +105,10 @@ interface SasiState {
   savedLocation: { province: string; city: string; suburb: string };
   setSavedLocation: (loc: Partial<SasiState["savedLocation"]>) => void;
 
+  /* ---- notification preferences (Settings → Notifications, real gating) ---- */
+  ntfPrefs: NtfPrefs;
+  setNtfPref: (key: keyof NtfPrefs, value: boolean) => void;
+
   /* ---- interface language (i18n scaffold) ---- */
   lang: Lang;
   setLang: (lang: Lang) => void;
@@ -136,6 +142,8 @@ interface SasiState {
   generateBriefing: (opts?: { force?: boolean }) => Promise<void>;
   /** restore a briefing cached earlier in this browser session (no network) */
   restoreBriefing: () => void;
+  /** distil the current Ask SASI conversation into a briefing (chat → digest reverse link) */
+  briefingFromChat: () => Promise<void>;
 }
 
 let caseCounter = 124;
@@ -252,6 +260,82 @@ function pushBriefingHistory(history: CityBriefing[], b: CityBriefing): CityBrie
 
 /** briefings older than this are considered stale and quietly refreshed */
 const BRIEFING_TTL_MS = 6 * 60 * 60 * 1000;
+
+/* ------------------------------------------------------------------
+   Notification preferences — persisted per browser so the user's
+   quiet/calm configuration survives reloads. Briefing (UPDATE)
+   notifications are the digest heartbeat and are not gated.
+   ------------------------------------------------------------------ */
+const DEFAULT_NTF_PREFS: NtfPrefs = {
+  case: true,
+  investigation: true,
+  action: true,
+  service: false,
+};
+
+function loadNtfPrefs(): NtfPrefs {
+  if (typeof window === "undefined") return DEFAULT_NTF_PREFS;
+  try {
+    const raw = window.localStorage.getItem("sasi.ntfPrefs");
+    if (!raw) return DEFAULT_NTF_PREFS;
+    const parsed = JSON.parse(raw) as Partial<NtfPrefs>;
+    return { ...DEFAULT_NTF_PREFS, ...parsed };
+  } catch {
+    return DEFAULT_NTF_PREFS;
+  }
+}
+
+function persistNtfPrefs(prefs: NtfPrefs) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem("sasi.ntfPrefs", JSON.stringify(prefs));
+  } catch {
+    /* storage blocked — prefs stay session-only */
+  }
+}
+
+/** which Settings toggle gates a live notification kind (UPDATE/SYSTEM heartbeats pass) */
+function prefGatesKind(prefs: NtfPrefs, kind: NotificationKind): boolean {
+  switch (kind) {
+    case "CASE":
+      return prefs.case;
+    case "INVESTIGATION":
+      return prefs.investigation;
+    case "ACTION":
+      return prefs.action;
+    case "SYSTEM":
+      return prefs.service;
+    case "UPDATE":
+      return true; // briefing heartbeat — always on (honest note in Settings)
+  }
+}
+
+/* ------------------------------------------------------------------
+   Service alerts — when hydrating, surface URGENT/CONFIRMED demo
+   incidents near the saved location as ONE quiet digest notification.
+   A localStorage seen-set keeps it a once-per-new-incident event
+   instead of nagging on every reload. Gated by ntfPrefs.service.
+   ------------------------------------------------------------------ */
+function getServiceAlertSeen(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem("sasi.svcSeen");
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberServiceAlertSeen(ids: string[]) {
+  if (typeof window === "undefined" || ids.length === 0) return;
+  try {
+    const seen = new Set(getServiceAlertSeen());
+    for (const id of ids) seen.add(id);
+    window.localStorage.setItem("sasi.svcSeen", JSON.stringify(Array.from(seen)));
+  } catch {
+    /* storage blocked — alerts may repeat next session (harmless) */
+  }
+}
 
 let locationSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function persistLocation(loc: SasiState["savedLocation"]) {
@@ -393,6 +477,70 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     }
   },
 
+  /* ---- chat → briefing reverse link: distil this conversation ---- */
+  briefingFromChat: async () => {
+    if (get().briefingBusy) return;
+    const transcript = get()
+      .chatMessages.filter((m) => m.state === "done" && m.content.trim())
+      .slice(-12)
+      .map((m) => ({ role: m.role, content: m.content }));
+    if (transcript.length < 2) {
+      toast("Nothing to summarise yet", {
+        description: "Ask SASI something first — then distil the answer into a briefing.",
+      });
+      return;
+    }
+    set({ briefingBusy: true, briefingError: null });
+    try {
+      const res = await fetch("/api/sasi/briefing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: get().savedLocation,
+          origin: "chat",
+          transcript,
+        }),
+      });
+      const data = (await res.json()) as { briefing?: CityBriefing; error?: string };
+      if (!res.ok || !data.briefing) {
+        throw new Error(data.error ?? "SASI could not distil this conversation right now.");
+      }
+      const b = data.briefing;
+      set((s) => ({
+        briefing: b,
+        briefingBusy: false,
+        briefingHistory: pushBriefingHistory(s.briefingHistory, b),
+      }));
+      try {
+        window.sessionStorage.setItem("sasi.briefing", JSON.stringify(b));
+      } catch {
+        /* storage full/blocked — briefing stays in memory */
+      }
+      void persistBriefing(b);
+      get().pushNotification({
+        id: `ntf-live-briefing-chat-${b.generatedAt}`,
+        kind: "UPDATE",
+        title: "Briefing written from your conversation",
+        body: b.headline,
+      });
+      set({ view: "dashboard", param: null, commandOpen: false });
+      toast("Briefing distilled from your chat", {
+        description: "It replaces today's card on the dashboard — regenerate any time.",
+      });
+    } catch (err) {
+      set({
+        briefingBusy: false,
+        briefingError:
+          err instanceof Error && err.message
+            ? err.message
+            : "SASI could not distil this conversation right now.",
+      });
+      toast.error("Could not write the briefing", {
+        description: "Your conversation is untouched — try again in a moment.",
+      });
+    }
+  },
+
   commandOpen: false,
   setCommandOpen: (open) => set({ commandOpen: open }),
 
@@ -417,7 +565,59 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     persistNotificationRead({ all: true });
     if (seedIds.length) rememberSeedRead(seedIds);
   },
+  /* ---------- notification preferences ---------- */
+  ntfPrefs: DEFAULT_NTF_PREFS,
+  setNtfPref: (key, value) => {
+    const prefs = { ...get().ntfPrefs, [key]: value };
+    set({ ntfPrefs: prefs });
+    persistNtfPrefs(prefs);
+    const label =
+      key === "case"
+        ? "Case updates"
+        : key === "investigation"
+          ? "Investigation findings"
+          : key === "action"
+            ? "Action approvals"
+            : "Service alerts";
+    toast(`Notification preference saved`, {
+      description: `${label} ${value ? "on" : "off"} — SASI stops or resumes those alerts right away.`,
+    });
+
+    /* Service alerts ON → surface whatever urgent/confirmed incidents are
+       pending right now, so the toggle gives instant, honest feedback
+       instead of waiting for a future incident that may never come. */
+    if (key === "service" && value) {
+      const loc = get().savedLocation;
+      const city = loc.city.toLowerCase();
+      const pending = INCIDENTS.filter(
+        (i) =>
+          !getServiceAlertSeen().includes(i.id) &&
+          (i.status === "URGENT" || i.status === "CONFIRMED") &&
+          i.location.city.toLowerCase() === city
+      );
+      if (pending.length > 0) {
+        rememberServiceAlertSeen(pending.map((i) => i.id));
+        /* push directly (prefs are already updated in state, so the gate
+           would pass — but call pushNotification for the single code path) */
+        get().pushNotification({
+          id: `ntf-live-svc-${pending[0].id}-${Date.now()}`,
+          kind: "SYSTEM",
+          title: `Service alert · ${pending.length} confirmed incident${pending.length === 1 ? "" : "s"} near ${loc.city}`,
+          body:
+            pending
+              .slice(0, 2)
+              .map((i) => `${i.ref} — ${i.title}`)
+              .join(" · ") +
+            (pending.length > 2 ? ` · +${pending.length - 2} more` : ""),
+        });
+      }
+    }
+  },
+
   pushNotification: (partial) => {
+    /* Settings → Notifications gate: the toggle decides whether this
+       event family may raise an alert at all. UPDATE (briefing) passes. */
+    if (!prefGatesKind(get().ntfPrefs, partial.kind)) return;
     const n: AppNotification = {
       id: partial.id ?? `ntf-live-${Date.now()}-${Math.floor(Math.random() * 1e4)}`,
       kind: partial.kind,
@@ -479,6 +679,8 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         set({ lang: savedLang });
         document.documentElement.lang = savedLang;
       }
+      /* restore the user's notification preferences (Settings → Notifications) */
+      set({ ntfPrefs: loadNtfPrefs() });
     } catch {
       /* storage blocked — session-only */
     }
@@ -537,6 +739,29 @@ export const useSasiStore = create<SasiState>((set, get) => ({
          that cites it) has data — TTL/session-cache guarded, so this is
          free when the cache is fresh and quiet when offline */
       void get().generateBriefing();
+
+      /* service alerts: one quiet digest of NEW urgent/confirmed incidents
+         near the saved location — only when the user has them enabled */
+      const loc = get().savedLocation;
+      const city = loc.city.toLowerCase();
+      const newOnes = INCIDENTS.filter(
+        (i) =>
+          !getServiceAlertSeen().includes(i.id) &&
+          (i.status === "URGENT" || i.status === "CONFIRMED") &&
+          i.location.city.toLowerCase() === city
+      );
+      if (newOnes.length > 0) {
+        rememberServiceAlertSeen(newOnes.map((i) => i.id));
+        get().pushNotification({
+          id: `ntf-live-svc-${newOnes[0].id}-${Date.now()}`,
+          kind: "SYSTEM",
+          title: `Service alert · ${newOnes.length} confirmed incident${newOnes.length === 1 ? "" : "s"} near ${loc.city}`,
+          body: newOnes
+            .slice(0, 2)
+            .map((i) => `${i.ref} — ${i.title}`)
+            .join(" · ") + (newOnes.length > 2 ? ` · +${newOnes.length - 2} more` : ""),
+        });
+      }
     } catch {
       /* offline / cold DB — demo continues from memory */
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -14,6 +14,7 @@ import {
   Lightbulb,
   MapPin,
   MessageCircleQuestion,
+  MessageSquareText,
   ScrollText,
   ShieldCheck,
   Sparkles,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
+import { toast } from "sonner";
 import type { ChatMessage } from "@/lib/sasi/types";
 import { RichText } from "../rich-text";
 import { DemoBadge } from "../primitives";
@@ -198,6 +200,8 @@ export default function AskSasiView() {
   const navigate = useSasiStore((s) => s.navigate);
   const savedLocation = useSasiStore((s) => s.savedLocation);
   const draftReportFromChat = useSasiStore((s) => s.draftReportFromChat);
+  const briefingBusy = useSasiStore((s) => s.briefingBusy);
+  const briefingFromChat = useSasiStore((s) => s.briefingFromChat);
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -241,6 +245,20 @@ export default function AskSasiView() {
 
   const empty = chatMessages.length === 0;
 
+  /* the reverse link needs a real answer to distil: ≥1 user ask + 1 done reply */
+  const canDistil = useMemo(() => {
+    const done = chatMessages.filter((m) => m.state === "done" && m.content.trim());
+    return done.some((m) => m.role === "user") && done.some((m) => m.role === "assistant");
+  }, [chatMessages]);
+
+  const distil = () => {
+    if (briefingBusy) return;
+    toast("SASI is distilling this conversation…", {
+      description: "Your dashboard briefing card will update when it is ready.",
+    });
+    void briefingFromChat();
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-5 sm:px-6 lg:px-8">
       {/* fixed-height flex column: topbar 3.5rem + pt-5 + bottom clearance */}
@@ -282,6 +300,38 @@ export default function AskSasiView() {
             <CloudCheck className="h-3.5 w-3.5" aria-hidden />
             Saved
           </span>
+          {!empty && (
+            <button
+              onClick={distil}
+              disabled={briefingBusy || !canDistil}
+              className={cn(
+                "sasi-chip-brief flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11.5px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
+                canDistil && !briefingBusy
+                  ? "border-[#64b5f6]/30 bg-[#64b5f6]/[0.08] text-[#a7d3f5]"
+                  : "border-white/8 bg-white/[0.02] text-zinc-500"
+              )}
+              aria-label="Distil this conversation into a dashboard briefing"
+              title={
+                canDistil
+                  ? "Summarise this conversation as a briefing on your dashboard"
+                  : "Ask SASI something first — then distil the answer"
+              }
+            >
+              {briefingBusy ? (
+                <motion.span
+                  className="h-3 w-3 rounded-full border-[1.5px] border-[#64b5f6]/30 border-t-[#64b5f6]"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.7, repeat: Infinity, ease: "linear" }}
+                  aria-hidden
+                />
+              ) : (
+                <MessageSquareText className="h-3.5 w-3.5" aria-hidden />
+              )}
+              <span className="hidden sm:inline">
+                {briefingBusy ? "Distilling…" : "Summarise as briefing"}
+              </span>
+            </button>
+          )}
           {!empty && (
             <button
               onClick={clearChat}
@@ -401,6 +451,23 @@ export default function AskSasiView() {
 
         {/* ---------- composer ---------- */}
         <div className="sticky bottom-0 mt-auto">
+          {/* reverse-loop hint: quiet affordance once there is something worth distilling */}
+          {canDistil && !chatBusy && !briefingBusy && (
+            <div className="mb-2 flex justify-center">
+              <button
+                onClick={distil}
+                className="sasi-chip-brief group flex h-7 items-center gap-1.5 rounded-full border border-[#64b5f6]/25 bg-[#64b5f6]/[0.06] px-3 text-[11px] font-medium text-[#a7d3f5] transition hover:border-[#64b5f6]/50 hover:bg-[#64b5f6]/[0.12]"
+                aria-label="Pin this conversation to your dashboard as a briefing"
+              >
+                <MessageSquareText
+                  className="h-3 w-3 transition group-hover:scale-110"
+                  aria-hidden
+                />
+                Summarise this chat as a briefing
+                <ArrowUp className="h-3 w-3 -rotate-45 opacity-60 transition group-hover:opacity-100" aria-hidden />
+              </button>
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();

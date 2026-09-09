@@ -10,6 +10,7 @@ import {
   Radio,
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import type { NotificationKind } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
 import { NotificationRow } from "@/components/sasi/domain";
@@ -18,16 +19,23 @@ import { timeAgo } from "@/lib/sasi/utils";
 
 type NtfFilter = "ALL" | "CASE" | "INVESTIGATION" | "ACTION" | "UPDATE";
 
-const FILTERS: { key: NtfFilter; label: string; kinds: NotificationKind[] }[] = [
+type NtfFilterKey =
+  | "ntf.filter.all"
+  | "ntf.filter.cases"
+  | "ntf.filter.investigations"
+  | "ntf.filter.actions"
+  | "ntf.filter.updates";
+
+const FILTERS: { key: NtfFilter; labelKey: NtfFilterKey; kinds: NotificationKind[] }[] = [
   {
     key: "ALL",
-    label: "All",
+    labelKey: "ntf.filter.all",
     kinds: ["CASE", "INVESTIGATION", "ACTION", "UPDATE", "SYSTEM"],
   },
-  { key: "CASE", label: "Cases", kinds: ["CASE"] },
-  { key: "INVESTIGATION", label: "Investigations", kinds: ["INVESTIGATION"] },
-  { key: "ACTION", label: "Actions", kinds: ["ACTION"] },
-  { key: "UPDATE", label: "Updates", kinds: ["UPDATE", "SYSTEM"] },
+  { key: "CASE", labelKey: "ntf.filter.cases", kinds: ["CASE"] },
+  { key: "INVESTIGATION", labelKey: "ntf.filter.investigations", kinds: ["INVESTIGATION"] },
+  { key: "ACTION", labelKey: "ntf.filter.actions", kinds: ["ACTION"] },
+  { key: "UPDATE", labelKey: "ntf.filter.updates", kinds: ["UPDATE", "SYSTEM"] },
 ];
 
 export default function NotificationsView() {
@@ -39,6 +47,7 @@ export default function NotificationsView() {
   const cases = useSasiStore((s) => s.cases);
   const briefing = useSasiStore((s) => s.briefing);
   const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
+  const t = useT();
 
   const [filter, setFilter] = useState<NtfFilter>("ALL");
 
@@ -104,7 +113,7 @@ export default function NotificationsView() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-semibold tracking-tight text-white">
-              Notifications
+              {t("ntf.title")}
             </h1>
             <DemoBadge />
             <span
@@ -122,16 +131,16 @@ export default function NotificationsView() {
                 )}
                 aria-hidden
               />
-              {unread} unread
+              {unread} {t("ntf.unread")}
             </span>
           </div>
           <p className="mt-1 text-[13px] text-zinc-500">
-            Approvals, findings and updates about your cases.
+            {t("ntf.subtitle")}
           </p>
         </div>
         <GhostButton onClick={markAllNotificationsRead} disabled={unread === 0}>
           <CheckCheck className="h-3.5 w-3.5" aria-hidden />
-          Mark all read
+          {t("ntf.mark-all-read")}
         </GhostButton>
       </div>
 
@@ -141,25 +150,25 @@ export default function NotificationsView() {
           <div className="flex min-w-[150px] flex-1 flex-col gap-0.5 bg-[#0b0c0e] px-4 py-3">
             <p className="flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-zinc-600">
               <Radio className="h-3 w-3 text-[#e3c567]" aria-hidden />
-              Live events
+              {t("ntf.digest.live-events")}
             </p>
             <p className="font-mono text-lg tabular-nums text-white">{liveCount}</p>
             <p className="truncate text-[11px] text-zinc-600">
-              {lastLive ? `Latest: ${timeAgo(lastLive.at)}` : "Nothing yet this session"}
+              {lastLive ? `${t("ntf.digest.latest")} ${timeAgo(lastLive.at)}` : t("ntf.digest.nothing-yet")}
             </p>
           </div>
           <div className="flex min-w-[150px] flex-1 flex-col gap-0.5 bg-[#0b0c0e] px-4 py-3">
             <p className="flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-zinc-600">
               <ActivityIcon className="h-3 w-3 text-[#64b5f6]" aria-hidden />
-              Your reports
+              {t("ntf.digest.your-reports")}
             </p>
             <p className="font-mono text-lg tabular-nums text-white">{userCaseCount}</p>
-            <p className="truncate text-[11px] text-zinc-600">Created through this browser</p>
+            <p className="truncate text-[11px] text-zinc-600">{t("ntf.digest.created-browser")}</p>
           </div>
           <div className="flex min-w-[170px] flex-1 flex-col gap-0.5 bg-[#0b0c0e] px-4 py-3">
             <p className="flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-zinc-600">
               <Newspaper className="h-3 w-3 text-[#66bb6a]" aria-hidden />
-              City briefing
+              {t("ntf.digest.city-briefing")}
             </p>
             {briefing ? (
               <p
@@ -171,10 +180,10 @@ export default function NotificationsView() {
                 {briefing.risk.charAt(0) + briefing.risk.slice(1).toLowerCase()}
               </p>
             ) : (
-              <p className="text-[12px] text-zinc-500">Not written yet</p>
+              <p className="text-[12px] text-zinc-500">{t("ntf.digest.not-written")}</p>
             )}
             <p className="truncate text-[11px] text-zinc-600">
-              {briefing ? timeAgo(briefing.generatedAt) : "Opens on the dashboard"}
+              {briefing ? timeAgo(briefing.generatedAt) : t("ntf.digest.opens-dashboard")}
             </p>
           </div>
           <button
@@ -187,7 +196,7 @@ export default function NotificationsView() {
                 Ask SASI
               </span>
               <span className="mt-1 block text-[12.5px] font-medium leading-snug text-zinc-200 transition-colors group-hover:text-white">
-                What changed today?
+                {t("ntf.digest.what-changed")}
               </span>
               <span className="mt-0.5 block truncate text-[11px] text-zinc-600">
                 Digest of your reports and briefings
@@ -221,7 +230,7 @@ export default function NotificationsView() {
                   : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-300"
               )}
             >
-              {f.label}
+              {t(f.labelKey)}
               <span
                 className={cn(
                   "ml-1.5 font-mono text-[10px]",
@@ -240,8 +249,8 @@ export default function NotificationsView() {
         <EmptyState
           className="mt-5"
           icon={BellOff}
-          title="You're all caught up."
-          description="No notifications in this category. New signals about your cases will appear here."
+          title={t("ntf.empty.title")}
+          description={t("ntf.empty.description")}
         />
       ) : (
         <>
@@ -264,7 +273,7 @@ export default function NotificationsView() {
           {unread === 0 && (
             <p className="mt-4 flex items-center justify-center gap-1.5 text-[12px] text-zinc-600">
               <CheckCheck className="h-3.5 w-3.5" aria-hidden />
-              All caught up — every notification has been read.
+              {t("ntf.all-caught-up")}
             </p>
           )}
         </>

@@ -205,6 +205,22 @@ export type NotificationKind =
   | "UPDATE"
   | "SYSTEM";
 
+/* ---------- notification preferences (Settings → Notifications) ---------- */
+
+/** Which event families SASI is allowed to raise a live notification for.
+ *  Keys mirror the Settings toggles 1:1; `briefing` updates are the digest
+ *  heartbeat and stay always-on (documented honestly in the Settings note). */
+export interface NtfPrefs {
+  /** status changes + new events on the user's cases (kind CASE) */
+  case: boolean;
+  /** investigation findings/completions (kind INVESTIGATION) */
+  investigation: boolean;
+  /** approval requests + action outcomes (kind ACTION) */
+  action: boolean;
+  /** urgent confirmed incidents near the saved location (kind SYSTEM) */
+  service: boolean;
+}
+
 export interface AppNotification {
   id: string;
   kind: NotificationKind;
@@ -363,6 +379,8 @@ export interface CityBriefing {
   generatedAt: string;
   /** location the briefing was generated for */
   locationLabel: string;
+  /** when present, this briefing was distilled from an Ask SASI conversation */
+  origin?: "chat";
 }
 
 export type PublicView = Extract<

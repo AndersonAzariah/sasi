@@ -14,6 +14,10 @@ import type { BriefingRisk, BriefingSection, CityBriefing } from "@/lib/sasi/typ
    Returns STRICT JSON:
      { headline, risk, sections: [{title, body, refs[]}],
        watchlist: [] }
+   Two modes:
+   - default (city): digest grounded in the user's demo dataset
+   - origin:"chat": distils the Ask SASI transcript passed by the
+     client into the same briefing shape (chat → dashboard loop)
    The client renders it with honest "AI-generated · demo data"
    framing and clickable refs. Non-streaming on purpose: the
    payload is small and the UI shows a shimmer skeleton.
@@ -33,6 +37,10 @@ interface BriefingBody {
     city?: string;
     actionState?: string;
   }[];
+  /** when "chat", `transcript` is the source material instead of the city dataset */
+  origin?: "city" | "chat";
+  /** Ask SASI conversation (done messages, ≤ 12) to distil into a briefing */
+  transcript?: { role: "user" | "assistant"; content: string }[];
 }
 
 const REF_RE = /(CASE-\d{6}|INC-\d{4})/g;
@@ -126,6 +134,40 @@ RULES
 - watchlist items must be concrete and derived from the dataset (e.g. "Approval on CASE-000123 is waiting for you", not "stay informed").
 - The briefing is independent and unarmed: SASI never claims to have contacted any authority.`;
 
+/* ---------- chat-digest mode: the conversation is the source material ---------- */
+
+function transcriptBlock(
+  transcript: NonNullable<BriefingBody["transcript"]>
+): string {
+  return transcript
+    .slice(-12)
+    .map((m) => `${m.role === "user" ? "RESIDENT" : "SASI"}: ${m.content.slice(0, 600)}`)
+    .join("\n\n");
+}
+
+const CHAT_SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — the South African Civic Intelligence Platform. The resident just had an assistance conversation with SASI's chat. Distil THAT CONVERSATION into a short "City briefing" card so the resident can pin a summary of it on their dashboard.
+
+Reply with STRICT JSON only (no markdown fences, no prose):
+{
+  "headline": "one sharp sentence (≤ 110 chars) capturing what the conversation established for the resident",
+  "risk": "CALM|ELEVATED|STRAINED|CRITICAL",
+  "sections": [
+    { "title": "Topic (e.g. Water)", "body": "2-3 short lines. Use '- ' bullets and **bold** key phrases. Mention specific refs where relevant.", "refs": ["CASE-000123"] }
+  ],
+  "watchlist": ["1-3 short forward-looking items (≤ 90 chars each) drawn from the conversation's advice"]
+}
+
+RULES
+- GROUNDING IS ABSOLUTE: every statement must come from the conversation transcript (or the supporting dataset below). Do NOT invent schedules, amounts, dates or announcements.
+- Only reference refs (CASE-xxxxxx / INC-xxxx) that actually appear in the transcript or dataset.
+- If the chat was about one issue, write 1-2 focused sections — do not pad to four.
+- South African civic voice: plain, practical, calm.
+- The briefing is independent and unarmed: SASI never claims to have contacted any authority.
+- If the conversation was vague, say what is known and what the resident still needs to confirm — honestly.
+
+CONVERSATION TRANSCRIPT:
+${context}`;
+
 function extractBriefing(
   raw: string,
   locationLabel: string
@@ -206,15 +248,26 @@ export async function POST(req: Request) {
 
   try {
     const zai = await ZAI.create();
+
+    /* chat-digest mode: distil the conversation instead of the city dataset */
+    const isChat =
+      body.origin === "chat" &&
+      Array.isArray(body.transcript) &&
+      body.transcript.length >= 2;
+
     const completion = (await zai.chat.completions.create({
       messages: [
         {
           role: "assistant",
-          content: SYSTEM_PROMPT(compactContext(loc, body.extraCases)),
+          content: isChat
+            ? CHAT_SYSTEM_PROMPT(transcriptBlock(body.transcript ?? []))
+            : SYSTEM_PROMPT(compactContext(loc, body.extraCases)),
         },
         {
           role: "user",
-          content: `USER LOCATION: ${locationLabel}\n\nWrite today's briefing now. Reply with the JSON object only.`,
+          content: isChat
+            ? `USER LOCATION: ${locationLabel}\n\nDistil the conversation above into the briefing JSON now. Reply with the JSON object only.`
+            : `USER LOCATION: ${locationLabel}\n\nWrite today's briefing now. Reply with the JSON object only.`,
         },
       ],
       thinking: { type: "disabled" },
@@ -228,6 +281,7 @@ export async function POST(req: Request) {
         { status: 502 }
       );
     }
+    if (isChat) briefing.origin = "chat";
     return NextResponse.json({ briefing });
   } catch (err) {
     console.error("[/api/sasi/briefing] failed:", err);

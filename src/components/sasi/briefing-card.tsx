@@ -9,6 +9,7 @@ import {
   History,
   Leaf,
   MapPin,
+  MessageSquareText,
   RefreshCw,
   Newspaper,
   Siren,
@@ -35,32 +36,44 @@ import { SectionLabel } from "./primitives";
 
 const RISK_META: Record<
   BriefingRisk,
-  { label: string; cls: string; dot: string; icon: typeof Leaf }
+  { label: string; cls: string; dot: string; icon: typeof Leaf; meter: number }
 > = {
   CALM: {
     label: "Calm",
     cls: "border-[#66bb6a]/25 bg-[#66bb6a]/[0.08] text-[#a5d6a7]",
     dot: "bg-[#66bb6a]",
     icon: Leaf,
+    meter: 25,
   },
   ELEVATED: {
     label: "Elevated",
     cls: "border-[#e3c567]/25 bg-[#e3c567]/[0.08] text-[#efe0a8]",
     dot: "bg-[#e3c567]",
     icon: Eye,
+    meter: 50,
   },
   STRAINED: {
     label: "Strained",
     cls: "border-[#ffa726]/25 bg-[#ffa726]/[0.08] text-[#ffcc80]",
     dot: "bg-[#ffa726]",
     icon: TriangleAlert,
+    meter: 75,
   },
   CRITICAL: {
     label: "Critical",
     cls: "border-[#ef5350]/30 bg-[#ef5350]/[0.1] text-[#fda4a0]",
     dot: "bg-[#ef5350]",
     icon: Siren,
+    meter: 100,
   },
+};
+
+/* gradient stops per risk for the meter bar fill */
+const RISK_METER_FILL: Record<BriefingRisk, string> = {
+  CALM: "linear-gradient(90deg, rgba(102,187,106,0.25), rgba(102,187,106,0.9))",
+  ELEVATED: "linear-gradient(90deg, rgba(227,197,103,0.2), rgba(227,197,103,0.9))",
+  STRAINED: "linear-gradient(90deg, rgba(227,197,103,0.2), rgba(255,167,38,0.95))",
+  CRITICAL: "linear-gradient(90deg, rgba(255,167,38,0.25), rgba(239,83,80,0.95))",
 };
 
 /* ---------- one briefing body, reused for today + past views ---------- */
@@ -269,9 +282,19 @@ export function CityBriefingCard() {
         <div className="flex items-center gap-2">
           <Newspaper className="h-3.5 w-3.5 text-[#e3c567]" aria-hidden />
           <SectionLabel>City briefing</SectionLabel>
-          <span className="font-mono text-[9.5px] tracking-[0.14em] text-zinc-700">
-            DAILY · DEMO
-          </span>
+          {shown?.origin === "chat" ? (
+            <span
+              className="sasi-origin-chat inline-flex items-center gap-1 rounded-md border border-[#64b5f6]/25 bg-[#64b5f6]/[0.08] px-1.5 py-0.5 font-mono text-[9px] tracking-[0.14em] text-[#a7d3f5]"
+              title="This briefing was distilled from your Ask SASI conversation"
+            >
+              <MessageSquareText className="h-2.5 w-2.5" aria-hidden />
+              FROM YOUR CHAT
+            </span>
+          ) : (
+            <span className="font-mono text-[9.5px] tracking-[0.14em] text-zinc-700">
+              DAILY · DEMO
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {shown && risk && (
@@ -296,6 +319,20 @@ export function CityBriefingCard() {
           </button>
         </div>
       </div>
+
+      {/* ---------- risk meter (quiet gauge under the header) ---------- */}
+      {shown && risk && !busy && (
+        <div
+          className="sasi-risk-track mt-3 h-[3px] w-full overflow-hidden rounded-full"
+          role="img"
+          aria-label={`Situation level: ${risk.label}`}
+        >
+          <div
+            className="h-full rounded-full transition-[width] duration-700 ease-out"
+            style={{ width: `${risk.meter}%`, background: RISK_METER_FILL[shown.risk] }}
+          />
+        </div>
+      )}
 
       {/* ---------- busy: shimmer skeleton ---------- */}
       {busy && !shown && (

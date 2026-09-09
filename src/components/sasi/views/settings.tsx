@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bell,
   Camera,
   CheckCircle2,
   Database,
   FileText,
+  FolderSearch,
   Globe,
   Info,
   Languages,
@@ -16,7 +17,9 @@ import {
   Plus,
   ShieldAlert,
   ShieldCheck,
+  Siren,
   Sparkles,
+  Stamp,
   Trash2,
   User,
   Download,
@@ -79,6 +82,7 @@ function ToggleRow({
   disabled = false,
   tag,
   subNote,
+  icon: Icon,
 }: {
   title: string;
   description?: string;
@@ -87,24 +91,62 @@ function ToggleRow({
   disabled?: boolean;
   tag?: string;
   subNote?: string;
+  /** optional identity glyph shown in a quiet tile beside the label */
+  icon?: typeof Bell;
 }) {
+  /* confirm-flash: the row breathes gold once whenever the user flips it */
+  const [flash, setFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    []
+  );
+  const handleChange = (v: boolean) => {
+    setFlash(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(false), 700);
+    onCheckedChange(v);
+  };
+
   return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border border-white/5 bg-white/[0.015] p-3.5">
-      <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-zinc-100">
-          {title}
-          {tag && <DemoBadge label={tag} />}
-        </p>
-        {description && (
-          <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{description}</p>
+    <div
+      className={cn(
+        "flex items-start justify-between gap-4 rounded-lg border border-white/5 bg-white/[0.015] p-3.5 transition-colors hover:border-white/10 hover:bg-white/[0.025]",
+        flash && "sasi-pref-flash"
+      )}
+    >
+      <div className="flex min-w-0 items-start gap-2.5">
+        {Icon && (
+          <span
+            className={cn(
+              "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-colors",
+              checked
+                ? "border-[#e3c567]/25 bg-[#e3c567]/[0.08] text-[#e3c567]"
+                : "border-white/8 bg-white/[0.03] text-zinc-600"
+            )}
+            aria-hidden
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </span>
         )}
-        {subNote && (
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-600">{subNote}</p>
-        )}
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-zinc-100">
+            {title}
+            {tag && <DemoBadge label={tag} />}
+          </p>
+          {description && (
+            <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{description}</p>
+          )}
+          {subNote && (
+            <p className="mt-1 text-[11px] leading-relaxed text-zinc-600">{subNote}</p>
+          )}
+        </div>
       </div>
       <Switch
         checked={checked}
-        onCheckedChange={onCheckedChange}
+        onCheckedChange={handleChange}
         disabled={disabled}
         aria-label={title}
         className="mt-0.5 data-[state=checked]:bg-white data-[state=unchecked]:bg-white/15 data-[state=checked]:text-black"
@@ -128,11 +170,10 @@ export default function SettingsView() {
   const [shareAnonymized, setShareAnonymized] = useState(false);
   const [exportNote, setExportNote] = useState(false);
 
-  /* --- notifications --- */
-  const [ntfCase, setNtfCase] = useState(true);
-  const [ntfInvestigation, setNtfInvestigation] = useState(true);
-  const [ntfAction, setNtfAction] = useState(true);
-  const [ntfService, setNtfService] = useState(false);
+  /* --- notifications (REAL prefs — gated in store.pushNotification) --- */
+  const ntfPrefs = useSasiStore((s) => s.ntfPrefs);
+  const setNtfPref = useSasiStore((s) => s.setNtfPref);
+  const ntfOnCount = Object.values(ntfPrefs).filter(Boolean).length;
 
   /* --- location --- */
   const [municipality, setMunicipality] = useState(DEMO_USER.location.municipality);
@@ -322,38 +363,60 @@ export default function SettingsView() {
           <section aria-labelledby="settings-notifications" className="space-y-4">
             <div className="sasi-card p-5">
               <SectionLabel>Notifications</SectionLabel>
-              <h2 id="settings-notifications" className="mt-1 text-[15px] font-semibold text-white">What SASI tells you about</h2>
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                <h2 id="settings-notifications" className="text-[15px] font-semibold text-white">What SASI tells you about</h2>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-md border border-white/8 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] tracking-[0.08em] text-zinc-400"
+                  aria-live="polite"
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      ntfOnCount > 0 ? "sasi-breathe bg-[#e3c567]" : "bg-zinc-600"
+                    )}
+                    aria-hidden
+                  />
+                  {ntfOnCount} OF 4 CHANNELS ON
+                </span>
+              </div>
               <div className="mt-4 space-y-3">
                 <ToggleRow
+                  icon={FileText}
                   title="Case updates"
                   description="Status changes and new events on your cases."
-                  checked={ntfCase}
-                  onCheckedChange={setNtfCase}
+                  checked={ntfPrefs.case}
+                  onCheckedChange={(v) => setNtfPref("case", v)}
                 />
                 <ToggleRow
+                  icon={FolderSearch}
                   title="Investigation findings"
                   description="When the investigation produces a finding or a recommended next step."
-                  checked={ntfInvestigation}
-                  onCheckedChange={setNtfInvestigation}
+                  checked={ntfPrefs.investigation}
+                  onCheckedChange={(v) => setNtfPref("investigation", v)}
                 />
                 <ToggleRow
+                  icon={Stamp}
                   title="Action approvals"
                   description="When SASI needs your approval before doing anything on your behalf."
-                  checked={ntfAction}
-                  onCheckedChange={setNtfAction}
+                  checked={ntfPrefs.action}
+                  onCheckedChange={(v) => setNtfPref("action", v)}
+                  subNote="Recommended: keep on — approvals never fire while this is off."
                 />
                 <ToggleRow
+                  icon={Siren}
                   title="Service alerts"
-                  description="Incidents tracked near your saved location."
-                  checked={ntfService}
-                  onCheckedChange={setNtfService}
+                  description="Urgent, confirmed incidents near your saved location, batched into one quiet alert."
+                  checked={ntfPrefs.service}
+                  onCheckedChange={(v) => setNtfPref("service", v)}
+                  tag="NEW"
                 />
               </div>
             </div>
             <p className="flex items-start gap-2 rounded-lg border border-white/8 bg-white/[0.02] p-3.5 text-[12px] leading-relaxed text-zinc-400">
               <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
-              Calm notifications: SASI batches updates and only interrupts you for approvals and
-              urgent, confirmed incidents.
+              Preferences apply instantly and survive a reload. City-briefing updates stay on —
+              they are the digest heartbeat, not an interruption. SASI batches everything else
+              and only interrupts you for approvals and urgent, confirmed incidents.
             </p>
           </section>
         )}
