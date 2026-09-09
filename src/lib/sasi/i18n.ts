@@ -15,8 +15,9 @@
    Coverage today: app shell (sidebar, topbar, mobile nav), landing
    hero + primary CTAs, public header CTAs, notification panel chrome,
    dashboard / cases / notifications / incidents / map views, case
-   detail + incident detail views, settings language section.
-   Remaining views (report wizard, activity, evidence, admin, etc.)
+   detail + incident detail views, the report wizard, activity and
+   evidence views, settings language section.
+   Remaining views (admin, chat/print/export surfaces, etc.)
    keep English (noted honestly in Settings).
    ============================================================ */
 
@@ -39,13 +40,13 @@ export const LANGUAGES: {
     code: "zu",
     label: "isiZulu",
     english: "Zulu",
-    note: "Shell, landing, dashboard, cases, case + incident detail, notifications, incidents, map and shared controls.",
+    note: "Shell, landing, dashboard, cases, case + incident detail, notifications, incidents, map, report wizard, activity, evidence and shared controls.",
   },
   {
     code: "af",
     label: "Afrikaans",
     english: "Afrikaans",
-    note: "Shell, landing, dashboard, cases, case + incident detail, notifications, incidents, map and shared controls.",
+    note: "Shell, landing, dashboard, cases, case + incident detail, notifications, incidents, map, report wizard, activity, evidence and shared controls.",
   },
 ];
 
@@ -1051,6 +1052,716 @@ const DICT: Dict = {
     en: "Related cases",
     zu: "Amacala ahlobene",
     af: "Verwante sake",
+  },
+
+  /* ============================================================
+     REPORT WIZARD view (rp.*)
+     Shared strings reused from landing./cd./nav. where identical:
+     title → landing.cta.report, Service → cd.facts.service,
+     Impact → cd.impact, Evidence → cd.tab.evidence.
+     ============================================================ */
+  "rp.step.what": { en: "What", zu: "Yini", af: "Wat" },
+  "rp.step.where": { en: "Where", zu: "Kuphi", af: "Waar" },
+  "rp.step.when": { en: "When", zu: "Nini", af: "Wanneer" },
+  "rp.step.review": { en: "Review", zu: "Bheka kabusha", af: "Hersien" },
+  "rp.step.done": { en: "Done", zu: "Kwenziwe", af: "Klaar" },
+  "rp.subtitle": {
+    en: "SASI will investigate and prepare next steps. Reporting to SASI is not a government submission — SASI will ask before contacting anyone.",
+    zu: "I-SASI izophenya futhi ilungeleleze izinyathelo ezilandelayo. Ukubika ku-SASI akuthunyelwa kukahulumende — i-SASI izobuza ngaphambi kokuxhumana nonke.",
+    af: "SASI sal ondersoek en volgende stappe voorberei. Rapportering aan SASI is nie ’n regeringsindsending nie — SASI sal vra voordat enigiemand gekontak word.",
+  },
+  "rp.progress-aria": {
+    en: "Report progress",
+    zu: "Ukuqhubeka kombiko",
+    af: "Rapportvordering",
+  },
+  "rp.completion-aria": {
+    en: "Report completion",
+    zu: "Ukuqedeka kombiko",
+    af: "Rapportvoltooiing",
+  },
+  "rp.step-counter": {
+    en: "Step {n} of {total} · {label}",
+    zu: "Isinyathelo {n} se-{total} · {label}",
+    af: "Stap {n} van {total} · {label}",
+  },
+  "rp.continue": { en: "Continue", zu: "Qhubeka", af: "Gaan voort" },
+  "rp.submit": { en: "Submit to SASI", zu: "Thumela ku-SASI", af: "Dien by SASI in" },
+  "rp.back": { en: "Back", zu: "Emuva", af: "Terug" },
+  "rp.service-aria": {
+    en: "Which service is affected",
+    zu: "Yiluphi insizakalo ethintekile",
+    af: "Watter diens is geraak",
+  },
+
+  /* report: problem option values (English values are stored; these are display labels) */
+  "rp.problem.not-delivered": {
+    en: "Service not delivered",
+    zu: "Insizakalo enganikezwanga",
+    af: "Diens nie gelewer nie",
+  },
+  "rp.problem.infrastructure": {
+    en: "Damaged or unsafe infrastructure",
+    zu: "Isakhiwo esonakele noma engaphephile",
+    af: "Beskadigde of onveilige infrastruktuur",
+  },
+  "rp.problem.no-response": {
+    en: "No response to a previous report",
+    zu: "Akukho mpendulo embikweni odlule",
+    af: "Geen reaksie op ’n vorige rapport nie",
+  },
+  "rp.problem.billing": {
+    en: "Billing or account problem",
+    zu: "Inkinga yenkokhelo noma ye-akhawunti",
+    af: "Faktuurerings- of rekeningprobleem",
+  },
+  "rp.problem.other": { en: "Other", zu: "Okunye", af: "Ander" },
+  "rp.problem.no-water": { en: "No water", zu: "Amanzi awatholakali", af: "Geen water nie" },
+  "rp.problem.low-pressure": {
+    en: "Low pressure",
+    zu: "Ingcindezi ephansi",
+    af: "Lae druk",
+  },
+  "rp.problem.burst-pipe": {
+    en: "Burst pipe",
+    zu: "Ipayipi elephukile",
+    af: "Gebuiste pyp",
+  },
+  "rp.problem.leak": { en: "Leak", zu: "Ukuvuza", af: "Lek" },
+  "rp.problem.dirty-water": {
+    en: "Dirty / discoloured water",
+    zu: "Amanzi angcolile noma aguqukile umbala",
+    af: "Vuil / verkleurde water",
+  },
+  "rp.problem.infra-damage": {
+    en: "Infrastructure damage",
+    zu: "Umonakalo wezakhiwo",
+    af: "Infrastruktuurskade",
+  },
+  "rp.problem.title": {
+    en: "What is the problem",
+    zu: "Yini inkinga",
+    af: "Wat is die probleem",
+  },
+  "rp.problem.aria": {
+    en: "Problem description options",
+    zu: "Izinketho zenkinga",
+    af: "Probleemopsies",
+  },
+  "rp.problem.placeholder": {
+    en: "Describe the problem in your own words",
+    zu: "Chaza inkinga ngamazwi akho",
+    af: "Beskryf die probleem in jou eie woorde",
+  },
+  "rp.problem.required": {
+    en: "Choose an option or describe the problem to continue.",
+    zu: "Khetha inketho noma chaza inkinga ukuze uqhubeke.",
+    af: "Kies ’n opsie of beskryf die probleem om voort te gaan.",
+  },
+
+  /* report: where */
+  "rp.where.title": {
+    en: "Where is it happening",
+    zu: "Kwenzeka kuphi",
+    af: "Waar gebeur dit",
+  },
+  "rp.where.placeholder": {
+    en: "Suburb, street or landmark",
+    zu: "Isigodi, umgwaqo noma uphawu lwendawo",
+    af: "Voorstad, straat of landmerk",
+  },
+  "rp.where.aria": {
+    en: "Location of the issue",
+    zu: "Indawo yodaba",
+    af: "Ligging van die probleem",
+  },
+  "rp.where.hint": {
+    en: "Include a street or landmark if possible.",
+    zu: "Faka umgwaqo noma uphawu lwendawo uma kungenzeka.",
+    af: "Sluit ’n straat of landmerk in indien moontlik.",
+  },
+  "rp.where.use-saved": {
+    en: "Use my saved location ({loc})",
+    zu: "Sebenzisa indawo yami egciniwe ({loc})",
+    af: "Gebruik my bergplek ({loc})",
+  },
+  "rp.where.required": {
+    en: "Enter a location so SASI can match official sources to your area.",
+    zu: "Faka indawo ukuze i-SASI ihlanganise imithombo esemthethweni nendawo yakho.",
+    af: "Voer ’n ligging in sodat SASI amptelike bronne met jou area kan pas.",
+  },
+
+  /* report: when */
+  "rp.when.title": {
+    en: "When did it start",
+    zu: "Kwaqala nini",
+    af: "Wanneer het dit begin",
+  },
+  "rp.when.aria": {
+    en: "When the issue started",
+    zu: "Ukuqala kodaba",
+    af: "Wanneer die probleem begin het",
+  },
+  "rp.when.today": { en: "Today", zu: "Namuhla", af: "Vandag" },
+  "rp.when.yesterday": { en: "Yesterday", zu: "Izolo", af: "Gister" },
+  "rp.when.older": {
+    en: "More than 2 days ago",
+    zu: "Ngaphezu kwezinsuku ezi-2 ezedlule",
+    af: "Meer as 2 dae gelede",
+  },
+  "rp.when.custom": { en: "Custom date", zu: "Usuku olwezifiso", af: "Eie datum" },
+  "rp.when.custom-aria": {
+    en: "Custom start date",
+    zu: "Usuku lokuqala olwezifiso",
+    af: "Eie begindatum",
+  },
+
+  /* report: impact */
+  "rp.impact.title": {
+    en: "Impact (optional)",
+    zu: "Umthelela (okukhethwa kukho)",
+    af: "Impak (opsioneel)",
+  },
+  "rp.impact.placeholder": {
+    en: "How is this affecting you, your household or the area?",
+    zu: "Kukuphatha kanjani wena, umndakini wakho noma indawo?",
+    af: "Beïnvloed dit jou, jou huishouding of die area?",
+  },
+  "rp.impact.aria": {
+    en: "How is this affecting you",
+    zu: "Kukuphatha kanjani",
+    af: "Hoe beïnvloed dit jou",
+  },
+  "rp.impact.hint": {
+    en: "Impact helps SASI judge urgency. It is never shared without your approval.",
+    zu: "Umthelela usiza i-SASI ekucubunguleni ukuphuthuma. Awabelwana ngawo ngaphandle kokuvuma kwakho.",
+    af: "Impak help SASI om dringendheid te beoordeel. Dit word nooit gedeel sonder jou goedkeuring nie.",
+  },
+
+  /* report: evidence step */
+  "rp.evidence.title": {
+    en: "Evidence (optional)",
+    zu: "Ubufakazi (okukhethwa kukho)",
+    af: "Bewys (opsioneel)",
+  },
+  "rp.evidence.photo-aria": {
+    en: "Add a photo for SASI to analyse",
+    zu: "Engeza isithombe ukuze i-SASI yisihlaziye",
+    af: "Voeg ’n foto by sodat SASI dit kan ontleed",
+  },
+  "rp.evidence.photo-title": {
+    en: "Add a photo — SASI will read it",
+    zu: "Engeza isithombe — i-SASI izosifunda",
+    af: "Voeg ’n foto by — SASI sal dit lees",
+  },
+  "rp.evidence.photo-hint": {
+    en: "PNG, JPEG or WebP · read by SASI's AI — the photo itself is never stored.",
+    zu: "PNG, JPEG noma WebP · iyafundwa i-AI ye-SASI — isithombe ngokwaso asigciniwe.",
+    af: "PNG, JPEG of WebP · gelees deur SASI se KI — die foto self word nooit gestoor nie.",
+  },
+  "rp.evidence.attached-alt": {
+    en: "Attached evidence: {name}",
+    zu: "Ubufakazi obuxhunyiwe: {name}",
+    af: "Gehegte bewys: {name}",
+  },
+  "rp.evidence.remove-photo": {
+    en: "Remove photo",
+    zu: "Susa isithombe",
+    af: "Verwyder foto",
+  },
+  "rp.evidence.attached-tag": {
+    en: "Attached · demo",
+    zu: "Kuxhunywe · idemo",
+    af: "Geheg · demo",
+  },
+  "rp.evidence.reading": {
+    en: "SASI is reading the photo…",
+    zu: "I-SASI iyisifunda isithombe…",
+    af: "SASI lees die foto…",
+  },
+  "rp.evidence.try-again": {
+    en: "Try again",
+    zu: "Zama futhi",
+    af: "Probeer weer",
+  },
+  "rp.evidence.analysis-title": {
+    en: "SASI visual analysis",
+    zu: "Ukuhlaziywa kwesithombe kwe-SASI",
+    af: "SASI-visuele analise",
+  },
+  "rp.evidence.reads-like": { en: "Reads like:", zu: "Ifana ne:", af: "Lyk soos:" },
+  "rp.evidence.change-service": {
+    en: "change report to {svc}",
+    zu: "guqula umbiko ube yi-{svc}",
+    af: "verander rapport na {svc}",
+  },
+  "rp.evidence.also-noted": {
+    en: "Also noted:",
+    zu: "Okwapawulwa futhi:",
+    af: "Ook genoteer:",
+  },
+  "rp.evidence.tip": {
+    en: "Better photo tip:",
+    zu: "Icebo lesithombe esingcono:",
+    af: "Beter foto-wenk:",
+  },
+  "rp.evidence.use-note": {
+    en: "Use as evidence note",
+    zu: "Sebenzisa njengophawu lobufakazi",
+    af: "Gebruik as bewysnotitie",
+  },
+  "rp.evidence.filed": {
+    en: "Filed as evidence",
+    zu: "Kufakwe njengobufakazi",
+    af: "Gelewer as bewys",
+  },
+  "rp.evidence.reanalyse": {
+    en: "Re-analyse",
+    zu: "Hlaziya kabusha",
+    af: "Herontleed",
+  },
+  "rp.evidence.ai-note": {
+    en: "AI-assisted read — not proof and not an official finding. SASI marks it AI-inferred.",
+    zu: "Ukufundwa osizwe ngo-AI — akubona bufakazi futhi akuyona itholakala esemthethweni. I-SASI iyibeka njengo-AI-inferred.",
+    af: "KI-gesteunde leeswerk — nie bewys nie en nie ’n amptelike bevinding nie. SASI merk dit KI-afgeleid.",
+  },
+  "rp.evidence.note-placeholder": {
+    en: "Add a note",
+    zu: "Engeza uphawu",
+    af: "Voeg ’n notitie by",
+  },
+  "rp.evidence.note-aria": {
+    en: "Add an evidence note",
+    zu: "Engeza uphawu lobufakazi",
+    af: "Voeg ’n bewysnotitie by",
+  },
+  "rp.evidence.link-placeholder": {
+    en: "Add a link",
+    zu: "Engeza isixhumanisi",
+    af: "Voeg ’n skakel by",
+  },
+  "rp.evidence.link-aria": {
+    en: "Add an evidence link",
+    zu: "Engeza isixhumanisi sobufakazi",
+    af: "Voeg ’n bewysskakel by",
+  },
+  "rp.evidence.add-note-aria": {
+    en: "Add note",
+    zu: "Engeza uphawu",
+    af: "Voeg notitie by",
+  },
+  "rp.evidence.add-link-aria": {
+    en: "Add link",
+    zu: "Engeza isixhumanisi",
+    af: "Voeg skakel by",
+  },
+  "rp.evidence.remove": {
+    en: "Remove {kind}: {value}",
+    zu: "Susa {kind}: {value}",
+    af: "Verwyder {kind}: {value}",
+  },
+  "rp.evidence.photo-fallback": {
+    en: "Photo evidence",
+    zu: "Isithombe sobufakazi",
+    af: "Fotobewys",
+  },
+  "rp.evidence.analysis-suffix": {
+    en: "· SASI visual analysis (AI-inferred)",
+    zu: "· Ukuhlaziywa kwesithombe kwe-SASI (AI-inferred)",
+    af: "· SASI-visuele analise (KI-afgeleid)",
+  },
+  "rp.kind.note": { en: "note", zu: "uphawu", af: "notitie" },
+  "rp.kind.photo": { en: "photo", zu: "isithombe", af: "foto" },
+  "rp.kind.link": { en: "link", zu: "isixhumanisi", af: "skakel" },
+  "rp.add": { en: "Add", zu: "Engeza", af: "Voeg by" },
+
+  /* report: review step */
+  "rp.review.problem": { en: "Problem", zu: "Inkinga", af: "Probleem" },
+  "rp.review.not-provided": {
+    en: "Not provided",
+    zu: "Akunikezwanga",
+    af: "Nie verskaf nie",
+  },
+  "rp.review.items-one": {
+    en: "1 item added",
+    zu: "Kwengeziwe into eyodwa",
+    af: "1 item bygevoeg",
+  },
+  "rp.review.items-many": {
+    en: "{n} items added",
+    zu: "Kwengeziwe izinto ezingu-{n}",
+    af: "{n} items bygevoeg",
+  },
+  "rp.review.none": {
+    en: "None added",
+    zu: "Akukho okungeziwe",
+    af: "Geen bygevoeg nie",
+  },
+  "rp.review.edit": { en: "Edit", zu: "Hlela", af: "Wysig" },
+  "rp.review.edit-aria": {
+    en: "Edit {what}",
+    zu: "Hlela {what}",
+    af: "Wysig {what}",
+  },
+  "rp.review.submit-note": {
+    en: "On submit, SASI records this report and can start an investigation. SASI will not contact any authority without your explicit approval.",
+    zu: "Uma uthumela, i-SASI ibhala lo mbiko futhi ingaqala uphenyo. I-SASI ngeke ixhumane nanoma yimuphi umphathiswehhala ngaphandle kokuvuma kwakho okucacile.",
+    af: "By indiening teken SASI hierdie rapport aan en kan ’n ondersoek begin. SASI sal geen owerheid kontak sonder jou uitdruklike goedkeuring nie.",
+  },
+
+  /* report: done screen */
+  "rp.done.title": {
+    en: "Reported to SASI",
+    zu: "Kubikiwe ku-SASI",
+    af: "Aan SASI gerapporteer",
+  },
+  "rp.done.body": {
+    en: "This is recorded in SASI. It is NOT yet filed with any government authority. SASI investigates first and will ask your approval before any contact is made.",
+    zu: "Lokhu kubhalwe ku-SASI. Akukabikwa kunoma yimuphi umbutho kahulumende. I-SASI iphenya kuqala bese icela ukuvuma kwakho ngaphambi kokuxhumana.",
+    af: "Dit word in SASI aangeteken. Dit is NOG nie by enige regeringsowerheid ingedien nie. SASI ondersoek eers en vra jou goedkeuring voordat kontak gemaak word.",
+  },
+  "rp.done.start-investigation": {
+    en: "Start investigation now",
+    zu: "Qala uphenyo manje",
+    af: "Begin nou ’n ondersoek",
+  },
+  "rp.done.view-case": { en: "View case", zu: "Bheka icala", af: "Bekyk saak" },
+  "rp.done.back-dashboard": {
+    en: "Back to dashboard",
+    zu: "Buyela kudashibodi",
+    af: "Terug na die dashbord",
+  },
+
+  /* report: photo analysis errors + toast */
+  "rp.err.analyse": {
+    en: "SASI could not analyse that photo.",
+    zu: "I-SASI ayikwazanga ukuhlaziya leso sithombe.",
+    af: "SASI kon daardie foto nie ontleed nie.",
+  },
+  "rp.err.analyse-now": {
+    en: "SASI could not analyse that photo just now.",
+    zu: "I-SASI ayikwazi ukuhlaziya leso sithombe manje.",
+    af: "SASI kan daardie foto tans nie ontleed nie.",
+  },
+  "rp.err.format": {
+    en: "SASI can read PNG, JPEG or WebP photos.",
+    zu: "I-SASI ifunda izithombe ze-PNG, JPEG noma ze-WebP.",
+    af: "SASI kan PNG-, JPEG- of WebP-foto’s lees.",
+  },
+  "rp.err.size": {
+    en: "That photo is very large — try one under about 10 MB.",
+    zu: "Leso sithombe sikhulu kakhulu — zama esinye esingaphansi kwe-10 MB.",
+    af: "Daardie foto is baie groot — probeer een van ongeveer 10 MB of kleiner.",
+  },
+  "rp.err.read": {
+    en: "SASI could not read that file.",
+    zu: "I-SASI ayikwazanga ukufunda lelo fayela.",
+    af: "SASI kon daardie lêer nie lees nie.",
+  },
+  "rp.err.image": {
+    en: "That file is not a readable image.",
+    zu: "Lelo fayela alusona isithombe esifundekayo.",
+    af: "Daardie lêer is nie ’n leesbare beeld nie.",
+  },
+  "rp.toast.photo-title": {
+    en: "Photo filed as evidence",
+    zu: "Isithombe sifakwe njengobufakazi",
+    af: "Foto as bewys gelê",
+  },
+  "rp.toast.photo-desc": {
+    en: "It is in your Evidence Vault and on this report — labelled AI-inferred, not proof.",
+    zu: "Sikwindawo yakho yokugcina ubufakazi nakule mbiko — kuphawulwe njengo-AI-inferred, akubona bufakazi.",
+    af: "Dit is in jou Bewyskluis en op hierdie rapport — gemerk KI-afgeleid, nie bewys nie.",
+  },
+
+  /* ============================================================
+     ACTIVITY view (act.*)
+     Filter labels reuse nav./cd./cases. keys; buckets reuse rp.when.
+     ============================================================ */
+  "act.count": {
+    en: "{n} EVENTS · DEMO RECORD",
+    zu: "IZEHLAKALO EZINGU-{n} · IREKHODI YEDEMO",
+    af: "{n} GEBEURE · DEMO-REKORD",
+  },
+  "act.subtitle": {
+    en: "The transparent record of everything SASI has done on your behalf.",
+    zu: "Irekodi ecace ngakho konke i-SASI eyenze ngokwegama lakho.",
+    af: "Die deursigtige rekord van alles wat SASI namens jou gedoen het.",
+  },
+  "act.filter-aria": {
+    en: "Filter activity by kind",
+    zu: "Hlunga umsebenzi ngohlobo",
+    af: "Filtreer aktiwiteit volgens soort",
+  },
+  "act.filter.verification": {
+    en: "Verification",
+    zu: "Ukuqinisekiswa",
+    af: "Verifikasie",
+  },
+  "act.bucket.earlier": { en: "Earlier", zu: "Okwedlule", af: "Vroeër" },
+  "act.bucket-aria": {
+    en: "{bucket} activity",
+    zu: "Umsebenzi: {bucket}",
+    af: "Aktiwiteit: {bucket}",
+  },
+  "act.empty.title": {
+    en: "No activity for this filter",
+    zu: "Awukho umsebenzi kule hlungi",
+    af: "Geen aktiwiteit vir hierdie filter nie",
+  },
+  "act.empty.description": {
+    en: "Try another filter — every case update, source, finding, action and verification is recorded here.",
+    zu: "Zama enye ihlungi — isibuyekezo secala ngasinye, imithombo, izitholakalo, izenzo nokuqinisekiswa kubhalwa lapha.",
+    af: "Probeer ’n ander filter — elke saakopdatering, bron, bevinding, aksie en verifikasie word hier aangeteken.",
+  },
+
+  /* ============================================================
+     EVIDENCE VAULT view (ev.*)
+     Reused: cd.add-evidence, map.open-case, cases.filter.all,
+     cases.clear-filters, map.clear-all, cd.facts.location,
+     status.confirmed, status.reported, cd.back (All cases).
+     ============================================================ */
+  "ev.title": {
+    en: "Evidence vault",
+    zu: "Indawo yokugcina ubufakazi",
+    af: "Bewyskluis",
+  },
+  "ev.subtitle": {
+    en: "Photos, documents, links and notes that support your cases.",
+    zu: "Izithombe, amadokhumenti, izixhumanisi nophawu olusekela amacala akho.",
+    af: "Foto’s, dokumente, skakels en notities wat jou sake ondersteun.",
+  },
+  "ev.stat-items": { en: "Items", zu: "Izinto", af: "Items" },
+  "ev.stat-items-hint": {
+    en: "In your local demo vault",
+    zu: "Kwindawo yakho yokugcina yedemo",
+    af: "In jou plaaslike demokluis",
+  },
+  "ev.stat-photos": { en: "Photos", zu: "Izithombe", af: "Foto’s" },
+  "ev.stat-photos-hint": {
+    en: "Site and context shots",
+    zu: "Izithombe zendawo nomongo",
+    af: "Plek- en konteksskote",
+  },
+  "ev.stat-linked": {
+    en: "Linked to cases",
+    zu: "Zixhumekile emacaleni",
+    af: "Aan sake gekoppel",
+  },
+  "ev.stat-linked-hint": {
+    en: "Attached to a case ref",
+    zu: "Kuxhunywe kureferensi yecala",
+    af: "Aan ’n saakverwysing geheg",
+  },
+  "ev.stat-verified": { en: "Verified", zu: "Kuqinisekisiwe", af: "Geverifieer" },
+  "ev.stat-verified-hint": {
+    en: "Confirmed status",
+    zu: "Isimo esiye saqinisekiswa",
+    af: "Bevestigde status",
+  },
+  "ev.search": {
+    en: "Search evidence titles…",
+    zu: "Sesha izihloko zobufakazi…",
+    af: "Soek bewystitels…",
+  },
+  "ev.search-aria": {
+    en: "Search evidence by title",
+    zu: "Sesha ubufakazi ngesihloko",
+    af: "Soek bewys volgens titel",
+  },
+  "ev.filter-case-aria": {
+    en: "Filter by case",
+    zu: "Hlunga ngecala",
+    af: "Filtreer volgens saak",
+  },
+  "ev.filter-verification-aria": {
+    en: "Filter by verification status",
+    zu: "Hlunga ngesimo sokuqinisekiswa",
+    af: "Filtreer volgens verifikasiestatus",
+  },
+  "ev.all-verification": {
+    en: "All verification",
+    zu: "Ukuqinisekiswa konke",
+    af: "Alle verifikasie",
+  },
+  "ev.trust-user": {
+    en: "User provided",
+    zu: "Kunikezwe ngumsebenzisi",
+    af: "Deur gebruiker verskaf",
+  },
+  "ev.layout-aria": {
+    en: "Layout mode",
+    zu: "Indlela yokubuka",
+    af: "Uitlegmodus",
+  },
+  "ev.view-grid": {
+    en: "Grid layout",
+    zu: "Ukubuka kwegridi",
+    af: "Roosteruitleg",
+  },
+  "ev.view-list": { en: "List layout", zu: "Ukubuka kohlu", af: "Lysuitleg" },
+  "ev.type-photos": { en: "Photos", zu: "Izithombe", af: "Foto’s" },
+  "ev.type-documents": {
+    en: "Documents",
+    zu: "Amadokhumenti",
+    af: "Dokumente",
+  },
+  "ev.type-links": { en: "Links", zu: "Izixhumanisi", af: "Skakels" },
+  "ev.type-notes": { en: "Notes", zu: "Ophawu", af: "Notities" },
+  "ev.empty.title": {
+    en: "No evidence matches these filters",
+    zu: "Abukho bufakazi obuhambisana nalezi zihlungi",
+    af: "Geen bewys pas hierdie filters nie",
+  },
+  "ev.empty.description": {
+    en: "Your vault is private to you. Try clearing the search or filters to see all demo items.",
+    zu: "Indawo yakho yokugcina iyimfihlo kuwe. Zama ukususa usesha noma izihlungi ukubona zonke izinto zedemo.",
+    af: "Jou kluis is privaat vir jou. Probeer om die soektog of filters te skrap om alle demo-items te sien.",
+  },
+  "ev.open-aria": {
+    en: "Open evidence: {title}",
+    zu: "Vula ubufakazi: {title}",
+    af: "Maak bewys oop: {title}",
+  },
+  "ev.row-type": { en: "Type", zu: "Uhlobo", af: "Tipe" },
+  "ev.row-uploaded": { en: "Uploaded", zu: "Kulayishwe", af: "Opgelaai" },
+  "ev.row-verification": {
+    en: "Verification",
+    zu: "Ukuqinisekiswa",
+    af: "Verifikasie",
+  },
+  "ev.row-link": { en: "Link", zu: "Isixhumanisi", af: "Skakel" },
+  "ev.row-not-recorded": {
+    en: "Not recorded",
+    zu: "Ayibhalwanga",
+    af: "Nie aangeteken nie",
+  },
+  "ev.linked-case": {
+    en: "Linked case",
+    zu: "Icala elixhumekile",
+    af: "Gekoppelde saak",
+  },
+  "ev.open-case-aria": {
+    en: "Open linked case",
+    zu: "Vula icala elixhumekile",
+    af: "Maak gekoppelde saak oop",
+  },
+  "ev.demo-note": {
+    en: "Demo evidence — stored locally in this demo environment. Nothing is uploaded to a server or shared with anyone.",
+    zu: "Ubufakazi bedemo — kugcinwe ngendawo kule demo. Akukho kulayishwa kuseva noma kwabelwana nanoma ubani.",
+    af: "Demobewys — plaaslik gestoor in hierdie demo-omgewing. Niks word na ’n bediener opgelaai of met iemand gedeel nie.",
+  },
+  "ev.add-desc": {
+    en: "Notes and links are stored locally in this demo environment.",
+    zu: "Ophawu nezixhumanisi kugcinwa ngendawo kule demo.",
+    af: "Notities en skakels word plaaslik in hierdie demo-omgewing gestoor.",
+  },
+  "ev.add-type-aria": {
+    en: "Evidence type",
+    zu: "Uhlobo lobufakazi",
+    af: "Bewyssoort",
+  },
+  "ev.add-note": { en: "Note", zu: "Uphawu", af: "Notitie" },
+  "ev.add-link": { en: "Link", zu: "Isixhumanisi", af: "Skakel" },
+  "ev.add-photo": { en: "Photo", zu: "Isithombe", af: "Foto" },
+  "ev.add-document": { en: "Document", zu: "Idokhumenti", af: "Dokument" },
+  "ev.coming-soon": {
+    en: "Coming soon (demo)",
+    zu: "Kuzofika maduze (idemo)",
+    af: "Binnekort (demo)",
+  },
+  "ev.coming-photo-aria": {
+    en: "Photo upload coming soon (demo)",
+    zu: "Ukulayisha izithombe kuzofika maduze (idemo)",
+    af: "Foto-oplaai kom binnekort (demo)",
+  },
+  "ev.coming-document-aria": {
+    en: "Document upload coming soon (demo)",
+    zu: "Ukulayisha amadokhumenti kuzofika maduze (idemo)",
+    af: "Dokumentoplaai kom binnekort (demo)",
+  },
+  "ev.upload-note": {
+    en: "Photo and document upload is coming soon in this demo.",
+    zu: "Ukulayisha izithombe namadokhumenti kuzofika maduze kule demo.",
+    af: "Foto- en dokumentoplaai kom binnekort in hierdie demo.",
+  },
+  "ev.add-title": { en: "Title", zu: "Isihloko", af: "Titel" },
+  "ev.optional": {
+    en: "(optional)",
+    zu: "(okukhethwa kukho)",
+    af: "(opsioneel)",
+  },
+  "ev.title-ph-note": {
+    en: "e.g. Hotline reference",
+    zu: "isb. Irheferensi yocingo",
+    af: "bv. Hotline-verwysing",
+  },
+  "ev.title-ph-link": {
+    en: "e.g. Utility notice page",
+    zu: "isb. Ikhasi lezaziso zezinsizakalo",
+    af: "bv. Kennisgewingblad van die diens",
+  },
+  "ev.add-note-placeholder": {
+    en: "What did you observe or record? Include reference numbers if you have them.",
+    zu: "Ubonile noma ubhaleni? Faka izinombolo zokureferensi uma unazo.",
+    af: "Wat het jy waargeneem of aangeteken? Sluit verwysingsnommers in as jy dit het.",
+  },
+  "ev.url-label": { en: "URL", zu: "I-URL", af: "URL" },
+  "ev.url-error": {
+    en: "Enter a full URL starting with http:// or https://",
+    zu: "Faka i-URL ephelele eqala ngo-http:// noma i-https://",
+    af: "Voer ’n volledige URL in wat met http:// of https:// begin",
+  },
+  "ev.link-case": {
+    en: "Link to case",
+    zu: "Xhumanisa necala",
+    af: "Skakel by ’n saak",
+  },
+  "ev.link-case-aria": {
+    en: "Select a case to link",
+    zu: "Khetha icala elizoxhumaniswa",
+    af: "Kies ’n saak om te skakel",
+  },
+  "ev.not-linked": {
+    en: "Not linked to a case",
+    zu: "Akuxhunywanga ecaleni",
+    af: "Nie aan ’n saak gekoppel nie",
+  },
+  "ev.nothing-leaves": {
+    en: "Nothing leaves this demo environment.",
+    zu: "Akukho nokuphuma kule demo.",
+    af: "Niks verlaat hierdie demo-omgewing nie.",
+  },
+  "ev.cancel": { en: "Cancel", zu: "Khansela", af: "Kanselleer" },
+  "ev.save": {
+    en: "Save to vault",
+    zu: "Gcina endaweni yokugcina",
+    af: "Stoor in die kluis",
+  },
+  "ev.save-aria": {
+    en: "Save evidence to vault",
+    zu: "Gcina ubufakazi endaweni yokugcina",
+    af: "Stoor bewys in die kluis",
+  },
+  "ev.toast.title": {
+    en: "Evidence added to your vault",
+    zu: "Ubufakazi bengeziwe endaweni yakho yokugcina",
+    af: "Bewys by jou kluis gevoeg",
+  },
+  "ev.toast.desc": {
+    en: "Stored locally in this demo environment — nothing was uploaded or shared.",
+    zu: "Kugcinwe ngendawo kule demo — akukho kulayishwe noma kwabelwana.",
+    af: "Plaaslik gestoor in hierdie demo-omgewing — niks is opgelaai of gedeel nie.",
+  },
+  "ev.fallback-note": {
+    en: "Note added by you",
+    zu: "Uphawu olwengezile",
+    af: "Notitie deur jou gevoeg",
+  },
+  "ev.fallback-link": {
+    en: "Link added by you",
+    zu: "Isixhumanisi esengezile",
+    af: "Skakel deur jou gevoeg",
   },
 };
 

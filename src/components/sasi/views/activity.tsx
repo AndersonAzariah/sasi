@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Inbox } from "lucide-react";
 import { ACTIVITY, DEMO_NOW } from "@/lib/sasi/data";
 import type { ActivityEvent, ActivityKind } from "@/lib/sasi/types";
+import { useT, type TKey } from "@/lib/sasi/i18n";
 import { cn } from "@/lib/utils";
 import { ActivityRow } from "@/components/sasi/domain";
 import { DemoBadge, EmptyState, SectionLabel } from "@/components/sasi/primitives";
@@ -13,10 +14,11 @@ const DAY_MS = 86_400_000;
 
 type DayBucket = "today" | "yesterday" | "earlier";
 
-const BUCKET_LABEL: Record<DayBucket, string> = {
-  today: "Today",
-  yesterday: "Yesterday",
-  earlier: "Earlier",
+/* Bucket labels are display-only; reuse rp.when where identical. */
+const BUCKET_LABEL: Record<DayBucket, TKey> = {
+  today: "rp.when.today",
+  yesterday: "rp.when.yesterday",
+  earlier: "act.bucket.earlier",
 };
 
 /** UTC-day bucketing against the fixed demo clock — deterministic + hydration-safe. */
@@ -37,10 +39,10 @@ type ActivityFilter =
   | "ACTIONS"
   | "VERIFICATION";
 
-const FILTERS: { key: ActivityFilter; label: string; kinds: ActivityKind[] }[] = [
+const FILTERS: { key: ActivityFilter; labelKey: TKey; kinds: ActivityKind[] }[] = [
   {
     key: "ALL",
-    label: "All",
+    labelKey: "cases.filter.all",
     kinds: [
       "CASE_UPDATED",
       "EVIDENCE_ADDED",
@@ -55,25 +57,26 @@ const FILTERS: { key: ActivityFilter; label: string; kinds: ActivityKind[] }[] =
       "INCIDENT_REPORTED",
     ],
   },
-  { key: "CASES", label: "Cases", kinds: ["CASE_UPDATED", "INVESTIGATION_STARTED"] },
-  { key: "EVIDENCE", label: "Evidence", kinds: ["EVIDENCE_ADDED"] },
-  { key: "SOURCES", label: "Sources", kinds: ["SOURCE_FOUND"] },
+  { key: "CASES", labelKey: "nav.cases", kinds: ["CASE_UPDATED", "INVESTIGATION_STARTED"] },
+  { key: "EVIDENCE", labelKey: "nav.evidence.item", kinds: ["EVIDENCE_ADDED"] },
+  { key: "SOURCES", labelKey: "cd.tab.sources", kinds: ["SOURCE_FOUND"] },
   {
     key: "FINDINGS",
-    label: "Findings",
+    labelKey: "cd.findings",
     kinds: ["FINDING_GENERATED", "CONFIDENCE_UPDATED"],
   },
   {
     key: "ACTIONS",
-    label: "Actions",
+    labelKey: "cd.tab.actions",
     kinds: ["PERMISSION_REQUESTED", "ACTION_APPROVED", "ACTION_COMPLETED"],
   },
-  { key: "VERIFICATION", label: "Verification", kinds: ["VERIFICATION_COMPLETED"] },
+  { key: "VERIFICATION", labelKey: "act.filter.verification", kinds: ["VERIFICATION_COMPLETED"] },
 ];
 
 const BUCKET_ORDER: DayBucket[] = ["today", "yesterday", "earlier"];
 
 export default function ActivityView() {
+  const t = useT();
   const [filter, setFilter] = useState<ActivityFilter>("ALL");
 
   const filtered = useMemo(() => {
@@ -100,22 +103,22 @@ export default function ActivityView() {
       <header>
         <div className="flex flex-wrap items-center gap-2.5">
           <h1 className="text-xl font-semibold tracking-tight text-white">
-            Activity
+            {t("nav.activity")}
           </h1>
           <DemoBadge />
           <span className="font-mono text-[10.5px] tracking-wider text-zinc-600">
-            {ACTIVITY.length} EVENTS · DEMO RECORD
+            {t("act.count").replace("{n}", String(ACTIVITY.length))}
           </span>
         </div>
         <p className="mt-1 text-[13px] text-zinc-500">
-          The transparent record of everything SASI has done on your behalf.
+          {t("act.subtitle")}
         </p>
       </header>
 
       {/* ---------- Kind filter chips ---------- */}
       <div
         role="group"
-        aria-label="Filter activity by kind"
+        aria-label={t("act.filter-aria")}
         className="mt-5 flex flex-wrap items-center gap-1.5"
       >
         {FILTERS.map((f) => {
@@ -132,7 +135,7 @@ export default function ActivityView() {
                   : "border-white/8 bg-transparent text-zinc-500 hover:border-white/15 hover:text-zinc-300"
               )}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           );
         })}
@@ -143,8 +146,8 @@ export default function ActivityView() {
         <EmptyState
           className="mt-6"
           icon={Inbox}
-          title="No activity for this filter"
-          description="Try another filter — every case update, source, finding, action and verification is recorded here."
+          title={t("act.empty.title")}
+          description={t("act.empty.description")}
         />
       ) : (
         <div className="mt-6 space-y-7">
@@ -152,11 +155,11 @@ export default function ActivityView() {
             groups[b].length === 0 ? null : (
               <section
                 key={b}
-                aria-label={`${BUCKET_LABEL[b]} activity`}
+                aria-label={t("act.bucket-aria").replace("{bucket}", t(BUCKET_LABEL[b]))}
                 className="relative border-l border-white/8 pl-4 sm:pl-5"
               >
                 <div className="sticky top-14 z-10 -ml-4 inline-block bg-[#050505]/95 px-1 py-1 backdrop-blur-sm sm:-ml-5">
-                  <SectionLabel>{BUCKET_LABEL[b]}</SectionLabel>
+                  <SectionLabel>{t(BUCKET_LABEL[b])}</SectionLabel>
                 </div>
                 <div className="mt-1 space-y-0.5">
                   {groups[b].map((ev) => (

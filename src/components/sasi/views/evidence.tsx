@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT, type TKey } from "@/lib/sasi/i18n";
 import type { EvidenceItem, EvidenceType, TrustStatus } from "@/lib/sasi/types";
 import { TRUST_STATUS_META, formatDate } from "@/lib/sasi/utils";
 import { toast } from "@/hooks/use-toast";
@@ -72,25 +73,27 @@ if (!TRUST_META.USER_PROVIDED) {
   };
 }
 
+/* Chip labels are display-only; the stored type stays canonical. */
 const TYPE_META: Record<
   EvidenceType | "ALL",
-  { label: string; icon: typeof ImageIcon }
+  { labelKey: TKey; icon: typeof ImageIcon }
 > = {
-  ALL: { label: "All", icon: LayoutGrid },
-  PHOTO: { label: "Photos", icon: ImageIcon },
-  DOCUMENT: { label: "Documents", icon: FileText },
-  LINK: { label: "Links", icon: Link2 },
-  NOTE: { label: "Notes", icon: StickyNote },
+  ALL: { labelKey: "cases.filter.all", icon: LayoutGrid },
+  PHOTO: { labelKey: "ev.type-photos", icon: ImageIcon },
+  DOCUMENT: { labelKey: "ev.type-documents", icon: FileText },
+  LINK: { labelKey: "ev.type-links", icon: Link2 },
+  NOTE: { labelKey: "ev.type-notes", icon: StickyNote },
 };
 
-const VERIFICATION_OPTIONS: { value: string; label: string }[] = [
-  { value: "all", label: "All verification" },
-  { value: "CONFIRMED", label: "Confirmed" },
-  { value: "REPORTED", label: "Reported" },
-  { value: "USER_PROVIDED", label: "User provided" },
+const VERIFICATION_OPTIONS: { value: string; labelKey: TKey }[] = [
+  { value: "all", labelKey: "ev.all-verification" },
+  { value: "CONFIRMED", labelKey: "status.confirmed" },
+  { value: "REPORTED", labelKey: "status.reported" },
+  { value: "USER_PROVIDED", labelKey: "ev.trust-user" },
 ];
 
 export default function EvidenceView() {
+  const t = useT();
   const evidence = useSasiStore((s) => s.evidence);
   const cases = useSasiStore((s) => s.cases);
   const openCase = useSasiStore((s) => s.openCase);
@@ -178,7 +181,7 @@ export default function EvidenceView() {
       type: addKind,
       title:
         addTitle.trim() ||
-        (addKind === "NOTE" ? "Note added by you" : "Link added by you"),
+        (addKind === "NOTE" ? t("ev.fallback-note") : t("ev.fallback-link")),
       description: addKind === "NOTE" ? addNote.trim() : undefined,
       url: addKind === "LINK" ? addUrl.trim() : undefined,
       createdAt: new Date().toISOString(),
@@ -191,8 +194,8 @@ export default function EvidenceView() {
     setAddOpen(false);
     resetAddForm();
     toast({
-      title: "Evidence added to your vault",
-      description: "Stored locally in this demo environment — nothing was uploaded or shared.",
+      title: t("ev.toast.title"),
+      description: t("ev.toast.desc"),
     });
   };
 
@@ -208,9 +211,9 @@ export default function EvidenceView() {
       {/* ---------- header ---------- */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-[20px] font-semibold tracking-tight text-white">Evidence vault</h1>
+          <h1 className="text-[20px] font-semibold tracking-tight text-white">{t("ev.title")}</h1>
           <p className="mt-1 text-[13px] text-zinc-500">
-            Photos, documents, links and notes that support your cases.
+            {t("ev.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -220,20 +223,20 @@ export default function EvidenceView() {
               resetAddForm();
               setAddOpen(true);
             }}
-            aria-label="Add evidence"
+            aria-label={t("cd.add-evidence")}
           >
             <Plus className="h-3.5 w-3.5" aria-hidden />
-            Add evidence
+            {t("cd.add-evidence")}
           </PrimaryButton>
         </div>
       </div>
 
       {/* ---------- stats ---------- */}
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Items" value={counts.all} hint="In your local demo vault" />
-        <StatTile label="Photos" value={counts.PHOTO} tone="blue" hint="Site and context shots" />
-        <StatTile label="Linked to cases" value={counts.linked} tone="gold" hint="Attached to a case ref" />
-        <StatTile label="Verified" value={counts.verified} tone="green" hint="Confirmed status" />
+        <StatTile label={t("ev.stat-items")} value={counts.all} hint={t("ev.stat-items-hint")} />
+        <StatTile label={t("ev.stat-photos")} value={counts.PHOTO} tone="blue" hint={t("ev.stat-photos-hint")} />
+        <StatTile label={t("ev.stat-linked")} value={counts.linked} tone="gold" hint={t("ev.stat-linked-hint")} />
+        <StatTile label={t("ev.stat-verified")} value={counts.verified} tone="green" hint={t("ev.stat-verified-hint")} />
       </div>
 
       {/* ---------- toolbar ---------- */}
@@ -246,8 +249,8 @@ export default function EvidenceView() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search evidence titles…"
-            aria-label="Search evidence by title"
+            placeholder={t("ev.search")}
+            aria-label={t("ev.search-aria")}
             className="h-10 rounded-lg border-white/10 bg-white/[0.03] pl-9 text-[13px] text-white placeholder:text-zinc-600"
           />
         </div>
@@ -256,13 +259,13 @@ export default function EvidenceView() {
           <Select value={caseFilter} onValueChange={setCaseFilter}>
             <SelectTrigger
               size="sm"
-              aria-label="Filter by case"
+              aria-label={t("ev.filter-case-aria")}
               className="h-9 w-[190px] border-white/10 bg-transparent text-[12px] text-zinc-300"
             >
-              <SelectValue placeholder="All cases" />
+              <SelectValue placeholder={t("cd.back")} />
             </SelectTrigger>
             <SelectContent className="border-white/10 bg-[#0b0c0e] text-zinc-200">
-              <SelectItem value="all">All cases</SelectItem>
+              <SelectItem value="all">{t("cd.back")}</SelectItem>
               {cases.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.ref} — {c.title.length > 26 ? `${c.title.slice(0, 26)}…` : c.title}
@@ -274,15 +277,15 @@ export default function EvidenceView() {
           <Select value={verification} onValueChange={setVerification}>
             <SelectTrigger
               size="sm"
-              aria-label="Filter by verification status"
+              aria-label={t("ev.filter-verification-aria")}
               className="h-9 w-[170px] border-white/10 bg-transparent text-[12px] text-zinc-300"
             >
-              <SelectValue placeholder="All verification" />
+              <SelectValue placeholder={t("ev.all-verification")} />
             </SelectTrigger>
             <SelectContent className="border-white/10 bg-[#0b0c0e] text-zinc-200">
               {VERIFICATION_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
-                  {o.label}
+                  {t(o.labelKey)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -291,13 +294,13 @@ export default function EvidenceView() {
           <div
             className="flex items-center rounded-lg border border-white/10 p-0.5"
             role="group"
-            aria-label="Layout mode"
+            aria-label={t("ev.layout-aria")}
           >
             <button
               type="button"
               onClick={() => setMode("grid")}
               aria-pressed={mode === "grid"}
-              aria-label="Grid layout"
+              aria-label={t("ev.view-grid")}
               className={cn(
                 "flex h-8 w-9 items-center justify-center rounded-md transition-colors",
                 mode === "grid" ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300"
@@ -309,7 +312,7 @@ export default function EvidenceView() {
               type="button"
               onClick={() => setMode("list")}
               aria-pressed={mode === "list"}
-              aria-label="List layout"
+              aria-label={t("ev.view-list")}
               className={cn(
                 "flex h-8 w-9 items-center justify-center rounded-md transition-colors",
                 mode === "list" ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300"
@@ -323,16 +326,16 @@ export default function EvidenceView() {
 
       {/* type chips with counts */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {typeChips.map((t) => {
-          const meta = TYPE_META[t];
+        {typeChips.map((k) => {
+          const meta = TYPE_META[k];
           const Icon = meta.icon;
-          const active = type === t;
-          const n = t === "ALL" ? counts.all : counts[t as EvidenceType];
+          const active = type === k;
+          const n = k === "ALL" ? counts.all : counts[k as EvidenceType];
           return (
             <button
-              key={t}
+              key={k}
               type="button"
-              onClick={() => setType(t)}
+              onClick={() => setType(k)}
               aria-pressed={active}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11.5px] font-medium transition-colors",
@@ -342,7 +345,7 @@ export default function EvidenceView() {
               )}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden />
-              {meta.label}
+              {t(meta.labelKey)}
               <span className={cn("text-[9.5px]", active ? "text-black/60" : "text-zinc-600")}>
                 {n}
               </span>
@@ -355,7 +358,7 @@ export default function EvidenceView() {
             onClick={clearFilters}
             className="ml-1 text-[11.5px] font-medium text-zinc-400 underline underline-offset-4 transition-colors hover:text-white"
           >
-            Clear filters
+            {t("cases.clear-filters")}
           </button>
         )}
       </div>
@@ -389,9 +392,9 @@ export default function EvidenceView() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={FolderLock}
-            title="No evidence matches these filters"
-            description="Your vault is private to you. Try clearing the search or filters to see all demo items."
-            action={<GhostButton onClick={clearFilters}>Clear all filters</GhostButton>}
+            title={t("ev.empty.title")}
+            description={t("ev.empty.description")}
+            action={<GhostButton onClick={clearFilters}>{t("map.clear-all")}</GhostButton>}
           />
         ) : mode === "grid" ? (
           <motion.div layout className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -425,7 +428,7 @@ export default function EvidenceView() {
                   <button
                     type="button"
                     onClick={() => setPreview(item)}
-                    aria-label={`Open evidence: ${item.title}`}
+                    aria-label={t("ev.open-aria").replace("{title}", item.title)}
                     className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.03]"
                   >
                     <EvidenceThumb item={item} className="h-14 w-20 shrink-0" />
@@ -481,15 +484,22 @@ export default function EvidenceView() {
               <div className="space-y-4 px-4 pb-4 sm:px-5 sm:pb-5">
                 <dl className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
                   {[
-                    { label: "Type", value: TYPE_META[preview.type]?.label ?? preview.type },
-                    { label: "Uploaded", value: formatDate(preview.createdAt) },
-                    { label: "Location", value: preview.location ?? "Not recorded" },
                     {
-                      label: "Verification",
-                      value:
-                        TRUST_META[preview.verification]?.label ?? String(preview.verification),
+                      label: t("ev.row-type"),
+                      value: TYPE_META[preview.type]
+                        ? t(TYPE_META[preview.type].labelKey)
+                        : preview.type,
                     },
-                    ...(preview.url ? [{ label: "Link", value: preview.url }] : []),
+                    { label: t("ev.row-uploaded"), value: formatDate(preview.createdAt) },
+                    { label: t("cd.facts.location"), value: preview.location ?? t("ev.row-not-recorded") },
+                    {
+                      label: t("ev.row-verification"),
+                      value:
+                        String(preview.verification) === "USER_PROVIDED"
+                          ? t("ev.trust-user")
+                          : TRUST_META[preview.verification]?.label ?? String(preview.verification),
+                    },
+                    ...(preview.url ? [{ label: t("ev.row-link"), value: preview.url }] : []),
                   ].map((row) => (
                     <div
                       key={row.label}
@@ -516,7 +526,7 @@ export default function EvidenceView() {
                   <div className="flex items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.02] p-3">
                     <div className="min-w-0">
                       <p className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-zinc-600">
-                        Linked case
+                        {t("ev.linked-case")}
                       </p>
                       <p className="mt-0.5 truncate font-mono text-[12px] text-zinc-300">
                         {caseRefById.get(preview.caseId) ?? preview.caseId}
@@ -528,16 +538,15 @@ export default function EvidenceView() {
                         setPreview(null);
                         openCase(preview.caseId!);
                       }}
-                      aria-label="Open linked case"
+                      aria-label={t("ev.open-case-aria")}
                     >
-                      Open case
+                      {t("map.open-case")}
                     </GhostButton>
                   </div>
                 )}
 
                 <p className="border-t border-white/5 pt-3 text-[11px] leading-relaxed text-zinc-600">
-                  Demo evidence — stored locally in this demo environment. Nothing is uploaded to a
-                  server or shared with anyone.
+                  {t("ev.demo-note")}
                 </p>
               </div>
             </>
@@ -557,9 +566,9 @@ export default function EvidenceView() {
       >
         <DialogContent className="sasi-scroll max-h-[85vh] overflow-y-auto border-white/10 bg-[#0b0c0e] text-white sm:max-w-md">
           <DialogHeader className="text-left">
-            <DialogTitle className="text-[15px] font-semibold text-white">Add evidence</DialogTitle>
+            <DialogTitle className="text-[15px] font-semibold text-white">{t("cd.add-evidence")}</DialogTitle>
             <DialogDescription className="text-[12.5px] text-zinc-500">
-              Notes and links are stored locally in this demo environment.
+              {t("ev.add-desc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -567,9 +576,9 @@ export default function EvidenceView() {
             {/* kind selector */}
             <div>
               <Label className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-zinc-500">
-                Type
+                {t("ev.row-type")}
               </Label>
-              <div className="mt-1.5 grid grid-cols-4 gap-1.5" role="group" aria-label="Evidence type">
+              <div className="mt-1.5 grid grid-cols-4 gap-1.5" role="group" aria-label={t("ev.add-type-aria")}>
                 <button
                   type="button"
                   onClick={() => setAddKind("NOTE")}
@@ -581,7 +590,7 @@ export default function EvidenceView() {
                       : "border-white/10 text-zinc-400 hover:border-white/25 hover:text-zinc-200"
                   )}
                 >
-                  <StickyNote className="h-4 w-4" aria-hidden /> Note
+                  <StickyNote className="h-4 w-4" aria-hidden /> {t("ev.add-note")}
                 </button>
                 <button
                   type="button"
@@ -594,41 +603,41 @@ export default function EvidenceView() {
                       : "border-white/10 text-zinc-400 hover:border-white/25 hover:text-zinc-200"
                   )}
                 >
-                  <Link2 className="h-4 w-4" aria-hidden /> Link
+                  <Link2 className="h-4 w-4" aria-hidden /> {t("ev.add-link")}
                 </button>
                 <button
                   type="button"
                   disabled
-                  title="Coming soon (demo)"
-                  aria-label="Photo upload coming soon (demo)"
+                  title={t("ev.coming-soon")}
+                  aria-label={t("ev.coming-photo-aria")}
                   className="flex h-14 cursor-not-allowed flex-col items-center justify-center gap-1 rounded-lg border border-white/8 text-[11px] text-zinc-600"
                 >
-                  <ImageIcon className="h-4 w-4" aria-hidden /> Photo
+                  <ImageIcon className="h-4 w-4" aria-hidden /> {t("ev.add-photo")}
                 </button>
                 <button
                   type="button"
                   disabled
-                  title="Coming soon (demo)"
-                  aria-label="Document upload coming soon (demo)"
+                  title={t("ev.coming-soon")}
+                  aria-label={t("ev.coming-document-aria")}
                   className="flex h-14 cursor-not-allowed flex-col items-center justify-center gap-1 rounded-lg border border-white/8 text-[11px] text-zinc-600"
                 >
-                  <FileText className="h-4 w-4" aria-hidden /> Document
+                  <FileText className="h-4 w-4" aria-hidden /> {t("ev.add-document")}
                 </button>
               </div>
               <p className="mt-1.5 text-[11px] text-zinc-600">
-                Photo and document upload is coming soon in this demo.
+                {t("ev.upload-note")}
               </p>
             </div>
 
             <div>
               <Label htmlFor="evidence-title" className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-zinc-500">
-                Title <span className="normal-case tracking-normal text-zinc-700">(optional)</span>
+                {t("ev.add-title")} <span className="normal-case tracking-normal text-zinc-700">{t("ev.optional")}</span>
               </Label>
               <Input
                 id="evidence-title"
                 value={addTitle}
                 onChange={(e) => setAddTitle(e.target.value)}
-                placeholder={addKind === "NOTE" ? "e.g. Hotline reference" : "e.g. Utility notice page"}
+                placeholder={addKind === "NOTE" ? t("ev.title-ph-note") : t("ev.title-ph-link")}
                 className="mt-1.5 h-9 border-white/10 bg-white/[0.03] text-[13px] text-white placeholder:text-zinc-600"
               />
             </div>
@@ -636,13 +645,13 @@ export default function EvidenceView() {
             {addKind === "NOTE" ? (
               <div>
                 <Label htmlFor="evidence-note" className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-zinc-500">
-                  Note
+                  {t("ev.add-note")}
                 </Label>
                 <Textarea
                   id="evidence-note"
                   value={addNote}
                   onChange={(e) => setAddNote(e.target.value)}
-                  placeholder="What did you observe or record? Include reference numbers if you have them."
+                  placeholder={t("ev.add-note-placeholder")}
                   rows={4}
                   className="mt-1.5 resize-none border-white/10 bg-white/[0.03] text-[13px] text-white placeholder:text-zinc-600"
                 />
@@ -650,7 +659,7 @@ export default function EvidenceView() {
             ) : (
               <div>
                 <Label htmlFor="evidence-url" className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-zinc-500">
-                  URL
+                  {t("ev.url-label")}
                 </Label>
                 <div className="relative mt-1.5">
                   <ExternalLink
@@ -669,7 +678,7 @@ export default function EvidenceView() {
                 </div>
                 {addUrl.trim() !== "" && !addReady && (
                   <p className="mt-1.5 text-[11px] text-[#fda4a0]">
-                    Enter a full URL starting with http:// or https://
+                    {t("ev.url-error")}
                   </p>
                 )}
               </div>
@@ -677,17 +686,17 @@ export default function EvidenceView() {
 
             <div>
               <Label className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-zinc-500">
-                Link to case <span className="normal-case tracking-normal text-zinc-700">(optional)</span>
+                {t("ev.link-case")} <span className="normal-case tracking-normal text-zinc-700">{t("ev.optional")}</span>
               </Label>
               <Select value={addCaseId} onValueChange={setAddCaseId}>
                 <SelectTrigger
-                  aria-label="Select a case to link"
+                  aria-label={t("ev.link-case-aria")}
                   className="mt-1.5 h-9 w-full border-white/10 bg-transparent text-[12.5px] text-zinc-300"
                 >
-                  <SelectValue placeholder="Not linked to a case" />
+                  <SelectValue placeholder={t("ev.not-linked")} />
                 </SelectTrigger>
                 <SelectContent className="border-white/10 bg-[#0b0c0e] text-zinc-200">
-                  <SelectItem value="none">Not linked to a case</SelectItem>
+                  <SelectItem value="none">{t("ev.not-linked")}</SelectItem>
                   {cases.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.ref} — {c.title.length > 28 ? `${c.title.slice(0, 28)}…` : c.title}
@@ -699,7 +708,7 @@ export default function EvidenceView() {
 
             <div className="flex items-center justify-between gap-3 border-t border-white/5 pt-3.5">
               <p className="text-[11px] leading-relaxed text-zinc-600">
-                Nothing leaves this demo environment.
+                {t("ev.nothing-leaves")}
               </p>
               <div className="flex shrink-0 items-center gap-2">
                 <GhostButton
@@ -709,15 +718,15 @@ export default function EvidenceView() {
                     resetAddForm();
                   }}
                 >
-                  Cancel
+                  {t("ev.cancel")}
                 </GhostButton>
                 <PrimaryButton
                   className="h-9 px-3.5"
                   disabled={!addReady}
                   onClick={handleAdd}
-                  aria-label="Save evidence to vault"
+                  aria-label={t("ev.save-aria")}
                 >
-                  Save to vault
+                  {t("ev.save")}
                 </PrimaryButton>
               </div>
             </div>

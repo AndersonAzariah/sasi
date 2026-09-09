@@ -969,3 +969,107 @@
 .sasi-ntf-row:focus-within {
   background-color: rgba(255, 255, 255, 0.03);
 }
+
+/* ============================================================
+   Round: offline data layer + honest coverage
+   - sasi-snapshot-grid / -tile : the Settings "On this device"
+     card. Tiles rise in with a tiny stagger (feels counted, not
+     dumped), and lift on hover like the rest of the UI.
+   - sasi-restored-note : amber honesty strip for "this visit
+     started offline" — quiet left hairline, breathing border.
+   - sasi-ios-step : the manual Add-to-Home-Screen steps; a faint
+     gold focus that follows the numbered tiles.
+   - sasi-coverage-row : per-view language coverage rows; entrance
+     is a soft fade (never a jolt), hover tint matches lists.
+   All animations are reduced-motion guarded.
+   ============================================================ */
+@keyframes sasi-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sasi-snapshot-grid > * {
+  animation: sasi-tile-in 0.34s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.sasi-snapshot-grid > *:nth-child(1) { animation-delay: 0.02s; }
+.sasi-snapshot-grid > *:nth-child(2) { animation-delay: 0.06s; }
+.sasi-snapshot-grid > *:nth-child(3) { animation-delay: 0.1s; }
+.sasi-snapshot-grid > *:nth-child(4) { animation-delay: 0.14s; }
+.sasi-snapshot-grid > *:nth-child(5) { animation-delay: 0.18s; }
+
+.sasi-snapshot-grid {
+  counter-reset: sasi-tile;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sasi-snapshot-grid > * {
+    animation: none;
+  }
+}
+
+.sasi-restored-note {
+  position: relative;
+  overflow: hidden;
+}
+.sasi-restored-note::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 167, 38, 0.85), rgba(255, 167, 38, 0.25));
+  animation: sasi-breathe 2.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-restored-note::before {
+    animation: none;
+  }
+}
+
+.sasi-ios-step {
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+.sasi-ios-step:hover {
+  border-color: rgba(227, 197, 103, 0.22);
+  background-color: rgba(227, 197, 103, 0.025);
+  transform: translateX(2px);
+}
+.sasi-ios-step:hover strong {
+  color: #f0d98c;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-ios-step,
+  .sasi-ios-step:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+@keyframes sasi-row-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.sasi-coverage-list > li {
+  animation: sasi-row-fade 0.4s ease both;
+}
+.sasi-coverage-list > li:nth-child(n + 6) { animation-delay: 0.04s; }
+.sasi-coverage-list > li:nth-child(n + 11) { animation-delay: 0.08s; }
+.sasi-coverage-list > li:nth-child(n + 16) { animation-delay: 0.12s; }
+@media (prefers-reduced-motion: reduce) {
+  .sasi-coverage-list > li {
+    animation: none;
+  }
+}

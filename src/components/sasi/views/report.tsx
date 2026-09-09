@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT, type TKey } from "@/lib/sasi/i18n";
 import { POPULAR_SERVICES, SERVICE_REPORT_OPTIONS } from "@/lib/sasi/data";
 import { SERVICES, formatDate } from "@/lib/sasi/utils";
 import type { EvidenceAnalysis, ServiceKey } from "@/lib/sasi/types";
@@ -38,14 +39,15 @@ import {
    navigation never loses input.
    ============================================================ */
 
-const STEP_LABELS = [
-  "What",
-  "Where",
-  "When",
-  "Impact",
-  "Evidence",
-  "Review",
-  "Done",
+/* Step labels are display-only; stored drafts keep canonical values. */
+const STEP_KEYS: TKey[] = [
+  "rp.step.what",
+  "rp.step.where",
+  "rp.step.when",
+  "cd.impact",
+  "cd.tab.evidence",
+  "rp.step.review",
+  "rp.step.done",
 ];
 
 const GENERIC_PROBLEM_OPTIONS = [
@@ -55,6 +57,23 @@ const GENERIC_PROBLEM_OPTIONS = [
   "Billing or account problem",
   "Other",
 ];
+
+/* Display labels for the canonical English problem option values
+   (SERVICE_REPORT_OPTIONS + GENERIC_PROBLEM_OPTIONS). Unknown values
+   (the user's own "Other" text) render as-is. */
+const PROBLEM_KEYS: Record<string, TKey> = {
+  "Service not delivered": "rp.problem.not-delivered",
+  "Damaged or unsafe infrastructure": "rp.problem.infrastructure",
+  "No response to a previous report": "rp.problem.no-response",
+  "Billing or account problem": "rp.problem.billing",
+  Other: "rp.problem.other",
+  "No water": "rp.problem.no-water",
+  "Low pressure": "rp.problem.low-pressure",
+  "Burst pipe": "rp.problem.burst-pipe",
+  Leak: "rp.problem.leak",
+  "Dirty / discoloured water": "rp.problem.dirty-water",
+  "Infrastructure damage": "rp.problem.infra-damage",
+};
 
 const LOCATION_CHIPS = [
   "Johannesburg",
@@ -91,10 +110,10 @@ function parseEvidenceNote(note: string): EvidenceChip[] {
   });
 }
 
-function whenLabel(w: string): string {
-  if (w === "today") return "Today";
-  if (w === "yesterday") return "Yesterday";
-  if (w === "older") return "More than 2 days ago";
+function whenLabel(w: string, t: (k: TKey) => string): string {
+  if (w === "today") return t("rp.when.today");
+  if (w === "yesterday") return t("rp.when.yesterday");
+  if (w === "older") return t("rp.when.older");
   if (w) return formatDate(w);
   return "—";
 }
@@ -117,13 +136,13 @@ async function fileToScaledDataUrl(
   const dataUrl = await new Promise<string>((res, rej) => {
     const r = new FileReader();
     r.onload = () => res(String(r.result));
-    r.onerror = () => rej(new Error("SASI could not read that file."));
+    r.onerror = () => rej(new Error("rp.err.read"));
     r.readAsDataURL(file);
   });
   const img = document.createElement("img");
   await new Promise<void>((res, rej) => {
     img.onload = () => res();
-    img.onerror = () => rej(new Error("That file is not a readable image."));
+    img.onerror = () => rej(new Error("rp.err.image"));
     img.src = dataUrl;
   });
   const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
@@ -191,6 +210,7 @@ function RadioDot({ selected }: { selected: boolean }) {
    ============================================================ */
 
 export default function ReportView() {
+  const t = useT();
   const storedDraft = useSasiStore((s) => s.reportDraft);
   const savedLocation = useSasiStore((s) => s.savedLocation);
 
@@ -308,7 +328,7 @@ export default function ReportView() {
       });
       const data = (await res.json()) as { analysis?: EvidenceAnalysis; error?: string };
       if (!res.ok || !data.analysis) {
-        throw new Error(data.error ?? "SASI could not analyse that photo.");
+        throw new Error(data.error ?? t("rp.err.analyse"));
       }
       setAnalysis(data.analysis);
       analysisUsedRef.current = false;
@@ -316,7 +336,7 @@ export default function ReportView() {
       setAnalysisError(
         err instanceof Error && err.message
           ? err.message
-          : "SASI could not analyse that photo just now."
+          : t("rp.err.analyse-now")
       );
     } finally {
       setAnalyzing(false);
@@ -326,11 +346,11 @@ export default function ReportView() {
   const handlePhotoFile = async (file: File | undefined) => {
     if (!file) return;
     if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
-      setAnalysisError("SASI can read PNG, JPEG or WebP photos.");
+      setAnalysisError(t("rp.err.format"));
       return;
     }
     if (file.size > 12 * 1024 * 1024) {
-      setAnalysisError("That photo is very large — try one under about 10 MB.");
+      setAnalysisError(t("rp.err.size"));
       return;
     }
     try {
@@ -341,7 +361,11 @@ export default function ReportView() {
       void runPhotoAnalysis(dataUrl);
     } catch (err) {
       setAnalysisError(
-        err instanceof Error ? err.message : "SASI could not read that file."
+        err instanceof Error && err.message
+          ? err.message.startsWith("rp.")
+            ? t(err.message)
+            : err.message
+          : t("rp.err.read")
       );
     }
   };
@@ -349,13 +373,13 @@ export default function ReportView() {
   const useAnalysisAsNote = () => {
     if (!analysis || analysisUsedRef.current) return;
     analysisUsedRef.current = true;
-    const caption = analysis.suggested_caption || "Photo evidence";
+    const caption = analysis.suggested_caption || t("rp.evidence.photo-fallback");
     setEvidenceItems((prev) => [
       ...prev,
       {
         id: `${Date.now()}-photo`,
         kind: "photo",
-        value: `${caption} · SASI visual analysis (AI-inferred)`,
+        value: `${caption} ${t("rp.evidence.analysis-suffix")}`,
       },
     ]);
     useSasiStore.getState().addEvidence({
@@ -368,8 +392,8 @@ export default function ReportView() {
       verification: "UNVERIFIED",
       isDemo: true,
     });
-    toast.success("Photo filed as evidence", {
-      description: "It is in your Evidence Vault and on this report — labelled AI-inferred, not proof.",
+    toast.success(t("rp.toast.photo-title"), {
+      description: t("rp.toast.photo-desc"),
     });
   };
 
@@ -415,11 +439,11 @@ export default function ReportView() {
         return (
           <StepShell>
             <div>
-              <SectionLabel className="mb-2">Service</SectionLabel>
+              <SectionLabel className="mb-2">{t("cd.facts.service")}</SectionLabel>
               <div
                 className="grid grid-cols-2 gap-2 sm:grid-cols-4"
                 role="radiogroup"
-                aria-label="Which service is affected"
+                aria-label={t("rp.service-aria")}
               >
                 {POPULAR_SERVICES.map((key) => {
                   const selected = service === key;
@@ -455,11 +479,11 @@ export default function ReportView() {
             </div>
 
             <div>
-              <SectionLabel className="mb-2">What is the problem</SectionLabel>
+              <SectionLabel className="mb-2">{t("rp.problem.title")}</SectionLabel>
               <div
                 className="grid gap-2 sm:grid-cols-2"
                 role="radiogroup"
-                aria-label="Problem description options"
+                aria-label={t("rp.problem.aria")}
               >
                 {problemOptions.map((opt) => {
                   const isOther = opt === "Other";
@@ -483,7 +507,7 @@ export default function ReportView() {
                       }}
                     >
                       <RadioDot selected={selected} />
-                      {opt}
+                      {PROBLEM_KEYS[opt] ? t(PROBLEM_KEYS[opt]) : opt}
                     </OptionCard>
                   );
                 })}
@@ -498,8 +522,8 @@ export default function ReportView() {
                       setAttempted(false);
                     }}
                     onKeyDown={handleEnterKey}
-                    placeholder="Describe the problem in your own words"
-                    aria-label="Describe the problem in your own words"
+                    placeholder={t("rp.problem.placeholder")}
+                    aria-label={t("rp.problem.placeholder")}
                     className={INPUT_CLS}
                   />
                 </div>
@@ -507,7 +531,7 @@ export default function ReportView() {
               {attempted && !problem.trim() && (
                 <p className="mt-2 flex items-center gap-1.5 text-[12px] text-[#fda4a0]">
                   <AlertCircle className="h-3.5 w-3.5" aria-hidden />
-                  Choose an option or describe the problem to continue.
+                  {t("rp.problem.required")}
                 </p>
               )}
             </div>
@@ -518,7 +542,7 @@ export default function ReportView() {
         return (
           <StepShell>
             <div>
-              <SectionLabel className="mb-2">Where is it happening</SectionLabel>
+              <SectionLabel className="mb-2">{t("rp.where.title")}</SectionLabel>
               <input
                 value={location}
                 onChange={(e) => {
@@ -526,12 +550,12 @@ export default function ReportView() {
                   setAttempted(false);
                 }}
                 onKeyDown={handleEnterKey}
-                placeholder="Suburb, street or landmark"
-                aria-label="Location of the issue"
+                placeholder={t("rp.where.placeholder")}
+                aria-label={t("rp.where.aria")}
                 className={INPUT_CLS}
               />
               <p className="mt-1.5 text-[12px] text-zinc-600">
-                Include a street or landmark if possible.
+                {t("rp.where.hint")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[`${savedLocation.suburb}, ${savedLocation.city}`, ...LOCATION_CHIPS].map(
@@ -547,7 +571,7 @@ export default function ReportView() {
                       )}
                     >
                       {chip === `${savedLocation.suburb}, ${savedLocation.city}`
-                        ? `Use my saved location (${chip})`
+                        ? t("rp.where.use-saved").replace("{loc}", chip)
                         : chip}
                     </button>
                   )
@@ -556,7 +580,7 @@ export default function ReportView() {
               {attempted && !location.trim() && (
                 <p className="mt-2 flex items-center gap-1.5 text-[12px] text-[#fda4a0]">
                   <AlertCircle className="h-3.5 w-3.5" aria-hidden />
-                  Enter a location so SASI can match official sources to your area.
+                  {t("rp.where.required")}
                 </p>
               )}
             </div>
@@ -567,16 +591,16 @@ export default function ReportView() {
         return (
           <StepShell>
             <div>
-              <SectionLabel className="mb-2">When did it start</SectionLabel>
+              <SectionLabel className="mb-2">{t("rp.when.title")}</SectionLabel>
               <div
                 className="grid gap-2 sm:grid-cols-2"
                 role="radiogroup"
-                aria-label="When the issue started"
+                aria-label={t("rp.when.aria")}
               >
                 {[
-                  { value: "today", label: "Today" },
-                  { value: "yesterday", label: "Yesterday" },
-                  { value: "older", label: "More than 2 days ago" },
+                  { value: "today", label: t("rp.when.today") },
+                  { value: "yesterday", label: t("rp.when.yesterday") },
+                  { value: "older", label: t("rp.when.older") },
                 ].map((opt) => {
                   const selected = when === opt.value;
                   return (
@@ -601,12 +625,12 @@ export default function ReportView() {
                   )}
                 >
                   <RadioDot selected={!["today", "yesterday", "older"].includes(when)} />
-                  <span className="shrink-0">Custom date</span>
+                  <span className="shrink-0">{t("rp.when.custom")}</span>
                   <input
                     type="date"
                     value={!["today", "yesterday", "older"].includes(when) ? when : ""}
                     onChange={(e) => e.target.value && setWhen(e.target.value)}
-                    aria-label="Custom start date"
+                    aria-label={t("rp.when.custom-aria")}
                     className="min-w-0 flex-1 bg-transparent text-right text-[12.5px] text-zinc-300 outline-none [color-scheme:dark]"
                   />
                 </label>
@@ -619,17 +643,17 @@ export default function ReportView() {
         return (
           <StepShell>
             <div>
-              <SectionLabel className="mb-2">Impact (optional)</SectionLabel>
+              <SectionLabel className="mb-2">{t("rp.impact.title")}</SectionLabel>
               <textarea
                 value={impact}
                 onChange={(e) => setImpact(e.target.value)}
-                placeholder="How is this affecting you, your household or the area?"
-                aria-label="How is this affecting you"
+                placeholder={t("rp.impact.placeholder")}
+                aria-label={t("rp.impact.aria")}
                 rows={5}
                 className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 text-[13.5px] leading-relaxed text-white placeholder:text-zinc-600 outline-none transition-colors focus:border-white/30 focus:bg-white/[0.05]"
               />
               <p className="mt-1.5 text-[12px] text-zinc-600">
-                Impact helps SASI judge urgency. It is never shared without your approval.
+                {t("rp.impact.hint")}
               </p>
             </div>
           </StepShell>
@@ -639,7 +663,7 @@ export default function ReportView() {
         return (
           <StepShell>
             <div>
-              <SectionLabel className="mb-2">Evidence (optional)</SectionLabel>
+              <SectionLabel className="mb-2">{t("rp.evidence.title")}</SectionLabel>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -652,16 +676,16 @@ export default function ReportView() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="group flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.015] px-4 py-7 text-center transition-colors hover:border-[#e3c567]/40 hover:bg-white/[0.03]"
-                  aria-label="Add a photo for SASI to analyse"
+                  aria-label={t("rp.evidence.photo-aria")}
                 >
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-400 transition group-hover:border-[#e3c567]/30 group-hover:text-[#e3c567]">
                     <Camera className="h-[18px] w-[18px]" aria-hidden />
                   </span>
                   <span className="text-[13px] font-medium text-zinc-200">
-                    Add a photo — SASI will read it
+                    {t("rp.evidence.photo-title")}
                   </span>
                   <span className="text-[11.5px] text-zinc-600">
-                    PNG, JPEG or WebP · analysed on-device and never shared without approval
+                    {t("rp.evidence.photo-hint")}
                   </span>
                 </button>
               ) : (
@@ -669,19 +693,19 @@ export default function ReportView() {
                   <div className="relative">
                     <img
                       src={photo.dataUrl}
-                      alt={`Attached evidence: ${photo.name}`}
+                      alt={t("rp.evidence.attached-alt").replace("{name}", photo.name)}
                       className="max-h-44 w-full object-cover"
                     />
                     <button
                       type="button"
                       onClick={clearPhoto}
                       className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-black/60 text-zinc-300 backdrop-blur transition hover:text-white"
-                      aria-label="Remove photo"
+                      aria-label={t("rp.evidence.remove-photo")}
                     >
                       <X className="h-3.5 w-3.5" aria-hidden />
                     </button>
                     <span className="absolute bottom-2 left-2 rounded-md border border-white/15 bg-black/60 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-300 backdrop-blur">
-                      Attached · demo
+                      {t("rp.evidence.attached-tag")}
                     </span>
                   </div>
 
@@ -696,7 +720,7 @@ export default function ReportView() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-[12.5px] font-medium text-zinc-200">
-                            SASI is reading the photo…
+                            {t("rp.evidence.reading")}
                           </p>
                           <div className="mt-2 space-y-1.5">
                             <div className="sasi-skeleton h-2.5 w-11/12" />
@@ -720,7 +744,7 @@ export default function ReportView() {
                             className="mt-1.5 inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.04] px-2.5 text-[11.5px] text-zinc-300 transition hover:border-white/25 hover:text-white"
                           >
                             <RefreshCw className="h-3 w-3" aria-hidden />
-                            Try again
+                            {t("rp.evidence.try-again")}
                           </button>
                         </div>
                       </div>
@@ -738,7 +762,7 @@ export default function ReportView() {
                             aria-hidden
                           />
                           <p className="min-w-0 flex-1 text-[12.5px] font-semibold text-white">
-                            SASI visual analysis
+                            {t("rp.evidence.analysis-title")}
                           </p>
                           <span
                             className={cn(
@@ -756,7 +780,7 @@ export default function ReportView() {
 
                         {analysis.service_guess && (
                           <p className="mt-2 text-[11.5px] text-zinc-500">
-                            Reads like:{" "}
+                            {t("rp.evidence.reads-like")}{" "}
                             <span className="font-medium text-zinc-300">
                               {analysis.service_guess}
                             </span>
@@ -766,7 +790,7 @@ export default function ReportView() {
                                 onClick={() => setService(analysis.service_guess)}
                                 className="ml-1.5 text-[11px] font-medium text-[#e3c567] underline decoration-[#e3c567]/40 underline-offset-2 transition hover:decoration-[#e3c567]"
                               >
-                                change report to {analysis.service_guess}
+                                {t("rp.evidence.change-service").replace("{svc}", analysis.service_guess)}
                               </button>
                             )}
                           </p>
@@ -790,13 +814,13 @@ export default function ReportView() {
 
                         {analysis.notable.length > 0 && (
                           <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-500">
-                            Also noted: {analysis.notable.join(" · ")}
+                            {t("rp.evidence.also-noted")} {analysis.notable.join(" · ")}
                           </p>
                         )}
 
                         {analysis.quality_tip && (
                           <p className="mt-2 rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-[11px] leading-relaxed text-zinc-500">
-                            <span className="font-medium text-zinc-400">Better photo tip: </span>
+                            <span className="font-medium text-zinc-400">{t("rp.evidence.tip")} </span>
                             {analysis.quality_tip}
                           </p>
                         )}
@@ -809,12 +833,12 @@ export default function ReportView() {
                               className="sasi-btn-sheen inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-[12px] font-medium text-black transition hover:bg-zinc-200 active:scale-[0.98]"
                             >
                               <Check className="h-3.5 w-3.5" aria-hidden />
-                              Use as evidence note
+                              {t("rp.evidence.use-note")}
                             </button>
                           ) : (
                             <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#66bb6a]/25 bg-[#66bb6a]/10 px-3 text-[12px] font-medium text-[#8fd694]">
                               <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-                              Filed as evidence
+                              {t("rp.evidence.filed")}
                             </span>
                           )}
                           <button
@@ -823,14 +847,13 @@ export default function ReportView() {
                             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.03] px-2.5 text-[12px] text-zinc-400 transition hover:border-white/25 hover:text-zinc-200"
                           >
                             <RefreshCw className="h-3 w-3" aria-hidden />
-                            Re-analyse
+                            {t("rp.evidence.reanalyse")}
                           </button>
                         </div>
 
                         <p className="mt-2.5 flex items-center gap-1.5 text-[10px] text-zinc-600">
                           <ShieldCheck className="h-3 w-3 shrink-0 text-zinc-600" aria-hidden />
-                          AI-assisted read — not proof and not an official finding. SASI marks it
-                          AI-inferred.
+                          {t("rp.evidence.ai-note")}
                         </p>
                       </motion.div>
                     )}
@@ -854,17 +877,17 @@ export default function ReportView() {
                           addEvidence("note");
                         }
                       }}
-                      placeholder="Add a note"
-                      aria-label="Add an evidence note"
+                      placeholder={t("rp.evidence.note-placeholder")}
+                      aria-label={t("rp.evidence.note-aria")}
                       className={cn(INPUT_CLS, "pl-9")}
                     />
                   </div>
                   <GhostButton
                     onClick={() => addEvidence("note")}
                     className="h-11 shrink-0 px-3"
-                    aria-label="Add note"
+                    aria-label={t("rp.evidence.add-note-aria")}
                   >
-                    Add
+                    {t("rp.add")}
                   </GhostButton>
                 </div>
                 <div className="flex gap-2">
@@ -882,17 +905,17 @@ export default function ReportView() {
                           addEvidence("link");
                         }
                       }}
-                      placeholder="Add a link"
-                      aria-label="Add an evidence link"
+                      placeholder={t("rp.evidence.link-placeholder")}
+                      aria-label={t("rp.evidence.link-aria")}
                       className={cn(INPUT_CLS, "pl-9")}
                     />
                   </div>
                   <GhostButton
                     onClick={() => addEvidence("link")}
                     className="h-11 shrink-0 px-3"
-                    aria-label="Add link"
+                    aria-label={t("rp.evidence.add-link-aria")}
                   >
-                    Add
+                    {t("rp.add")}
                   </GhostButton>
                 </div>
               </div>
@@ -921,7 +944,9 @@ export default function ReportView() {
                         onClick={() =>
                           setEvidenceItems((prev) => prev.filter((p) => p.id !== item.id))
                         }
-                        aria-label={`Remove ${item.kind}: ${item.value}`}
+                        aria-label={t("rp.evidence.remove")
+                          .replace("{kind}", t(`rp.kind.${item.kind}` as TKey))
+                          .replace("{value}", item.value)}
                         className="rounded-full p-0.5 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white"
                       >
                         <X className="h-3 w-3" aria-hidden />
@@ -937,19 +962,29 @@ export default function ReportView() {
       case 5: {
         const rows: { label: string; value: string; editStep: number }[] = [
           {
-            label: "Service",
+            label: t("cd.facts.service"),
             value: SERVICES[serviceKey]?.label ?? service,
             editStep: 0,
           },
-          { label: "Problem", value: problem || "—", editStep: 0 },
-          { label: "Where", value: location || "—", editStep: 1 },
-          { label: "When", value: whenLabel(when), editStep: 2 },
-          { label: "Impact", value: impact.trim() || "Not provided", editStep: 3 },
           {
-            label: "Evidence",
+            label: t("rp.review.problem"),
+            value: problem
+              ? PROBLEM_KEYS[problem]
+                ? t(PROBLEM_KEYS[problem])
+                : problem
+              : "—",
+            editStep: 0,
+          },
+          { label: t("rp.step.where"), value: location || "—", editStep: 1 },
+          { label: t("rp.step.when"), value: whenLabel(when, t), editStep: 2 },
+          { label: t("cd.impact"), value: impact.trim() || t("rp.review.not-provided"), editStep: 3 },
+          {
+            label: t("cd.tab.evidence"),
             value: evidenceItems.length
-              ? `${evidenceItems.length} item${evidenceItems.length === 1 ? "" : "s"} added`
-              : "None added",
+              ? evidenceItems.length === 1
+                ? t("rp.review.items-one")
+                : t("rp.review.items-many").replace("{n}", String(evidenceItems.length))
+              : t("rp.review.none"),
             editStep: 4,
           },
         ];
@@ -975,9 +1010,9 @@ export default function ReportView() {
                   <button
                     onClick={() => setStep(row.editStep)}
                     className="shrink-0 rounded-md border border-white/10 px-2.5 py-1 text-[11.5px] text-zinc-400 transition-colors hover:border-white/25 hover:text-white"
-                    aria-label={`Edit ${row.label}`}
+                    aria-label={t("rp.review.edit-aria").replace("{what}", row.label)}
                   >
-                    Edit
+                    {t("rp.review.edit")}
                   </button>
                 </div>
               ))}
@@ -986,8 +1021,7 @@ export default function ReportView() {
             <div className="flex items-start gap-2.5 rounded-lg border border-[#e3c567]/25 bg-[#e3c567]/[0.06] p-3.5">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#e3c567]" aria-hidden />
               <p className="text-[12.5px] leading-relaxed text-[#efe0a8]">
-                On submit, SASI records this report and can start an investigation.
-                SASI will not contact any authority without your explicit approval.
+                {t("rp.review.submit-note")}
               </p>
             </div>
           </StepShell>
@@ -1020,15 +1054,13 @@ export default function ReportView() {
               <CheckCircle2 className="h-6 w-6 text-[#8ee09a]" aria-hidden />
             </motion.div>
             <h1 className="mt-4 text-[18px] font-semibold text-white">
-              Reported to SASI
+              {t("rp.done.title")}
             </h1>
             <p className="mt-1.5 font-mono text-[13px] tracking-[0.14em] text-zinc-400">
               {result.ref}
             </p>
             <p className="mx-auto mt-4 max-w-md text-[13px] leading-relaxed text-zinc-400">
-              This is recorded in SASI. It is NOT yet filed with any government
-              authority. SASI investigates first and will ask your approval
-              before any contact is made.
+              {t("rp.done.body")}
             </p>
             <div className="mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row">
               <PrimaryButton
@@ -1040,19 +1072,19 @@ export default function ReportView() {
                 className="min-h-11 w-full sm:w-auto"
                 disabled={!result.caseId}
               >
-                Start investigation now
+                {t("rp.done.start-investigation")}
               </PrimaryButton>
               <GhostButton
                 onClick={() => useSasiStore.getState().openCase(result.ref)}
                 className="min-h-11 w-full sm:w-auto"
               >
-                View case
+                {t("rp.done.view-case")}
               </GhostButton>
               <GhostButton
                 onClick={() => useSasiStore.getState().navigate("dashboard")}
                 className="min-h-11 w-full sm:w-auto"
               >
-                Back to dashboard
+                {t("rp.done.back-dashboard")}
               </GhostButton>
             </div>
           </motion.div>
@@ -1069,24 +1101,24 @@ export default function ReportView() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-[18px] font-semibold tracking-tight text-white">
-              Tell SASI what is happening
+              {t("landing.cta.report")}
             </h1>
             <p className="mt-1 max-w-lg text-[13px] leading-relaxed text-zinc-500">
-              SASI will investigate and prepare next steps. Reporting to SASI is
-              not a government submission — SASI will ask before contacting anyone.
+              {t("rp.subtitle")}
             </p>
           </div>
           <DemoBadge label="DEMO" className="mt-1 shrink-0" />
         </header>
 
         {/* stepper */}
-        <nav className="mt-6" aria-label="Report progress">
+        <nav className="mt-6" aria-label={t("rp.progress-aria")}>
           <div className="sasi-scroll flex items-center gap-1 overflow-x-auto pb-1">
-            {STEP_LABELS.map((label, i) => {
+            {STEP_KEYS.map((key, i) => {
+              const label = t(key);
               const done = i < step;
               const current = i === step;
               return (
-                <Fragment key={label}>
+                <Fragment key={key}>
                   {i > 0 && (
                     <span
                       aria-hidden
@@ -1121,12 +1153,12 @@ export default function ReportView() {
           <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-white transition-all duration-300"
-              style={{ width: `${((step + 1) / STEP_LABELS.length) * 100}%` }}
+              style={{ width: `${((step + 1) / STEP_KEYS.length) * 100}%` }}
               role="progressbar"
               aria-valuenow={step + 1}
               aria-valuemin={1}
-              aria-valuemax={STEP_LABELS.length}
-              aria-label="Report completion"
+              aria-valuemax={STEP_KEYS.length}
+              aria-label={t("rp.completion-aria")}
             />
           </div>
         </nav>
@@ -1134,7 +1166,10 @@ export default function ReportView() {
         {/* step body */}
         <div className="sasi-card mt-5 p-4 sm:p-6">
           <p className="mb-4 font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-600">
-            Step {step + 1} of {STEP_LABELS.length} · {STEP_LABELS[step]}
+            {t("rp.step-counter")
+              .replace("{n}", String(step + 1))
+              .replace("{total}", String(STEP_KEYS.length))
+              .replace("{label}", t(STEP_KEYS[step]))}
           </p>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -1157,14 +1192,14 @@ export default function ReportView() {
               disabled={step === 0}
               className="min-h-11 flex-1 sm:flex-none sm:px-5"
             >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Back
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {t("rp.back")}
             </GhostButton>
             {step < 5 ? (
               <PrimaryButton
                 onClick={goNext}
                 className="min-h-11 flex-1 sm:flex-none sm:px-6"
               >
-                Continue <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                {t("rp.continue")} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
               </PrimaryButton>
             ) : (
               <PrimaryButton
@@ -1175,7 +1210,7 @@ export default function ReportView() {
                 {submitting && (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                 )}
-                Submit to SASI
+                {t("rp.submit")}
               </PrimaryButton>
             )}
           </div>

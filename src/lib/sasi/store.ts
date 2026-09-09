@@ -24,6 +24,21 @@ import {
   NOTIFICATIONS,
 } from "./data";
 import { getSessionId } from "./utils";
+import {
+  clearSnapshotChat,
+  offlineSnapshotInfo,
+  readSnapshot,
+  snapshotBriefing,
+  snapshotCase,
+  snapshotChat,
+  snapshotEvidence,
+  snapshotLocation,
+  snapshotNotifications,
+  type OfflineSnapshotInfo,
+  type SnapshotCase,
+  type SnapshotMessage,
+  type SnapshotNotification,
+} from "./offline";
 
 interface SasiState {
   /* ---- navigation (client-side router; the product ships on a single route) ---- */
@@ -70,6 +85,11 @@ interface SasiState {
   /* ---- persistence ("survive a reload" layer) ---- */
   hydrated: boolean;
   hydrate: () => Promise<void>;
+  /** hydrate restored the user's data from the on-device snapshot (network was down) */
+  restoredOffline: boolean;
+  /** what the on-device IndexedDB snapshot currently holds (Settings → App & offline) */
+  deviceSnapshot: OfflineSnapshotInfo | null;
+  refreshDeviceSnapshot: () => Promise<void>;
 
   /* ---- report flow ---- */
   reportDraft: {
@@ -167,6 +187,9 @@ function bumpCaseCounterFrom(c: SasiCase) {
 /* ---------- persistence helpers (fire-and-forget; the demo never blocks on storage) ---------- */
 
 async function persistCase(c: SasiCase) {
+  /* mirror into the on-device snapshot first — an offline reload must
+     still show this case even if the server POST below never lands */
+  void snapshotCase(c as unknown as SnapshotCase);
   try {
     await fetch("/api/sasi/state", {
       method: "POST",
@@ -174,11 +197,12 @@ async function persistCase(c: SasiCase) {
       body: JSON.stringify({ type: "case", sessionId: getSessionId(), case: c }),
     });
   } catch {
-    /* offline / demo — the in-memory case still works */
+    /* offline / demo — the in-memory case (and snapshot) still work */
   }
 }
 
 async function persistBriefing(b: CityBriefing) {
+  void snapshotBriefing(b);
   try {
     await fetch("/api/sasi/state", {
       method: "POST",
@@ -186,7 +210,7 @@ async function persistBriefing(b: CityBriefing) {
       body: JSON.stringify({ type: "briefing", sessionId: getSessionId(), briefing: b }),
     });
   } catch {
-    /* offline / demo — the session cache still covers this visit */
+    /* offline / demo — the session cache + device snapshot cover this visit */
   }
 }
 
@@ -208,6 +232,19 @@ function persistNotificationRead(opts: { notificationId?: string; all?: boolean 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type: "notification-read", sessionId: getSessionId(), ...opts }),
   }).catch(() => undefined);
+}
+
+/** mirror the current in-memory notification list into the on-device snapshot */
+function mirrorNotifications(list: AppNotification[]) {
+  void snapshotNotifications(list as unknown as SnapshotNotification[]);
+}
+
+/** mirror the finished half of the chat into the on-device snapshot */
+function mirrorChat(list: ChatMessage[]) {
+  const done: SnapshotMessage[] = list
+    .filter((m) => m.state === "done" && m.content.trim())
+    .map((m) => ({ id: m.id, role: m.role, content: m.content, at: m.at, refs: m.refs }));
+  void snapshotChat(done);
 }
 
 /** newest first, capped — shared by push and hydrate merges */
@@ -267,6 +304,64 @@ function pushBriefingHistory(history: CityBriefing[], b: CityBriefing): CityBrie
 
 /** briefings older than this are considered stale and quietly refreshed */
 const BRIEFING_TTL_MS = 6 * 60 * 60 * 1000;
+
+/* ------------------------------------------------------------------
+   Shared merge for user data arriving from EITHER source — the
+   on-device IndexedDB snapshot (offline) or /api/sasi/state (the
+   server copy, which takes precedence when reachable). Both use
+   the same dedupe + prepend rules, so hydrate stays honest:
+   server rows win only by merging after the snapshot.
+   ------------------------------------------------------------------ */
+interface RemotePayload {
+  cases?: SasiCase[];
+  chat?: { id: string; role: "user" | "assistant"; content: string; at: string; refs?: string[] }[];
+  evidence?: EvidenceItem[];
+  location?: { province: string; city: string; suburb: string };
+  briefings?: CityBriefing[];
+  briefing?: CityBriefing | null;
+  notifications?: AppNotification[];
+}
+
+function mergeRemote(
+  s: SasiState,
+  remote: RemotePayload
+): Partial<SasiState> {
+  const userCases = (remote.cases ?? []).filter(
+    (c) => !s.cases.some((existing) => existing.ref === c.ref)
+  );
+  for (const c of remote.cases ?? []) bumpCaseCounterFrom(c);
+  const userEvidence = (remote.evidence ?? []).filter(
+    (ev) => !s.evidence.some((existing) => existing.id === ev.id)
+  );
+  const chat =
+    s.chatMessages.length === 0 && (remote.chat?.length ?? 0) > 0
+      ? (remote.chat ?? []).map<ChatMessage>((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          at: m.at,
+          state: "done",
+          refs: m.refs,
+        }))
+      : s.chatMessages;
+  let history = s.briefingHistory;
+  for (const b of remote.briefings ?? []) history = pushBriefingHistory(history, b);
+  /* a single cached briefing (device snapshot) fills the card + history */
+  let liveBriefing = s.briefing;
+  if (!liveBriefing && remote.briefing) {
+    liveBriefing = remote.briefing;
+    history = pushBriefingHistory(history, remote.briefing);
+  }
+  return {
+    cases: userCases.length ? [...userCases, ...s.cases] : s.cases,
+    evidence: userEvidence.length ? [...userEvidence, ...s.evidence] : s.evidence,
+    chatMessages: chat,
+    savedLocation: remote.location ?? s.savedLocation,
+    briefingHistory: history,
+    ...(liveBriefing && !s.briefing ? { briefing: liveBriefing } : {}),
+    notifications: mergeNotifications(applySeedReads(s.notifications), remote.notifications ?? []),
+  };
+}
 
 /* ------------------------------------------------------------------
    Notification preferences — persisted per browser so the user's
@@ -378,6 +473,7 @@ function rememberServiceAlertSeen(ids: string[]) {
 
 let locationSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function persistLocation(loc: SasiState["savedLocation"]) {
+  void snapshotLocation(loc);
   if (locationSaveTimer) clearTimeout(locationSaveTimer);
   locationSaveTimer = setTimeout(() => {
     void fetch("/api/sasi/state", {
@@ -623,6 +719,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     const n = get().notifications.find((x) => x.id === id);
     if (n?.live) persistNotificationRead({ notificationId: id });
     else rememberSeedRead([id]);
+    mirrorNotifications(get().notifications);
   },
   markAllNotificationsRead: () => {
     const seedIds = get()
@@ -633,6 +730,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     }));
     persistNotificationRead({ all: true });
     if (seedIds.length) rememberSeedRead(seedIds);
+    mirrorNotifications(get().notifications);
   },
   /* ---------- notification preferences ---------- */
   ntfPrefs: DEFAULT_NTF_PREFS,
@@ -701,6 +799,8 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     };
     set((s) => ({ notifications: mergeNotifications([n], s.notifications) }));
     void persistNotification(n);
+    /* keep the on-device snapshot in sync (offline reloads show this) */
+    mirrorNotifications(get().notifications);
   },
   notifyInvestigationComplete: (caseId) => {
     const c = get().cases.find((x) => x.id === caseId);
@@ -734,11 +834,19 @@ export const useSasiStore = create<SasiState>((set, get) => ({
 
   /* ------------------------------------------------------------------
      Hydrate — load the user's cases, chat history and saved location
-     from /api/sasi/state (keyed by an anonymous browser session id).
-     Runs once while the splash screen is up; failures are silent and
-     the demo falls back to its in-memory dataset.
+     from the on-device IndexedDB snapshot FIRST (so an offline reload
+     still shows the user's work), then from /api/sasi/state (keyed by
+     an anonymous browser session id; the server copy merges over the
+     snapshot and wins where they differ). Runs once while the splash
+     screen is up; failures are silent and the demo falls back to its
+     in-memory dataset.
      ------------------------------------------------------------------ */
   hydrated: false,
+  restoredOffline: false,
+  deviceSnapshot: null,
+  refreshDeviceSnapshot: async () => {
+    set({ deviceSnapshot: await offlineSnapshotInfo() });
+  },
   hydrate: async () => {
     if (get().hydrated || typeof window === "undefined") return;
     set({ hydrated: true }); // guard against double-invoke before the fetch resolves
@@ -755,64 +863,73 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     } catch {
       /* storage blocked — session-only */
     }
+
+    /* ---------- 1. on-device snapshot (IndexedDB) — works with no network ---------- */
+    let haveSnapshot = false;
     try {
-      const res = await fetch(`/api/sasi/state?sessionId=${encodeURIComponent(getSessionId())}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        cases?: SasiCase[];
-        chat?: {
-          id: string;
-          role: "user" | "assistant";
-          content: string;
-          at: string;
-          refs?: string[];
-        }[];
-        evidence?: EvidenceItem[];
-        location?: { province: string; city: string; suburb: string };
-        briefings?: CityBriefing[];
-        notifications?: AppNotification[];
-      };
-
-      set((s) => {
-        const userCases = (data.cases ?? []).filter(
-          (c) => !s.cases.some((existing) => existing.ref === c.ref)
+      const snap = await readSnapshot();
+      if (
+        (snap.cases?.length ?? 0) > 0 ||
+        (snap.chat?.length ?? 0) > 0 ||
+        (snap.notifications?.length ?? 0) > 0 ||
+        (snap.evidence?.length ?? 0) > 0 ||
+        snap.location ||
+        snap.briefing
+      ) {
+        haveSnapshot = true;
+        set((s) =>
+          mergeRemote(s, {
+            cases: snap.cases as unknown as SasiCase[] | undefined,
+            chat: snap.chat ?? undefined,
+            evidence: snap.evidence as unknown as EvidenceItem[] | undefined,
+            location: snap.location ?? undefined,
+            briefing: (snap.briefing as CityBriefing | null) ?? undefined,
+            notifications: snap.notifications as AppNotification[] | undefined,
+          })
         );
-        for (const c of data.cases ?? []) bumpCaseCounterFrom(c);
-        const userEvidence = (data.evidence ?? []).filter(
-          (ev) => !s.evidence.some((existing) => existing.id === ev.id)
-        );
-        const chat =
-          s.chatMessages.length === 0 && (data.chat?.length ?? 0) > 0
-            ? (data.chat ?? []).map<ChatMessage>((m) => ({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-                at: m.at,
-                state: "done",
-                refs: m.refs,
-              }))
-            : s.chatMessages;
-        /* merge restored briefings into history (dedupe by generatedAt, newest first) */
-        let history = s.briefingHistory;
-        for (const b of data.briefings ?? []) history = pushBriefingHistory(history, b);
-        return {
-          cases: userCases.length ? [...userCases, ...s.cases] : s.cases,
-          evidence: userEvidence.length ? [...userEvidence, ...s.evidence] : s.evidence,
-          chatMessages: chat,
-          savedLocation: data.location ?? s.savedLocation,
-          briefingHistory: history,
-          notifications: (data.notifications?.length ?? 0) > 0
-            ? mergeNotifications(applySeedReads(s.notifications), data.notifications ?? [])
-            : mergeNotifications(applySeedReads(s.notifications), []),
-        };
-      });
-      /* warm the city briefing so the notifications digest (and any view
-         that cites it) has data — TTL/session-cache guarded, so this is
-         free when the cache is fresh and quiet when offline */
-      void get().generateBriefing();
+        /* the snapshot briefing also seeds the session cache so
+           restoreBriefing / City mode keep working offline */
+        const b = get().briefing;
+        if (b) {
+          try {
+            window.sessionStorage.setItem("sasi.briefing", JSON.stringify(b));
+          } catch {
+            /* storage full/blocked — briefing stays in memory */
+          }
+        }
+      }
+    } catch {
+      /* snapshot unavailable — demo continues from memory */
+    }
+    void get().refreshDeviceSnapshot();
 
-      /* service alerts: one quiet digest of NEW urgent/confirmed incidents
-         near the saved location — only when the user has them enabled */
+    const offline = typeof navigator !== "undefined" && !navigator.onLine;
+    if (haveSnapshot && offline) set({ restoredOffline: true });
+
+    /* ---------- 2. server copy (source of truth when reachable) ---------- */
+    if (!offline) {
+      try {
+        const res = await fetch(`/api/sasi/state?sessionId=${encodeURIComponent(getSessionId())}`);
+        if (res.ok) {
+          const data = (await res.json()) as RemotePayload;
+          set((s) => mergeRemote(s, data));
+          /* warm the city briefing so the notifications digest (and any view
+             that cites it) has data — TTL/session-cache guarded, so this is
+             free when the cache is fresh. SKIPPED while offline: the LLM
+             call would fail; the snapshot briefing covers the card. */
+          void get().generateBriefing();
+        } else if (haveSnapshot) {
+          set({ restoredOffline: true });
+        }
+      } catch {
+        if (haveSnapshot) set({ restoredOffline: true });
+      }
+    }
+
+    /* service alerts: one quiet digest of NEW urgent/confirmed incidents
+       near the saved location — only when the user has them enabled.
+       Uses the static demo dataset, so it works offline too. */
+    {
       const loc = get().savedLocation;
       const city = loc.city.toLowerCase();
       const newOnes = INCIDENTS.filter(
@@ -833,8 +950,13 @@ export const useSasiStore = create<SasiState>((set, get) => ({
             .join(" · ") + (newOnes.length > 2 ? ` · +${newOnes.length - 2} more` : ""),
         });
       }
-    } catch {
-      /* offline / cold DB — demo continues from memory */
+    }
+
+    /* an offline restore is worth one honest, quiet announcement */
+    if (get().restoredOffline) {
+      toast("Restored from this device", {
+        description: "You're offline — SASI is showing your saved cases, chat and alerts from the on-device copy.",
+      });
     }
 
     /* ---------- deep link: /?view=report (PWA manifest shortcuts) ----------
@@ -981,6 +1103,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     })),
   addEvidence: (item) => {
     set((s) => ({ evidence: [item, ...s.evidence] }));
+    void snapshotEvidence(item);
     void fetch("/api/sasi/state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1100,6 +1223,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
   setPendingAsk: (q) => set({ pendingAsk: q }),
   clearChat: () => {
     set({ chatMessages: [], pendingAsk: null });
+    void clearSnapshotChat();
     void fetch(
       `/api/sasi/state?sessionId=${encodeURIComponent(getSessionId())}&scope=chat`,
       { method: "DELETE" }
@@ -1221,6 +1345,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
           });
         }
         set({ chatBusy: false });
+        mirrorChat(get().chatMessages);
         return;
       }
 
@@ -1239,6 +1364,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         state: "done",
       });
       set({ chatBusy: false });
+      mirrorChat(get().chatMessages);
     } catch (err) {
       patchReply({
         content:
@@ -1248,6 +1374,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         state: "error",
       });
       set({ chatBusy: false });
+      mirrorChat(get().chatMessages);
     }
   },
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { useT } from "@/lib/sasi/i18n";
+import { INCIDENTS } from "@/lib/sasi/data";
 import type { NotificationKind } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
 import { NotificationRow } from "@/components/sasi/domain";
@@ -264,21 +265,32 @@ export default function NotificationsView() {
             {filtered.map((n) => {
               /* notifications carrying a case ref get a gold "View on map"
                  affordance — focusOnMap resolves the user's own cases onto
-                 their saved location (and guards unknown refs honestly) */
-              const mappable = n.caseRef ? cases.some((c) => c.ref === n.caseRef) : false;
+                 their saved location (and guards unknown refs honestly).
+                 SYSTEM service-alert bodies embed INC refs in their text —
+                 parse the first one and offer the same jump for incidents. */
+              const mapRef = n.caseRef ?? (/INC-\d{4,6}/.exec(n.body)?.[0] ?? null);
+              const mapRefKnown =
+                mapRef && !n.caseRef
+                  ? INCIDENTS.some(
+                      (i) =>
+                        i.ref.toLowerCase() === mapRef.toLowerCase() ||
+                        i.id === mapRef.toLowerCase()
+                    )
+                  : Boolean(mapRef);
               return (
                 <NotificationRow
                   key={n.id}
                   n={n}
+                  mapRef={mapRefKnown ? (mapRef ?? undefined) : undefined}
                   onOpen={() => {
                     markNotificationRead(n.id);
                     if (n.caseRef) openCase(n.caseRef);
                   }}
                   onViewOnMap={
-                    mappable && n.caseRef
+                    mapRefKnown && mapRef
                       ? () => {
                           markNotificationRead(n.id);
-                          focusOnMap(n.caseRef as string);
+                          focusOnMap(mapRef);
                         }
                       : undefined
                   }

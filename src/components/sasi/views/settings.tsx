@@ -11,6 +11,7 @@ import {
   FileText,
   FolderSearch,
   Globe,
+  HardDrive,
   Info,
   Languages,
   Lock,
@@ -36,7 +37,7 @@ import { applyPwaUpdate, promptPwaInstall } from "@/components/sasi/pwa";
 import { DEMO_USER, GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
 import { LANGUAGES, PLANNED_LANGUAGES, useT } from "@/lib/sasi/i18n";
 import type { Lang } from "@/lib/sasi/types";
-import { locationLabel } from "@/lib/sasi/utils";
+import { locationLabel, timeAgo } from "@/lib/sasi/utils";
 import {
   DemoBadge,
   SectionLabel,
@@ -142,6 +143,115 @@ function StatusRow({
   );
 }
 
+/** one quiet count tile in the "On this device" snapshot card */
+function SnapshotTile({ label, value, unit }: { label: string; value: number; unit?: string }) {
+  return (
+    <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 transition-colors hover:border-white/10">
+      <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+      <p className="mt-1 flex items-baseline gap-1.5 text-[17px] font-semibold text-zinc-100">
+        {value}
+        {unit && unit !== "—" && (
+          <span className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-[#a5d6a7]">{unit}</span>
+        )}
+        {unit === "—" && <span className="text-[12px] font-normal text-zinc-600">not cached</span>}
+      </p>
+    </div>
+  );
+}
+
+/* ============================================================
+   Per-view translation coverage — hand-maintained to stay honest.
+   "full" = the view's user-facing strings resolve through the
+   dictionary; "partial" = chrome/labels only; "none" = English
+   for now. Mirrors the coverage notes in src/lib/sasi/i18n.ts.
+   ============================================================ */
+type CoverageState = "full" | "partial" | "none";
+const I18N_COVERAGE: { view: string; cov: [CoverageState, CoverageState, CoverageState] }[] = [
+  { view: "App shell & navigation", cov: ["full", "full", "full"] },
+  { view: "Landing page", cov: ["full", "full", "full"] },
+  { view: "Dashboard & briefing", cov: ["full", "full", "full"] },
+  { view: "Report wizard", cov: ["full", "full", "full"] },
+  { view: "Cases & case detail", cov: ["full", "full", "full"] },
+  { view: "Incidents & incident detail", cov: ["full", "full", "full"] },
+  { view: "Civic map", cov: ["full", "full", "full"] },
+  { view: "Notifications", cov: ["full", "full", "full"] },
+  { view: "Activity feed", cov: ["full", "full", "full"] },
+  { view: "Evidence", cov: ["full", "full", "full"] },
+  { view: "Ask SASI (interface)", cov: ["full", "partial", "partial"] },
+  { view: "Settings (most sections)", cov: ["full", "partial", "partial"] },
+  { view: "Services & service detail", cov: ["full", "none", "none"] },
+  { view: "About / Security / Privacy / Terms", cov: ["full", "none", "none"] },
+  { view: "Sign in / Sign up", cov: ["full", "none", "none"] },
+  { view: "Investigate views", cov: ["full", "none", "none"] },
+  { view: "Admin & profile", cov: ["full", "none", "none"] },
+];
+
+const COVERAGE_LEGEND: { state: CoverageState; label: string }[] = [
+  { state: "full", label: "Translated" },
+  { state: "partial", label: "Chrome / labels only" },
+  { state: "none", label: "English for now" },
+];
+
+function coverageDotClass(state: CoverageState): string {
+  return state === "full"
+    ? "bg-[#66bb6a]"
+    : state === "partial"
+      ? "bg-[#ffa726]/70"
+      : "bg-zinc-700";
+}
+
+function CoverageTable() {
+  const fullZu = I18N_COVERAGE.filter((r) => r.cov[1] === "full").length;
+  const fullAf = I18N_COVERAGE.filter((r) => r.cov[2] === "full").length;
+  return (
+    <div className="mt-3">
+      <div
+        className="grid grid-cols-[1fr_auto] gap-x-3 border-b border-white/8 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600"
+        role="row"
+      >
+        <span role="columnheader">Surface</span>
+        <span className="grid grid-cols-3 gap-2 text-center" role="columnheader">
+          <span>EN</span>
+          <span>ZU</span>
+          <span>AF</span>
+        </span>
+      </div>
+      <ul className="sasi-coverage-list mt-1.5 space-y-px">
+        {I18N_COVERAGE.map((row) => (
+          <li
+            key={row.view}
+            className="grid grid-cols-[1fr_auto] items-center gap-x-3 rounded px-1 py-[3px] transition-colors hover:bg-white/[0.03]"
+          >
+            <span className="truncate text-[11.5px] text-zinc-400">{row.view}</span>
+            <span className="grid grid-cols-3 gap-2">
+              {row.cov.map((state, i) => (
+                <span key={i} className="flex justify-center">
+                  <span
+                    className={cn("h-1.5 w-1.5 rounded-full", coverageDotClass(state))}
+                    aria-label={`${LANGUAGES[i].label}: ${COVERAGE_LEGEND.find((l) => l.state === state)?.label}`}
+                    title={`${LANGUAGES[i].label}: ${COVERAGE_LEGEND.find((l) => l.state === state)?.label}`}
+                  />
+                </span>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/8 pt-2">
+        {COVERAGE_LEGEND.map((l) => (
+          <span key={l.state} className="flex items-center gap-1.5 text-[10.5px] text-zinc-500">
+            <span className={cn("h-1.5 w-1.5 rounded-full", coverageDotClass(l.state))} aria-hidden />
+            {l.label}
+          </span>
+        ))}
+        <span className="ml-auto font-mono text-[10px] text-zinc-600">
+          isiZulu {fullZu}/{I18N_COVERAGE.length} · Afrikaans {fullAf}/{I18N_COVERAGE.length}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function AppOfflineSection() {
   const online = usePwaStore((s) => s.online);
   const swPhase = usePwaStore((s) => s.swPhase);
@@ -149,6 +259,24 @@ function AppOfflineSection() {
   const installable = usePwaStore((s) => s.installable);
   const installed = usePwaStore((s) => s.installed);
   const updateReady = usePwaStore((s) => s.updateReady);
+
+  /* on-device snapshot (IndexedDB) — counts + freshness for the card below */
+  const deviceSnapshot = useSasiStore((s) => s.deviceSnapshot);
+  const restoredOffline = useSasiStore((s) => s.restoredOffline);
+  const refreshDeviceSnapshot = useSasiStore((s) => s.refreshDeviceSnapshot);
+
+  /* iOS Safari offers no beforeinstallprompt — show honest manual steps instead */
+  const [isIos] = useState(() => {
+    if (typeof navigator === "undefined") return false;
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    );
+  });
+
+  useEffect(() => {
+    void refreshDeviceSnapshot();
+  }, [refreshDeviceSnapshot]);
 
   const handleInstall = async () => {
     const outcome = await promptPwaInstall();
@@ -255,7 +383,91 @@ function AppOfflineSection() {
               }
             />
           )}
+          {isIos && !installed && !installable && (
+            <StatusRow
+              icon={Smartphone}
+              label="iPhone / iPad install"
+              state="Safari on iOS installs via the Share menu — see the steps below"
+              tone="muted"
+            />
+          )}
         </div>
+      </div>
+
+      {isIos && !installed && (
+        <div className="sasi-card p-5">
+          <p className="flex items-center gap-2 text-[13px] font-medium text-zinc-200">
+            <Smartphone className="h-3.5 w-3.5 text-[#e3c567]" aria-hidden />
+            Install on iPhone or iPad
+          </p>
+          <p className="mt-2 max-w-xl text-[12.5px] leading-relaxed text-zinc-400">
+            Apple does not let Safari show a one-tap install prompt, so this is the
+            honest two-step way — it takes about ten seconds:
+          </p>
+          <ol className="mt-3 space-y-2 text-[12.5px] text-zinc-300">
+            <li className="sasi-ios-step flex items-start gap-2.5 rounded-lg border border-white/5 bg-white/[0.02] p-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[#e3c567]/25 bg-[#e3c567]/[0.08] text-[11px] font-semibold text-[#e3c567]" aria-hidden>1</span>
+              Open this page in Safari and tap the <strong className="font-medium text-white">Share</strong> icon (the square with the arrow).
+            </li>
+            <li className="sasi-ios-step flex items-start gap-2.5 rounded-lg border border-white/5 bg-white/[0.02] p-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[#e3c567]/25 bg-[#e3c567]/[0.08] text-[11px] font-semibold text-[#e3c567]" aria-hidden>2</span>
+              Choose <strong className="font-medium text-white">Add to Home Screen</strong>, then tap Add — SASI opens full-screen from your home screen from then on.
+            </li>
+          </ol>
+        </div>
+      )}
+
+      <div className="sasi-card p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="flex items-center gap-2 text-[13px] font-medium text-zinc-200">
+              <HardDrive className="h-3.5 w-3.5 text-[#e3c567]" aria-hidden />
+              On this device
+            </p>
+            <p className="mt-1 max-w-xl text-[12.5px] leading-relaxed text-zinc-400">
+              SASI keeps a private snapshot of your data in this browser (IndexedDB) so an
+              offline reload still shows your work. It never leaves this device — when the
+              network returns, the server copy takes over again.
+            </p>
+          </div>
+          <GhostButton
+            onClick={() => void refreshDeviceSnapshot()}
+            className="h-8 shrink-0 px-2.5 text-[11.5px]"
+            aria-label="Refresh device snapshot counts"
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+            Refresh
+          </GhostButton>
+        </div>
+
+        {deviceSnapshot && (deviceSnapshot.cases > 0 || deviceSnapshot.chat > 0 || deviceSnapshot.notifications > 0 || deviceSnapshot.evidence > 0 || deviceSnapshot.briefing) ? (
+          <>
+            <div className="sasi-snapshot-grid mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <SnapshotTile label="Your reports" value={deviceSnapshot.cases} />
+              <SnapshotTile label="Chat messages" value={deviceSnapshot.chat} />
+              <SnapshotTile label="Notifications" value={deviceSnapshot.notifications} />
+              <SnapshotTile label="Evidence items" value={deviceSnapshot.evidence} />
+              <SnapshotTile label="City briefing" value={deviceSnapshot.briefing ? 1 : 0} unit={deviceSnapshot.briefing ? "cached" : "—"} />
+            </div>
+            <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-zinc-500">
+              <Database className="h-3 w-3" aria-hidden />
+              {deviceSnapshot.savedAt
+                ? `Snapshot last written ${timeAgo(deviceSnapshot.savedAt)}`
+                : "Snapshot not written yet"}
+            </p>
+            {restoredOffline && (
+              <p className="sasi-restored-note mt-2 rounded-lg border border-[#ffa726]/20 bg-[#ffa726]/[0.05] py-2 pl-4 pr-3 text-[12px] leading-relaxed text-[#ffcc80]">
+                This visit started offline — the counts above were restored from this device,
+                not from the network. Everything syncs again on the next visit with a connection.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5 text-[12px] leading-relaxed text-zinc-500">
+            Nothing saved yet — report an issue or ask SASI something, and your data will
+            start saving here (it stays even when you reload with no network).
+          </p>
+        )}
       </div>
 
       <div className="sasi-card p-5">
@@ -746,11 +958,10 @@ export default function SettingsView() {
               <div className="mt-3 rounded-lg border border-white/8 bg-white/[0.02] p-3">
                 <p className="text-[11.5px] font-medium text-zinc-300">Honest coverage</p>
                 <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
-                  English, isiZulu and Afrikaans translate the app shell (sidebar, topbar, mobile
-                  nav), the landing page and shared controls — switch now and those surfaces
-                  respond instantly. Individual views remain English for this demo; reports written
-                  in any language are accepted, and deeper translation is planned.
+                  Switching is instant — every surface marked green below responds immediately.
+                  SASI accepts reports written in any language, and deeper translation is planned.
                 </p>
+                <CoverageTable />
               </div>
               {lang !== "en" && (
                 <button
