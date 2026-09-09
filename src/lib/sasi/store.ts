@@ -40,6 +40,9 @@ interface SasiState {
   commandOpen: boolean;
   setCommandOpen: (open: boolean) => void;
 
+  /* ---- settings deep-link: which section is active (palette/shortcuts write it) ---- */
+  settingsSection: string;
+
   /* ---- notifications (demo seed + live events) ---- */
   notifications: AppNotification[];
   markNotificationRead: (id: string) => void;
@@ -316,6 +319,36 @@ function prefGatesKind(prefs: NtfPrefs, kind: NotificationKind): boolean {
   }
 }
 
+/** every view the SPA knows — used to validate /?view= deep links (PWA shortcuts) */
+const ALL_VIEWS: readonly View[] = [
+  "landing",
+  "about",
+  "how-it-works",
+  "services",
+  "service-detail",
+  "security",
+  "privacy",
+  "terms",
+  "login",
+  "signup",
+  "dashboard",
+  "ask-sasi",
+  "investigate",
+  "start-investigation",
+  "report",
+  "cases",
+  "case-detail",
+  "incidents",
+  "incident-detail",
+  "map",
+  "evidence",
+  "activity",
+  "notifications",
+  "settings",
+  "profile",
+  "admin",
+];
+
 /* ------------------------------------------------------------------
    Service alerts — when hydrating, surface URGENT/CONFIRMED demo
    incidents near the saved location as ONE quiet digest notification.
@@ -555,6 +588,8 @@ export const useSasiStore = create<SasiState>((set, get) => ({
 
   commandOpen: false,
   setCommandOpen: (open) => set({ commandOpen: open }),
+
+  settingsSection: "account",
 
   cityBriefingBackup: null,
   restoreCityBriefing: async () => {
@@ -800,6 +835,43 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       }
     } catch {
       /* offline / cold DB — demo continues from memory */
+    }
+
+    /* ---------- deep link: /?view=report (PWA manifest shortcuts) ----------
+       Runs once at hydrate; only honoured for known views, and only when
+       the target is reachable in the current auth state (a shortcut to an
+       app view while signed out lands on the login view instead — honest). */
+    try {
+      const wanted = new URLSearchParams(window.location.search).get("view");
+      if (wanted) {
+        const PUBLIC_VIEW_SET = new Set<View>([
+          "landing",
+          "about",
+          "how-it-works",
+          "services",
+          "service-detail",
+          "security",
+          "privacy",
+          "terms",
+          "login",
+          "signup",
+        ]);
+        const valid = (PUBLIC_VIEW_SET as Set<string>).has(wanted)
+          ? null /* public views are already the default experience — nothing to jump to */
+          : ((ALL_VIEWS as readonly string[]).includes(wanted) ? (wanted as View) : null);
+        if (valid) {
+          const authed = get().authed;
+          if (!authed) {
+            get().navigate("login");
+          } else {
+            get().navigate(valid);
+          }
+        }
+        /* clean the query so a later refresh doesn't re-trigger the jump */
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    } catch {
+      /* history API blocked — the deep link simply keeps its query */
     }
   },
 

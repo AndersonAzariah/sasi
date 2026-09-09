@@ -130,8 +130,11 @@ function BriefingBody({
           </p>
           <ul className="mt-2 space-y-1.5">
             {briefing.watchlist.map((w, i) => {
-              /* watchlist rows that cite a demo incident ref get a map click-through */
+              /* watchlist rows citing a ref get a map click-through:
+                 INC refs are blue (demo incident markers), CASE refs are
+                 gold (the user's own reports, placed at their location) */
               const incRef = /INC-\d{3,4}/i.exec(w)?.[0];
+              const caseRef = /CASE-\d{4,6}/i.exec(w)?.[0];
               return (
                 <li key={i} className="flex gap-2 text-[12.5px] leading-relaxed text-zinc-300">
                   <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600" aria-hidden />
@@ -142,6 +145,16 @@ function BriefingBody({
                         onClick={() => onMap(incRef)}
                         className="sasi-chip-map mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500 transition-colors hover:text-[#64b5f6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#64b5f6]/50"
                         aria-label={`Show ${incRef} on the civic map`}
+                      >
+                        <MapPin className="h-3 w-3" aria-hidden />
+                        View on map
+                      </button>
+                    )}
+                    {!incRef && caseRef && (
+                      <button
+                        onClick={() => onMap(caseRef)}
+                        className="sasi-chip-map-gold mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e3c567]/50"
+                        aria-label={`Show your report ${caseRef} on the civic map`}
                       >
                         <MapPin className="h-3 w-3" aria-hidden />
                         View on map

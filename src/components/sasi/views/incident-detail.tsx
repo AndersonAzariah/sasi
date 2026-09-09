@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import { INCIDENTS, sourcesByIds } from "@/lib/sasi/data";
 import type { TimelineEvent } from "@/lib/sasi/types";
 import {
@@ -47,6 +48,7 @@ export default function IncidentDetailView() {
   const cases = useSasiStore((s) => s.cases);
   const navigate = useSasiStore((s) => s.navigate);
   const openCase = useSasiStore((s) => s.openCase);
+  const t = useT();
 
   /* share popover state (copy + print, same pattern as case brief) */
   const [shareOpen, setShareOpen] = useState(false);
@@ -174,18 +176,18 @@ export default function IncidentDetailView() {
         <GhostButton
           onClick={() => navigate("incidents")}
           className="-ml-2 h-8 px-2.5 text-[12px]"
-          aria-label="Back to incidents explorer"
+          aria-label={t("id.back-aria")}
         >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Back to incidents
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {t("id.back")}
         </GhostButton>
         <div className="mt-4">
           <EmptyState
             icon={Sparkles}
-            title="Incident not found"
-            description="This incident reference does not exist in the demo dataset. It may have been opened from an outdated link."
+            title={t("id.notfound.title")}
+            description={t("id.notfound.desc")}
             action={
               <GhostButton onClick={() => navigate("incidents")}>
-                Browse all incidents
+                {t("id.browse-all")}
               </GhostButton>
             }
           />
@@ -197,26 +199,26 @@ export default function IncidentDetailView() {
   const serviceMeta = SERVICES[incident.service];
 
   const detailRows: { label: string; value: string }[] = [
-    { label: "Service", value: serviceMeta.label },
-    { label: "Province", value: incident.location.province },
-    { label: "Municipality", value: incident.location.municipality },
+    { label: t("id.facts.service"), value: serviceMeta.label },
+    { label: t("id.facts.province"), value: incident.location.province },
+    { label: t("id.facts.municipality"), value: incident.location.municipality },
     {
-      label: "City / suburb",
+      label: t("id.facts.city"),
       value: incident.location.suburb
         ? `${incident.location.city} — ${incident.location.suburb}`
         : incident.location.city,
     },
     ...(incident.affectedArea
-      ? [{ label: "Affected area", value: incident.affectedArea }]
+      ? [{ label: t("id.facts.area"), value: incident.affectedArea }]
       : []),
-    { label: "Reported", value: formatDateTime(incident.reportedAt) },
-    { label: "Last update", value: `${timeAgo(incident.updatedAt)}` },
+    { label: t("id.facts.reported"), value: formatDateTime(incident.reportedAt) },
+    { label: t("id.facts.last-update"), value: `${timeAgo(incident.updatedAt)}` },
     {
-      label: "Sources",
+      label: t("id.facts.sources"),
       value:
         incident.sourceIds.length > 0
           ? `${incident.sourceIds.length} public source${incident.sourceIds.length === 1 ? "" : "s"}`
-          : "None attached yet",
+          : t("id.sources-none"),
     },
   ];
 
@@ -226,9 +228,9 @@ export default function IncidentDetailView() {
       <GhostButton
         onClick={() => navigate("incidents")}
         className="-ml-2 h-8 px-2.5 text-[12px]"
-        aria-label="Back to incidents explorer"
+        aria-label={t("id.back-aria")}
       >
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Back to incidents
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {t("id.back")}
       </GhostButton>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
@@ -271,7 +273,7 @@ export default function IncidentDetailView() {
             className="h-8 px-2.5 text-[12px]"
           >
             <Share2 className="h-3.5 w-3.5" aria-hidden />
-            Share
+            {t("id.share")}
           </GhostButton>
           {shareOpen && (
             <>
@@ -282,7 +284,7 @@ export default function IncidentDetailView() {
               />
               <div
                 role="dialog"
-                aria-label="Share incident"
+                aria-label={t("id.share-dialog")}
                 className="sasi-card sasi-pop absolute left-0 top-10 z-50 w-64 bg-[#0d0e10] p-2 shadow-xl shadow-black/50"
               >
                 <button
@@ -305,7 +307,7 @@ export default function IncidentDetailView() {
                   ) : (
                     <ClipboardCopy className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
                   )}
-                  {copied ? "Summary copied" : "Copy incident summary"}
+                  {copied ? t("id.share.copied") : t("id.share.copy")}
                 </button>
                 <button
                   onClick={() => {
@@ -315,17 +317,17 @@ export default function IncidentDetailView() {
                   className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] text-zinc-200 transition-colors hover:bg-white/[0.05] hover:text-white"
                 >
                   <Printer className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-                  Print / save as PDF
+                  {t("id.share.print")}
                 </button>
                 <p className="mt-1 border-t border-white/5 px-2.5 pb-1 pt-2 text-[11px] leading-relaxed text-zinc-600">
-                  Direct link sharing is not available in this demo.
+                  {t("id.share.note")}
                 </p>
               </div>
             </>
           )}
         </div>
         <p className="text-[11px] text-zinc-600">
-          Export this incident as a plain-text brief or a one-page PDF.
+          {t("id.share.hint")}
         </p>
       </div>
 
@@ -334,16 +336,16 @@ export default function IncidentDetailView() {
         {/* LEFT */}
         <div className="min-w-0 space-y-4">
           {/* summary */}
-          <section className="sasi-card p-4" aria-label="Incident summary">
-            <SectionLabel>Summary</SectionLabel>
+          <section className="sasi-card p-4" aria-label={t("id.summary")}>
+            <SectionLabel>{t("id.summary")}</SectionLabel>
             <p className="mt-2 text-[13px] leading-relaxed text-zinc-300">
               {incident.description}
             </p>
           </section>
 
           {/* details */}
-          <section className="sasi-card p-4" aria-label="Incident details">
-            <SectionLabel>Details</SectionLabel>
+          <section className="sasi-card p-4" aria-label={t("id.details")}>
+            <SectionLabel>{t("id.details")}</SectionLabel>
             <dl className="mt-2">
               {detailRows.map((row) => (
                 <div
@@ -360,22 +362,22 @@ export default function IncidentDetailView() {
           </section>
 
           {/* timeline */}
-          <section className="sasi-card p-4" aria-label="Incident timeline">
-            <SectionLabel>Recent updates</SectionLabel>
+          <section className="sasi-card p-4" aria-label={t("id.updates")}>
+            <SectionLabel>{t("id.updates")}</SectionLabel>
             <div className="mt-3">
               <TimelineRail events={timeline} />
             </div>
             <p className="mt-1 border-t border-white/5 pt-2.5 text-[11px] text-zinc-600">
-              Reconstructed from demo incident data — not a live event feed.
+              {t("id.updates.note")}
             </p>
           </section>
 
           {/* sources */}
-          <section aria-label="Public sources">
+          <section aria-label={t("id.sources")}>
             <div className="mb-2.5 flex items-center justify-between">
-              <SectionLabel>Public sources</SectionLabel>
+              <SectionLabel>{t("id.sources")}</SectionLabel>
               <span className="font-mono text-[10px] tracking-wider text-zinc-600">
-                {sources.length} attached
+                {t("id.attached").replace("{n}", String(sources.length))}
               </span>
             </div>
             {sources.length > 0 ? (
@@ -387,9 +389,7 @@ export default function IncidentDetailView() {
             ) : (
               <div className="sasi-card p-4">
                 <p className="text-[12.5px] leading-relaxed text-zinc-500">
-                  No public sources attached yet — reports from residents keep this incident
-                  flagged. When an official notice or news report matches, it will appear here with
-                  its own trust status.
+                  {t("id.sources.empty")}
                 </p>
               </div>
             )}
@@ -399,8 +399,8 @@ export default function IncidentDetailView() {
         {/* RIGHT — sticky */}
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-20">
           {/* location */}
-          <section className="sasi-card p-4" aria-label="Location on map">
-            <SectionLabel>Location</SectionLabel>
+          <section className="sasi-card p-4" aria-label={t("id.location")}>
+            <SectionLabel>{t("id.location")}</SectionLabel>
             <GautengMiniMap
               className="mt-2.5 aspect-square w-full"
               markers={[
@@ -425,41 +425,40 @@ export default function IncidentDetailView() {
               </p>
             </div>
             <p className="mt-2.5 border-t border-white/5 pt-2 font-mono text-[9px] tracking-[0.14em] text-zinc-700">
-              STYLISED POSITION · DEMO COORDINATES
+              {t("id.coords")}
             </p>
           </section>
 
           {/* related actions */}
-          <section className="sasi-card p-4" aria-label="Related actions">
-            <SectionLabel>Related actions</SectionLabel>
+          <section className="sasi-card p-4" aria-label={t("id.actions.title")}>
+            <SectionLabel>{t("id.actions.title")}</SectionLabel>
             <div className="mt-3 space-y-2">
               <PrimaryButton
                 className="w-full"
                 onClick={() => navigate("start-investigation")}
-                aria-label="Investigate this incident"
+                aria-label={t("id.investigate")}
               >
                 <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                Investigate this incident
+                {t("id.investigate")}
               </PrimaryButton>
               <GhostButton
                 className="w-full"
                 onClick={() => navigate("report")}
-                aria-label="Report a similar issue"
+                aria-label={t("id.report-similar")}
               >
-                Report a similar issue
+                {t("id.report-similar")}
               </GhostButton>
             </div>
             <p className="mt-2.5 text-[11px] leading-relaxed text-zinc-600">
-              SASI prepares everything for your review first — nothing is submitted to government
-              without your approval.
+              {t("id.actions.note")}
             </p>
           </section>
 
           {/* related cases */}
           {relatedCases.length > 0 && (
-            <section aria-label="Related cases">
+            <section aria-label={t("id.related")}>
               <div className="mb-2.5">
-                <SectionLabel>Related cases</SectionLabel>
+                <SectionLabel>{t("id.related")}</SectionLabel>
               </div>
               <div className="space-y-2.5">
                 {relatedCases.map((c) => (

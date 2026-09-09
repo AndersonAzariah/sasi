@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import { DEMO_NOW, evidenceForCase, sourcesForCase } from "@/lib/sasi/data";
 import {
   SERVICES,
@@ -59,37 +60,27 @@ import {
 
 const NOW_MS = new Date(DEMO_NOW).getTime();
 
-const TABS: { key: string; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "investigation", label: "Investigation" },
-  { key: "evidence", label: "Evidence" },
-  { key: "sources", label: "Sources" },
-  { key: "actions", label: "Actions" },
-  { key: "activity", label: "Activity" },
+const TABS: { key: string; labelKey: string }[] = [
+  { key: "overview", labelKey: "cd.tab.overview" },
+  { key: "investigation", labelKey: "cd.tab.investigation" },
+  { key: "evidence", labelKey: "cd.tab.evidence" },
+  { key: "sources", labelKey: "cd.tab.sources" },
+  { key: "actions", labelKey: "cd.tab.actions" },
+  { key: "activity", labelKey: "cd.tab.activity" },
 ];
 
-const PROGRESS_HINT: Record<CaseStatus, string> = {
-  OPEN: "Report received — SASI is preparing to investigate.",
-  INVESTIGATING: "SASI is researching sources and building findings.",
-  ACTION_REQUIRED: "An action is prepared and waiting for your approval.",
-  WAITING: "SASI is monitoring for updates from the responsible service.",
-  RESOLVED: "Resolved and verified.",
-  CLOSED: "Closed.",
+const PROGRESS_HINT_KEY: Record<CaseStatus, string> = {
+  OPEN: "cd.hint.OPEN",
+  INVESTIGATING: "cd.hint.INVESTIGATING",
+  ACTION_REQUIRED: "cd.hint.ACTION_REQUIRED",
+  WAITING: "cd.hint.WAITING",
+  RESOLVED: "cd.hint.RESOLVED",
+  CLOSED: "cd.hint.CLOSED",
 };
 
-const CAN_DO = [
-  "Search official notices, open data and credible news for your issue.",
-  "Correlate your evidence with public records and community reports.",
-  "Prepare a submission or enquiry — for your approval before anything is sent.",
-  "Re-check after an approved action to verify the outcome.",
-];
+const CAN_DO_KEYS = ["cd.can.1", "cd.can.2", "cd.can.3", "cd.can.4"];
 
-const CANNOT_DO = [
-  "Submit anything to government without your explicit approval.",
-  "Guarantee response times or outcomes from any institution.",
-  "Provide legal advice or represent you in any process.",
-  "Act on your behalf without a record in the case timeline.",
-];
+const CANNOT_DO_KEYS = ["cd.cannot.1", "cd.cannot.2", "cd.cannot.3", "cd.cannot.4"];
 
 const KIND_DOT: Record<TimelineEvent["kind"], string> = {
   user: "bg-white",
@@ -201,6 +192,7 @@ export default function CaseDetailView() {
   const setCaseAIState = useSasiStore((s) => s.setCaseAIState);
   const addCaseEvent = useSasiStore((s) => s.addCaseEvent);
   const { toast } = useToast();
+  const t = useT();
 
   const [tab, setTab] = useState("overview");
   const [busy, setBusy] = useState(false);
@@ -371,11 +363,11 @@ export default function CaseDetailView() {
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         <EmptyState
           icon={FolderLock}
-          title="Case not found"
-          description="This case is not in the demo record. It may have been cleared, or the reference is incorrect."
+          title={t("cd.notfound.title")}
+          description={t("cd.notfound.desc")}
           action={
             <GhostButton onClick={() => navigate("cases")}>
-              Back to cases
+              {t("cd.back")}
             </GhostButton>
           }
         />
@@ -422,10 +414,10 @@ export default function CaseDetailView() {
           <button
             onClick={() => navigate("cases")}
             className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-zinc-500 transition-colors hover:text-white"
-            aria-label="Back to all cases"
+            aria-label={t("cd.back-aria")}
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-            All cases
+            {t("cd.back")}
           </button>
           <p className="mt-3 font-mono text-[11px] tracking-[0.14em] text-zinc-500">
             {c.ref}
@@ -456,7 +448,7 @@ export default function CaseDetailView() {
               aria-haspopup="dialog"
             >
               <Share2 className="h-3.5 w-3.5" aria-hidden />
-              Share
+              {t("cd.share")}
             </GhostButton>
             {shareOpen && (
               <>
@@ -467,7 +459,7 @@ export default function CaseDetailView() {
                 />
                 <div
                   role="dialog"
-                  aria-label="Share case"
+                  aria-label={t("cd.share-dialog")}
                   className="sasi-card absolute right-0 top-11 z-50 w-64 bg-[#0d0e10] p-2 shadow-xl shadow-black/50"
                 >
                   <button
@@ -479,17 +471,17 @@ export default function CaseDetailView() {
                     ) : (
                       <ClipboardCopy className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
                     )}
-                    {copied ? "Summary copied" : "Copy case summary"}
+                    {copied ? t("cd.share.copied") : t("cd.share.copy")}
                   </button>
                   <button
                     onClick={printCase}
                     className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] text-zinc-200 transition-colors hover:bg-white/[0.05] hover:text-white"
                   >
                     <Printer className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-                    Print / save as PDF
+                    {t("cd.share.print")}
                   </button>
                   <p className="mt-1 border-t border-white/5 px-2.5 pb-1 pt-2 text-[11px] leading-relaxed text-zinc-600">
-                    Direct link sharing is not available in this demo.
+                    {t("cd.share.note")}
                   </p>
                 </div>
               </>
@@ -499,7 +491,7 @@ export default function CaseDetailView() {
           {c.status === "INVESTIGATING" && (
             <GhostButton onClick={() => startInvestigationFor(c.id)}>
               <Search className="h-3.5 w-3.5" aria-hidden />
-              Open investigation
+              {t("cd.open-investigation")}
             </GhostButton>
           )}
         </div>
@@ -508,13 +500,13 @@ export default function CaseDetailView() {
       {/* ---------- Tabs ---------- */}
       <Tabs value={tab} onValueChange={setTab} className="mt-6">
         <TabsList className="sasi-scroll h-auto w-full justify-start overflow-x-auto rounded-lg border border-white/8 bg-white/[0.02] p-1 sm:w-fit">
-          {TABS.map((t) => (
+          {TABS.map((t2) => (
             <TabsTrigger
-              key={t.key}
-              value={t.key}
+              key={t2.key}
+              value={t2.key}
               className="flex-none rounded-md px-3 py-1 text-[12.5px] text-zinc-500 data-[state=active]:bg-white/8 data-[state=active]:text-white data-[state=active]:shadow-none"
             >
-              {t.label}
+              {t(t2.labelKey)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -524,15 +516,15 @@ export default function CaseDetailView() {
           <TabFade>
             <div className="grid gap-4 lg:grid-cols-5">
               <div className="space-y-4 lg:col-span-3">
-                <section className="sasi-card p-5" aria-label="Case summary">
-                  <SectionLabel>Summary</SectionLabel>
+                <section className="sasi-card p-5" aria-label={t("cd.summary")}>
+                  <SectionLabel>{t("cd.summary")}</SectionLabel>
                   <p className="mt-2.5 text-[13.5px] leading-relaxed text-zinc-300">
                     {c.description}
                   </p>
                   {c.impact && (
                     <div className="mt-3.5 rounded-lg border border-white/8 bg-white/[0.02] p-3.5">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                        Impact
+                        {t("cd.impact")}
                       </p>
                       <p className="mt-1 text-[12.5px] leading-relaxed text-zinc-400">
                         {c.impact}
@@ -557,11 +549,11 @@ export default function CaseDetailView() {
               </div>
 
               <div className="space-y-4 lg:col-span-2">
-                <section className="sasi-card p-5" aria-label="Case facts">
-                  <SectionLabel>Details</SectionLabel>
+                <section className="sasi-card p-5" aria-label={t("cd.details")}>
+                  <SectionLabel>{t("cd.details")}</SectionLabel>
                   <dl className="mt-1 divide-y divide-white/[0.04]">
                     <FactRow
-                      label="Service"
+                      label={t("cd.facts.service")}
                       icon={
                         <ServiceIcon
                           service={c.service}
@@ -571,26 +563,26 @@ export default function CaseDetailView() {
                     >
                       {SERVICES[c.service].label}
                     </FactRow>
-                    <FactRow label="Location" icon={<MapPin className="h-3.5 w-3.5" />}>
+                    <FactRow label={t("cd.facts.location")} icon={<MapPin className="h-3.5 w-3.5" />}>
                       {locationLabel(c.location, "suburb")}
                     </FactRow>
                     <FactRow
-                      label="Created"
+                      label={t("cd.facts.created")}
                       icon={<CalendarDays className="h-3.5 w-3.5" />}
                     >
                       {formatDate(c.createdAt)}
                     </FactRow>
                     <FactRow
-                      label="Updated"
+                      label={t("cd.facts.updated")}
                       icon={<History className="h-3.5 w-3.5" />}
                     >
                       {timeAgo(c.updatedAt, NOW_MS)}
                     </FactRow>
-                    <FactRow label="Priority" icon={<Flag className="h-3.5 w-3.5" />}>
+                    <FactRow label={t("cd.facts.priority")} icon={<Flag className="h-3.5 w-3.5" />}>
                       <PriorityBadge priority={c.priority} />
                     </FactRow>
                     <FactRow
-                      label="Status"
+                      label={t("cd.facts.status")}
                       icon={<CircleDot className="h-3.5 w-3.5" />}
                     >
                       <CaseStatusBadge status={c.status} />
@@ -599,7 +591,7 @@ export default function CaseDetailView() {
 
                   <div className="mt-3 border-t border-white/[0.06] pt-4">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-zinc-500">Case progress</span>
+                      <span className="text-zinc-500">{t("cd.progress")}</span>
                       <span className="font-mono text-zinc-400">
                         {progress}%
                       </span>
@@ -610,7 +602,7 @@ export default function CaseDetailView() {
                       aria-valuenow={progress}
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-label="Case progress"
+                      aria-label={t("cd.progress-aria")}
                     >
                       <div
                         className="h-full rounded-full bg-white/70 transition-all duration-500"
@@ -618,35 +610,35 @@ export default function CaseDetailView() {
                       />
                     </div>
                     <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
-                      {PROGRESS_HINT[c.status]}
+                      {t(PROGRESS_HINT_KEY[c.status])}
                     </p>
                   </div>
                 </section>
 
                 <section
                   className="sasi-card p-5"
-                  aria-label="What SASI can and cannot do"
+                  aria-label={t("cd.cando.title")}
                 >
-                  <SectionLabel>What SASI can and cannot do</SectionLabel>
+                  <SectionLabel>{t("cd.cando.title")}</SectionLabel>
                   <ul className="mt-3 space-y-2">
-                    {CAN_DO.map((item) => (
+                    {CAN_DO_KEYS.map((key) => (
                       <li
-                        key={item}
+                        key={key}
                         className="flex items-start gap-2 text-[12.5px] leading-relaxed text-zinc-300"
                       >
                         <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#66bb6a]" aria-hidden />
-                        {item}
+                        {t(key)}
                       </li>
                     ))}
                   </ul>
                   <ul className="mt-4 space-y-2 border-t border-white/[0.06] pt-4">
-                    {CANNOT_DO.map((item) => (
+                    {CANNOT_DO_KEYS.map((key) => (
                       <li
-                        key={item}
+                        key={key}
                         className="flex items-start gap-2 text-[12.5px] leading-relaxed text-zinc-500"
                       >
                         <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#ef5350]" aria-hidden />
-                        {item}
+                        {t(key)}
                       </li>
                     ))}
                   </ul>
@@ -662,10 +654,10 @@ export default function CaseDetailView() {
             <div className="grid gap-4 lg:grid-cols-5">
               <section
                 className="sasi-card p-5 lg:col-span-3"
-                aria-label="Investigation timeline"
+                aria-label={t("cd.timeline.title")}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <SectionLabel>Investigation timeline</SectionLabel>
+                  <SectionLabel>{t("cd.timeline.title")}</SectionLabel>
                   <AIStateChip state={c.aiState} />
                 </div>
                 <div className="mt-4">
@@ -674,13 +666,13 @@ export default function CaseDetailView() {
               </section>
 
               <div className="lg:col-span-2">
-                <SectionLabel>Findings</SectionLabel>
+                <SectionLabel>{t("cd.findings")}</SectionLabel>
                 <div className="mt-3 space-y-3">
                   {caseFindings.length === 0 ? (
                     <EmptyState
                       icon={Search}
-                      title="No findings yet"
-                      description="SASI has not generated findings for this case yet. They will appear here as the investigation progresses."
+                      title={t("cd.empty.findings")}
+                      description={t("cd.empty.findings.desc")}
                     />
                   ) : (
                     caseFindings.map((f) => (
@@ -698,21 +690,19 @@ export default function CaseDetailView() {
           <TabFade>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="font-mono text-[11px] tracking-wide text-zinc-600">
-                {caseEvidence.length}{" "}
-                {caseEvidence.length === 1 ? "item" : "items"} · linked to this
-                case
+                {t("cd.evidence.count").replace("{n}", String(caseEvidence.length))}
               </p>
               <GhostButton onClick={handleAddEvidence}>
                 <Plus className="h-3.5 w-3.5" aria-hidden />
-                Add evidence
+                {t("cd.add-evidence")}
               </GhostButton>
             </div>
             {caseEvidence.length === 0 ? (
               <EmptyState
                 className="mt-4"
                 icon={ImageIcon}
-                title="No evidence linked"
-                description="Add photos, notes or links to strengthen this case. Evidence helps SASI verify what is happening."
+                title={t("cd.empty.evidence")}
+                description={t("cd.empty.evidence.desc")}
               />
             ) : (
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -728,16 +718,16 @@ export default function CaseDetailView() {
         <TabsContent value="sources" className="mt-5">
           <TabFade>
             <p className="font-mono text-[11px] tracking-wide text-zinc-600">
-              {caseSources.length}{" "}
-              {caseSources.length === 1 ? "source" : "sources"} ·{" "}
-              {officialCount} official
+              {t("cd.sources.count")
+                .replace("{n}", String(caseSources.length))
+                .replace("{off}", String(officialCount))}
             </p>
             {caseSources.length === 0 ? (
               <EmptyState
                 className="mt-4"
                 icon={Link2}
-                title="No sources found yet"
-                description="SASI has not matched any official or public sources to this case yet."
+                title={t("cd.empty.sources")}
+                description={t("cd.empty.sources.desc")}
               />
             ) : (
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -765,8 +755,8 @@ export default function CaseDetailView() {
                 ) : (
                   <EmptyState
                     icon={FolderLock}
-                    title="No action prepared yet"
-                    description="When SASI has a recommended next step for this case, it will appear here for your approval first."
+                    title={t("cd.empty.action")}
+                    description={t("cd.empty.action.desc")}
                   />
                 )}
                 {c.verification && (
@@ -776,42 +766,34 @@ export default function CaseDetailView() {
 
               <section
                 className="sasi-card h-fit p-5 lg:col-span-2"
-                aria-label="Why approval is required"
+                aria-label={t("cd.why.title")}
               >
                 <div className="flex items-center gap-2">
                   <ShieldAlert
                     className="h-4 w-4 shrink-0 text-[#e3c567]"
                     aria-hidden
                   />
-                  <SectionLabel>Why approval is required</SectionLabel>
+                  <SectionLabel>{t("cd.why.title")}</SectionLabel>
                 </div>
                 <p className="mt-2.5 text-[13px] leading-relaxed text-zinc-300">
-                  SASI never takes consequential external action silently.
-                  Anything that leaves the platform — a submission, an enquiry,
-                  a formal report — is prepared as a draft and waits for your
-                  explicit approval.
+                  {t("cd.why.body")}
                 </p>
                 <ul className="mt-3 space-y-2">
-                  {[
-                    "You approve the exact content before it leaves the platform.",
-                    "You can see the recipient and what information is shared.",
-                    "Nothing is submitted in the background or on a delay.",
-                  ].map((item) => (
+                  {["cd.why.1", "cd.why.2", "cd.why.3"].map((key) => (
                     <li
-                      key={item}
+                      key={key}
                       className="flex items-start gap-2 text-[12.5px] leading-relaxed text-zinc-400"
                     >
                       <span
                         className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600"
                         aria-hidden
                       />
-                      {item}
+                      {t(key)}
                     </li>
                   ))}
                 </ul>
                 <p className="mt-3.5 border-t border-white/[0.06] pt-3 text-[11px] leading-relaxed text-zinc-600">
-                  Every approval and rejection is recorded in the case
-                  timeline.
+                  {t("cd.why.note")}
                 </p>
               </section>
             </div>
@@ -821,11 +803,11 @@ export default function CaseDetailView() {
         {/* ================= ACTIVITY ================= */}
         <TabsContent value="activity" className="mt-5">
           <TabFade>
-            <section className="sasi-card p-5" aria-label="Full case activity">
+            <section className="sasi-card p-5" aria-label={t("cd.activity.title")}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <SectionLabel>Full case activity</SectionLabel>
+                <SectionLabel>{t("cd.activity.title")}</SectionLabel>
                 <span className="font-mono text-[10.5px] text-zinc-600">
-                  {c.events.length} {c.events.length === 1 ? "event" : "events"}
+                  {t("cd.activity.count").replace("{n}", String(c.events.length))}
                 </span>
               </div>
               <div className="mt-4">

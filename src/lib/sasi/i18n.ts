@@ -14,10 +14,10 @@
    - Missing zu/af values fall back to English rather than breaking.
    Coverage today: app shell (sidebar, topbar, mobile nav), landing
    hero + primary CTAs, public header CTAs, notification panel chrome,
-   dashboard / cases / notifications / incidents / map views, settings
-   language section.
-   Remaining views (case detail, report wizard, etc.) keep English
-   (noted honestly in Settings).
+   dashboard / cases / notifications / incidents / map views, case
+   detail + incident detail views, settings language section.
+   Remaining views (report wizard, activity, evidence, admin, etc.)
+   keep English (noted honestly in Settings).
    ============================================================ */
 
 import { useSasiStore } from "./store";
@@ -39,13 +39,13 @@ export const LANGUAGES: {
     code: "zu",
     label: "isiZulu",
     english: "Zulu",
-    note: "Shell, landing, dashboard, cases, notifications, incidents, map and shared controls.",
+    note: "Shell, landing, dashboard, cases, case + incident detail, notifications, incidents, map and shared controls.",
   },
   {
     code: "af",
     label: "Afrikaans",
     english: "Afrikaans",
-    note: "Shell, landing, dashboard, cases, notifications, incidents, map and shared controls.",
+    note: "Shell, landing, dashboard, cases, case + incident detail, notifications, incidents, map and shared controls.",
   },
 ];
 
@@ -684,6 +684,373 @@ const DICT: Dict = {
     en: "Clear all filters",
     zu: "Susa zonke izihlungi",
     af: "Maak alle filters skoon",
+  },
+
+  /* ============================================================
+     CASE DETAIL view
+     ============================================================ */
+  "cd.back": { en: "All cases", zu: "Wonke amacala", af: "Alle sake" },
+  "cd.back-aria": {
+    en: "Back to all cases",
+    zu: "Buyela emacaleni wonke",
+    af: "Terug na alle sake",
+  },
+  "cd.notfound.title": { en: "Case not found", zu: "Icala alitholakali", af: "Saak nie gevind nie" },
+  "cd.notfound.desc": {
+    en: "This case is not in the demo record. It may have been cleared, or the reference is incorrect.",
+    zu: "Le cala alikho kurekhodi yedemo. Kungenzeka susiwe, noma ireferensi ayilona.",
+    af: "Hierdie saak is nie in die demorekord nie. Dit is dalk uitgevee, of die verwysing is verkeerd.",
+  },
+  "cd.share": { en: "Share", zu: "Yabelana", af: "Deel" },
+  "cd.share-dialog": {
+    en: "Share case",
+    zu: "Yabelanangecala",
+    af: "Deel saak",
+  },
+  "cd.share.copy": { en: "Copy case summary", zu: "Kopisha isifingqo secala", af: "Kopie saakopsomming" },
+  "cd.share.copied": { en: "Summary copied", zu: "Isifingqo sikopishiwe", af: "Opsomming gekopieer" },
+  "cd.share.print": {
+    en: "Print / save as PDF",
+    zu: "Phrinta / gcina njenge-PDF",
+    af: "Druk / stoor as PDF",
+  },
+  "cd.share.note": {
+    en: "Direct link sharing is not available in this demo.",
+    zu: "Ukwabelana ngesixhumanisi esiqondile akutholakala kule demo.",
+    af: "Direkte skakel-deling is nie in hierdie demo beskikbaar nie.",
+  },
+  "cd.open-investigation": {
+    en: "Open investigation",
+    zu: "Vula uphenyo",
+    af: "Maar ondersoek oop",
+  },
+  "cd.tab.overview": { en: "Overview", zu: "Uhlolojikelele", af: "Oorsig" },
+  "cd.tab.investigation": { en: "Investigation", zu: "Uphenyo", af: "Ondersoek" },
+  "cd.tab.evidence": { en: "Evidence", zu: "Ubufakazi", af: "Bewys" },
+  "cd.tab.sources": { en: "Sources", zu: "Imithombo", af: "Bronne" },
+  "cd.tab.actions": { en: "Actions", zu: "Izenzo", af: "Aksies" },
+  "cd.tab.activity": { en: "Activity", zu: "Umsebenzi", af: "Aktiwiteit" },
+  "cd.summary": { en: "Summary", zu: "Isifingqo", af: "Opsomming" },
+  "cd.impact": { en: "Impact", zu: "Umthelela", af: "Impak" },
+  "cd.details": { en: "Details", zu: "Imininingwane", af: "Details" },
+  "cd.facts.service": { en: "Service", zu: "Insizakalo", af: "Diens" },
+  "cd.facts.location": { en: "Location", zu: "Indawo", af: "Ligging" },
+  "cd.facts.created": { en: "Created", zu: "Idaliwe", af: "Geskep" },
+  "cd.facts.updated": { en: "Updated", zu: "Ibuyekezisiwe", af: "Opgedateer" },
+  "cd.facts.priority": { en: "Priority", zu: "Okubalulekile", af: "Prioriteit" },
+  "cd.facts.status": { en: "Status", zu: "Isimo", af: "Status" },
+  "cd.progress": { en: "Case progress", zu: "Ukuqhubeka secala", af: "Saakvordering" },
+  "cd.progress-aria": {
+    en: "Case progress",
+    zu: "Ukuqhubeka secala",
+    af: "Saakvordering",
+  },
+  "cd.hint.OPEN": {
+    en: "Report received — SASI is preparing to investigate.",
+    zu: "Umbiko wamukelwe — i-SASI ilungiselela ukuphenya.",
+    af: "Verslag ontvang — SASI berei voor om te ondersoek.",
+  },
+  "cd.hint.INVESTIGATING": {
+    en: "SASI is researching sources and building findings.",
+    zu: "I-SASI iphenya imithombo futhi yakha izitholakalo.",
+    af: "SASI ondersoek bronne en bou bevindinge.",
+  },
+  "cd.hint.ACTION_REQUIRED": {
+    en: "An action is prepared and waiting for your approval.",
+    zu: "Isenzo silungile silinde ukuvunywa kwakho.",
+    af: "’n Aksie is voorberei en wag vir jou goedkeuring.",
+  },
+  "cd.hint.WAITING": {
+    en: "SASI is monitoring for updates from the responsible service.",
+    zu: "I-SASI ilandelela izibuyekezo kunsizakalo ebhekene nalo.",
+    af: "SASI monitor opdaterings van die verantwoordelike diens.",
+  },
+  "cd.hint.RESOLVED": {
+    en: "Resolved and verified.",
+    zu: "Kuxazululiwe futhi kuqinisekisiwe.",
+    af: "Opgelos en geverifieer.",
+  },
+  "cd.hint.CLOSED": { en: "Closed.", zu: "Kuvaliwe.", af: "Gesluit." },
+  "cd.cando.title": {
+    en: "What SASI can and cannot do",
+    zu: "Okungakwenza nokungeke kwenze i-SASI",
+    af: "Wat SASI kan en nie kan doen nie",
+  },
+  "cd.can.1": {
+    en: "Search official notices, open data and credible news for your issue.",
+    zu: "Sesha izaziso ezisemthethweni, idatha evulekile kanye nezindaba ezithembekile.",
+    af: "Deursoek amptelike kennisgewings, oop data en betroubare nuus vir jou saak.",
+  },
+  "cd.can.2": {
+    en: "Correlate your evidence with public records and community reports.",
+    zu: "Hlanganisa ubufakazi bakho nemirekhomiqembu nemibiko yomphakathi.",
+    af: "Korreleer jou bewys met openbare rekords en gemeenskapsverslae.",
+  },
+  "cd.can.3": {
+    en: "Prepare a submission or enquiry — for your approval before anything is sent.",
+    zu: "Lungisa ukuthunyelwa nombuzo — kuqale kuwuvunywe wena.",
+    af: "Berei ’n indiening of navraag voor — vir jou goedkeuring voordat iets gestuur word.",
+  },
+  "cd.can.4": {
+    en: "Re-check after an approved action to verify the outcome.",
+    zu: "Hlola futhi emva kwesenzo esivunyiwe ukuze uqinisekise umphumela.",
+    af: "Her Kontroleer na goedgekeurde aksie om die uitkoms te verifieer.",
+  },
+  "cd.cannot.1": {
+    en: "Submit anything to government without your explicit approval.",
+    zu: "Thumela lutho kukahulumende ngaphandle kokuvuma kwakho okucacile.",
+    af: "Dien niks by die regering in sonder jou uitdruklike goedkeuring nie.",
+  },
+  "cd.cannot.2": {
+    en: "Guarantee response times or outcomes from any institution.",
+    zu: "Silahlekelwe isikhathi sokusabela noma imiphumela ezinsizeni.",
+    af: "Waarborg nie reaksietye of uitkomste van enige instansie nie.",
+  },
+  "cd.cannot.3": {
+    en: "Provide legal advice or represent you in any process.",
+    zu: "Nikeza usizo olwesabelo noma meluleko yobunjiniyela.",
+    af: "Verskaf nie regsluiting of verteenwoordiging in enige proses nie.",
+  },
+  "cd.cannot.4": {
+    en: "Act on your behalf without a record in the case timeline.",
+    zu: "Enza ngokwakho ngaphandle kokubhalwa emgudweni wecala.",
+    af: "Handel nie namens jou sonder ’n rekord in die saaktydlyn nie.",
+  },
+  "cd.timeline.title": {
+    en: "Investigation timeline",
+    zu: "Umugqa wephenyo",
+    af: "Ondersoektydlyn",
+  },
+  "cd.findings": { en: "Findings", zu: "Izitholakalo", af: "Bevindinge" },
+  "cd.empty.findings": {
+    en: "No findings yet",
+    zu: "Azikho izitholakalo okusalungile",
+    af: "Nog geen bevindinge nie",
+  },
+  "cd.empty.findings.desc": {
+    en: "SASI has not generated findings for this case yet. They will appear here as the investigation progresses.",
+    zu: "I-SASI ikhishile izitholakalo yalesi sigaba. Zizovela lapha uphenyo luqhubeka.",
+    af: "SASI het nog geen bevindinge vir hierdie saak gegenereer nie. Dit sal hier verskyn soos die ondersoek vorder.",
+  },
+  "cd.evidence.count": {
+    en: "{n} items · linked to this case",
+    zu: "Izinto ezingu-{n} · zixhumekene nale cala",
+    af: "{n} items · aan hierdie saak gekoppel",
+  },
+  "cd.add-evidence": { en: "Add evidence", zu: "Engeza ubufakazi", af: "Voeg bewys by" },
+  "cd.empty.evidence": {
+    en: "No evidence linked",
+    zu: "Abukho bufakazi obuxhumekile",
+    af: "Geen bewys gekoppel nie",
+  },
+  "cd.empty.evidence.desc": {
+    en: "Add photos, notes or links to strengthen this case. Evidence helps SASI verify what is happening.",
+    zu: "Engeza izithombe, amanothi noma izixhumanisi ukuze uqinisekise le cala.",
+    af: "Voeg foto’s, notities of skakels by om hierdie saak te versterk.",
+  },
+  "cd.sources.count": {
+    en: "{n} sources · {off} official",
+    zu: "Imithombo engu-{n} · {off} isemthethweni",
+    af: "{n} bronne · {off} amptelik",
+  },
+  "cd.empty.sources": {
+    en: "No sources found yet",
+    zu: "Ayikho imithombo etholakele",
+    af: "Nog geen bronne gevind nie",
+  },
+  "cd.empty.sources.desc": {
+    en: "SASI has not matched any official or public sources to this case yet.",
+    zu: "I-SASI ayikatholakali imithombo esemthethweni yobulungisa le cala.",
+    af: "SASI het nog geen amptelike of openbare bronne met hierdie saak gepas nie.",
+  },
+  "cd.empty.action": {
+    en: "No action prepared yet",
+    zu: "Asikho isenzo silungile",
+    af: "Nog geen aksie voorberei nie",
+  },
+  "cd.empty.action.desc": {
+    en: "When SASI has a recommended next step for this case, it will appear here for your approval first.",
+    zu: "Uma i-SASI inesiphakamiso esilandelayo, sizovela lapha siqale kuwuvunywe wena.",
+    af: "Wanneer SASI ’n aanbevole volgende stap het, verskyn dit hier vir jou goedkeuring eerste.",
+  },
+  "cd.why.title": {
+    en: "Why approval is required",
+    zu: "Ukuvunywa kudingeka ngani",
+    af: "Hoekom goedkeuring vereis word",
+  },
+  "cd.why.body": {
+    en: "SASI never takes consequential external action silently. Anything that leaves the platform — a submission, an enquiry, a formal report — is prepared as a draft and waits for your explicit approval.",
+    zu: "I-SASI ayenzizi izenzo ezibalulekile ngokuthula. Noma yini ephuma kulesi sikhwama — ilungisa bese ilinde wena.",
+    af: "SASI neem nooit belangrike eksterne aksie stilswyend nie. Enigiets wat die platform verlaat word as ’n konsep voorberei en wag vir jou goedkeuring.",
+  },
+  "cd.why.1": {
+    en: "You approve the exact content before it leaves the platform.",
+    zu: "Wena wavuma okuqukethwe ngaphambi kokuphuma.",
+    af: "Jy keur die presiese inhoud goed voordat dit die platform verlaat.",
+  },
+  "cd.why.2": {
+    en: "You can see the recipient and what information is shared.",
+    zu: "Uyabona owamukelayo nalokho okwabelwana ngakho.",
+    af: "Jy kan die ontvanger sien en watter inligting gedeel word.",
+  },
+  "cd.why.3": {
+    en: "Nothing is submitted in the background or on a delay.",
+    zu: "Akukho okuthunyelwa ngemuva noma ukulinda.",
+    af: "Niks word op die agtergrond of met vertraag ingedien nie.",
+  },
+  "cd.why.note": {
+    en: "Every approval and rejection is recorded in the case timeline.",
+    zu: "Ukuvunywa nokwenqaba kubhalwa emgudweni wecala.",
+    af: "Elke goedkeuring en weiering word in die saaktydlyn aangeteken.",
+  },
+  "cd.activity.title": {
+    en: "Full case activity",
+    zu: "Umsebenzi wecala wonke",
+    af: "Volle saakaktiwiteit",
+  },
+  "cd.activity.count": {
+    en: "{n} events",
+    zu: "Izehlakalo ezingu-{n}",
+    af: "{n} gebeurtenisse",
+  },
+
+  /* ============================================================
+     INCIDENT DETAIL view
+     ============================================================ */
+  "id.back": {
+    en: "Back to incidents",
+    zu: "Buyela ezigamekweni",
+    af: "Terug na voorvalle",
+  },
+  "id.back-aria": {
+    en: "Back to incidents explorer",
+    zu: "Buyela kumhloli wezigameko",
+    af: "Terug na voorvalverkenner",
+  },
+  "id.notfound.title": {
+    en: "Incident not found",
+    zu: "Isigameko asitholakali",
+    af: "Voorval nie gevind nie",
+  },
+  "id.notfound.desc": {
+    en: "This incident reference does not exist in the demo dataset. It may have been opened from an outdated link.",
+    zu: "Le referensi yesigameko ayikho kusethi yedemo. Kungenzeka kavuliwe ngesixhumanisi esidala.",
+    af: "Hierdie voorvalverwysing bestaan nie in die demodatastel nie. Dit is dalk van ’n verouderde skakel geopen.",
+  },
+  "id.browse-all": {
+    en: "Browse all incidents",
+    zu: "Zulazula ezigamekweni zonke",
+    af: "Deurblaai alle voorvalle",
+  },
+  "id.share": { en: "Share", zu: "Yabelana", af: "Deel" },
+  "id.share-dialog": {
+    en: "Share incident",
+    zu: "Yabelana ngesigameko",
+    af: "Deel voorval",
+  },
+  "id.share.copy": {
+    en: "Copy incident summary",
+    zu: "Kopisha isifingqo sesigameko",
+    af: "Kopie voorvalopsomming",
+  },
+  "id.share.copied": { en: "Summary copied", zu: "Isifingqo sikopishiwe", af: "Opsomming gekopieer" },
+  "id.share.print": {
+    en: "Print / save as PDF",
+    zu: "Phrinta / gcina njenge-PDF",
+    af: "Druk / stoor as PDF",
+  },
+  "id.share.note": {
+    en: "Direct link sharing is not available in this demo.",
+    zu: "Ukwabelana ngesixhumanisi esiqondile akutholakala kule demo.",
+    af: "Direkte skakel-deling is nie in hierdie demo beskikbaar nie.",
+  },
+  "id.share.hint": {
+    en: "Export this incident as a plain-text brief or a one-page PDF.",
+    zu: "Thekelela lesi sigameko njengesifingqo noma i-PDF yesigaba.",
+    af: "Voer hierdie voorval uit as ’n teksopsomming of eenblad-PDF.",
+  },
+  "id.summary": { en: "Summary", zu: "Isifingqo", af: "Opsomming" },
+  "id.details": { en: "Details", zu: "Imininingwane", af: "Details" },
+  "id.facts.service": { en: "Service", zu: "Insizakalo", af: "Diens" },
+  "id.facts.province": { en: "Province", zu: "Isifundazwe", af: "Provinsie" },
+  "id.facts.municipality": {
+    en: "Municipality",
+    zu: "Umasipala",
+    af: "Munisipaliteit",
+  },
+  "id.facts.city": {
+    en: "City / suburb",
+    zu: "Idolobha / idolobhana",
+    af: "Stad / voorstad",
+  },
+  "id.facts.area": {
+    en: "Affected area",
+    zu: "Indawo ethintekile",
+    af: "Geaffekteerde gebied",
+  },
+  "id.facts.reported": { en: "Reported", zu: "Kubikiwe", af: "Gerapporteer" },
+  "id.facts.last-update": {
+    en: "Last update",
+    zu: "Isibuyekezo sokugcina",
+    af: "Laaste opdatering",
+  },
+  "id.facts.sources": { en: "Sources", zu: "Imithombo", af: "Bronne" },
+  "id.sources-none": {
+    en: "None attached yet",
+    zu: "Akukho naxhumekile",
+    af: "Nog nie gekoppel nie",
+  },
+  "id.updates": {
+    en: "Recent updates",
+    zu: "Izibuyekezo zakamuva",
+    af: "Onlangse opdaterings",
+  },
+  "id.updates.note": {
+    en: "Reconstructed from demo incident data — not a live event feed.",
+    zu: "Yakhiwe kabusha kusethi yedemo — ayona imigqa yezehlakalo ephilayo.",
+    af: "Geherkonstrueer uit demovoorvaldata — nie ’n lewende gebeurtenisstroom nie.",
+  },
+  "id.sources": {
+    en: "Public sources",
+    zu: "Imithombo yomphakathi",
+    af: "Openbare bronne",
+  },
+  "id.attached": { en: "{n} attached", zu: "Kuxhumekile okungu-{n}", af: "{n} gekoppel" },
+  "id.sources.empty": {
+    en: "No public sources attached yet — reports from residents keep this incident flagged. When an official notice or news report matches, it will appear here with its own trust status.",
+    zu: "Ayikho imithombo yomphakathi exhumekile — imibiko yabahlali igcina lesi sigameko siphawule.",
+    af: "Nog geen openbare bronne gekoppel nie — verslae van inwoners hou hierdie voorval gemerk.",
+  },
+  "id.location": { en: "Location", zu: "Indawo", af: "Ligging" },
+  "id.coords": {
+    en: "STYLISED POSITION · DEMO COORDINATES",
+    zu: "INDAWO YE-STAYILI · IZIXHUMANO ZEDEMO",
+    af: "GESTILISEERDE POSISIE · DEMOKOÖRDINATE",
+  },
+  "id.actions.title": {
+    en: "Related actions",
+    zu: "Izenzo ezihlobene",
+    af: "Verwante aksies",
+  },
+  "id.investigate": {
+    en: "Investigate this incident",
+    zu: "Phenya lesi sigameko",
+    af: "Ondersoek hierdie voorval",
+  },
+  "id.report-similar": {
+    en: "Report a similar issue",
+    zu: "Bika udaba olufana nalolu",
+    af: "Rapporteer ’n soortgelyke probleem",
+  },
+  "id.actions.note": {
+    en: "SASI prepares everything for your review first — nothing is submitted to government without your approval.",
+    zu: "I-SASI ilungisa konkuqale kuwubuke we — akukho okuthunyelwa kukahulumende ngaphandle kokuvuma kwakho.",
+    af: "SASI berei alles eerste vir jou hersiening voor — niks word sonder jou goedkeuring aan die regering ingedien nie.",
+  },
+  "id.related": {
+    en: "Related cases",
+    zu: "Amacala ahlobene",
+    af: "Verwante sake",
   },
 };
 

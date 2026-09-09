@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
+import { usePwaStore } from "@/lib/sasi/pwa-store";
+import { applyPwaUpdate, promptPwaInstall } from "./pwa";
 import { CASES, EVIDENCE, INCIDENTS } from "@/lib/sasi/data";
 import { LANGUAGES, translate } from "@/lib/sasi/i18n";
 import { SERVICES as SERVICE_META } from "@/lib/sasi/utils";
@@ -190,6 +192,60 @@ export function CommandPalette() {
         keywords: `language taal ulimi limi switch ${l.label} ${l.english}`,
         perform: () => useSasiStore.getState().setLang(l.code),
       });
+    });
+
+    // App & offline — install affordance + offline status (mirrors Settings)
+    const pwa = usePwaStore.getState();
+    if (pwa.installable && !pwa.installed) {
+      out.push({
+        id: "app-install",
+        group: "App",
+        label: "Install SASI as an app",
+        hint: "Home screen",
+        keywords: "install pwa home screen offline app add",
+        perform: () => {
+          void promptPwaInstall().then((outcome) => {
+            if (outcome === "unavailable") {
+              import("sonner").then(({ toast }) =>
+                toast("Install is not available right now", {
+                  description:
+                    "Use the browser menu → “Add to Home screen”, or find it in Settings → App & offline.",
+                })
+              );
+            } else if (outcome === "accepted") {
+              import("sonner").then(({ toast }) =>
+                toast.success("SASI installed", {
+                  description: "Launch it from your home screen — it opens as its own app.",
+                })
+              );
+            }
+          });
+        },
+      });
+    }
+    if (pwa.updateReady) {
+      out.push({
+        id: "app-update",
+        group: "App",
+        label: "Reload to update SASI",
+        hint: "New version ready",
+        keywords: "update reload new version service worker",
+        perform: () => {
+          void applyPwaUpdate();
+          setTimeout(() => window.location.reload(), 400);
+        },
+      });
+    }
+    out.push({
+      id: "app-offline-settings",
+      group: "App",
+      label: pwa.online ? "App & offline settings" : "Offline — App & offline settings",
+      hint: "Settings",
+      keywords: "offline install service worker settings app standalone",
+      perform: () => {
+        useSasiStore.setState({ settingsSection: "app" });
+        navigate("settings");
+      },
     });
 
     return out;

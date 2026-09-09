@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
+import { usePwaStore } from "@/lib/sasi/pwa-store";
+import { applyPwaUpdate } from "./pwa";
 import type { View } from "@/lib/sasi/types";
 import { AppShell } from "./app-shell";
 import { PublicShell } from "./public-shell";
 import { CommandPalette } from "./command-palette";
+import { PwaRuntime } from "./pwa";
 import { SasiLogo } from "./primitives";
 
 import LandingView from "./views/landing";
@@ -146,6 +149,8 @@ export function SasiApp() {
   const view = useSasiStore((s) => s.view);
   const authed = useSasiStore((s) => s.authed);
   const hydrate = useSasiStore((s) => s.hydrate);
+  const updateReady = usePwaStore((s) => s.updateReady);
+  const clearUpdateReady = usePwaStore((s) => s.clearUpdateReady);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -154,6 +159,24 @@ export function SasiApp() {
     const t = setTimeout(() => setMounted(true), 650);
     return () => clearTimeout(t);
   }, [hydrate]);
+
+  /* a new service worker finished installing in the background → offer the swap */
+  useEffect(() => {
+    if (!updateReady) return;
+    toast("A new version of SASI is ready", {
+      description: "Reload to pick it up. Your data stays.",
+      duration: Infinity,
+      id: "sasi-pwa-update",
+      action: {
+        label: "Reload",
+        onClick: () => {
+          clearUpdateReady();
+          void applyPwaUpdate(); // skipWaiting → controllerchange → clean reload
+          setTimeout(() => window.location.reload(), 400);
+        },
+      },
+    });
+  }, [updateReady, clearUpdateReady]);
 
   if (!mounted) return <SplashScreen />;
 
@@ -172,6 +195,7 @@ export function SasiApp() {
         </AppShell>
       )}
       <CommandPalette />
+      <PwaRuntime />
       <Toaster
         position="bottom-right"
         theme="dark"

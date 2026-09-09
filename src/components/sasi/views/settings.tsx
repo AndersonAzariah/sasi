@@ -5,7 +5,9 @@ import {
   Bell,
   Camera,
   CheckCircle2,
+  CloudOff,
   Database,
+  Download,
   FileText,
   FolderSearch,
   Globe,
@@ -14,18 +16,23 @@ import {
   Lock,
   MapPin,
   Minus,
+  MonitorSmartphone,
   Newspaper,
   Plus,
+  RefreshCw,
   ShieldAlert,
   ShieldCheck,
   Siren,
+  Smartphone,
   Sparkles,
   Stamp,
   Trash2,
   User,
-  Download,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
+import { usePwaStore } from "@/lib/sasi/pwa-store";
+import { applyPwaUpdate, promptPwaInstall } from "@/components/sasi/pwa";
 import { DEMO_USER, GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
 import { LANGUAGES, PLANNED_LANGUAGES, useT } from "@/lib/sasi/i18n";
 import type { Lang } from "@/lib/sasi/types";
@@ -59,6 +66,7 @@ type SectionId =
   | "accessibility"
   | "ai"
   | "security"
+  | "app"
   | "data";
 
 const NAV: { id: SectionId; label: string; icon: typeof User }[] = [
@@ -70,10 +78,214 @@ const NAV: { id: SectionId; label: string; icon: typeof User }[] = [
   { id: "accessibility", label: "Accessibility", icon: Globe },
   { id: "ai", label: "AI permissions", icon: Sparkles },
   { id: "security", label: "Security", icon: ShieldCheck },
+  { id: "app", label: "App & offline", icon: Smartphone },
   { id: "data", label: "Data", icon: Database },
 ];
 
 const TEXT_SIZES = [14, 15, 16, 17, 18];
+
+/* ============================================================
+   App & offline — live status of the installable offline shell.
+   Reads the PWA runtime store (pwa-store.ts) so the section is
+   always truthful: what is installed, whether the service worker
+   is keeping an offline copy, and what still needs a connection.
+   ============================================================ */
+
+function StatusRow({
+  icon: Icon,
+  label,
+  state,
+  tone,
+  action,
+}: {
+  icon: typeof Smartphone;
+  label: string;
+  state: string;
+  tone: "good" | "warn" | "muted";
+  action?: React.ReactNode;
+}) {
+  const toneCls =
+    tone === "good"
+      ? "border-[#66bb6a]/25 bg-[#66bb6a]/[0.07] text-[#a5d6a7]"
+      : tone === "warn"
+        ? "border-[#ffa726]/25 bg-[#ffa726]/[0.07] text-[#ffcc80]"
+        : "border-white/8 bg-white/[0.03] text-zinc-500";
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-white/[0.015] p-3.5 transition-colors hover:border-white/10">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#e3c567]/15 bg-[#e3c567]/[0.06]">
+          <Icon className="h-3.5 w-3.5 text-[#e3c567]" aria-hidden />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[13px] font-medium text-zinc-200">{label}</span>
+          <span className="block text-[11.5px] text-zinc-500">{state}</span>
+        </span>
+      </div>
+      {action ?? (
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+            toneCls
+          )}
+        >
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              tone === "good" ? "bg-[#66bb6a]" : tone === "warn" ? "sasi-breathe bg-[#ffa726]" : "bg-zinc-600"
+            )}
+            aria-hidden
+          />
+          {tone === "good" ? "Active" : tone === "warn" ? "Waiting" : "—"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function AppOfflineSection() {
+  const online = usePwaStore((s) => s.online);
+  const swPhase = usePwaStore((s) => s.swPhase);
+  const swReady = usePwaStore((s) => s.swReady);
+  const installable = usePwaStore((s) => s.installable);
+  const installed = usePwaStore((s) => s.installed);
+  const updateReady = usePwaStore((s) => s.updateReady);
+
+  const handleInstall = async () => {
+    const outcome = await promptPwaInstall();
+    if (outcome === "unavailable") {
+      toast("Install is not available right now", {
+        description:
+          "Your browser did not offer an install prompt. On Android/Chrome use the menu → “Add to Home screen”; on iOS use Share → “Add to Home Screen”.",
+      });
+    } else if (outcome === "accepted") {
+      toast.success("SASI installed", {
+        description: "Launch it from your home screen — it opens as its own app.",
+      });
+    }
+  };
+
+  const handleUpdate = () => {
+    void applyPwaUpdate();
+    toast("Updating…", { description: "Reloading into the new version." });
+    setTimeout(() => window.location.reload(), 600);
+  };
+
+  const swState =
+    swPhase === "unsupported"
+      ? "This browser can't keep an offline copy"
+      : swPhase === "ready"
+        ? "An offline copy of SASI is saved on this device"
+        : swPhase === "failed"
+          ? "The offline copy could not be saved here"
+          : "Preparing the offline copy…";
+
+  return (
+    <section aria-labelledby="settings-app" className="space-y-4">
+      <div className="sasi-card p-5">
+        <SectionLabel>App &amp; offline</SectionLabel>
+        <h2 id="settings-app" className="mt-1 flex items-center gap-2 text-[15px] font-semibold text-white">
+          <MonitorSmartphone className="h-4 w-4 text-[#e3c567]" aria-hidden />
+          SASI as an app
+        </h2>
+        <p className="mt-2 max-w-xl text-[12.5px] leading-relaxed text-zinc-400">
+          SASI can be installed as its own app and keeps an offline copy of your last session —
+          your cases, briefings and the map stay readable with no network. Nothing is ever
+          submitted while you are offline.
+        </p>
+
+        <div className="mt-4 space-y-2">
+          <StatusRow
+            icon={CloudOff}
+            label={online ? "Connection" : "You are offline"}
+            state={
+              online
+                ? "Live — everything syncs as usual"
+                : "Browsing cached data. Reports, chats and briefings wait for the network."
+            }
+            tone={online ? "muted" : "warn"}
+            action={
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+                  online
+                    ? "border-white/8 bg-white/[0.03] text-zinc-500"
+                    : "border-[#ffa726]/25 bg-[#ffa726]/[0.07] text-[#ffcc80]"
+                )}
+              >
+                <span
+                  className={cn("h-1.5 w-1.5 rounded-full", online ? "bg-[#66bb6a]" : "sasi-breathe bg-[#ffa726]")}
+                  aria-hidden
+                />
+                {online ? "Online" : "Offline"}
+              </span>
+            }
+          />
+          <StatusRow icon={Smartphone} label="Installed as an app" state={installed ? "Running from your home screen" : "Runs in the browser tab"} tone={installed ? "good" : "muted"} />
+          <StatusRow
+            icon={Database}
+            label="Offline copy (service worker)"
+            state={swState}
+            tone={swReady ? "good" : swPhase === "failed" || swPhase === "unsupported" ? "muted" : "warn"}
+          />
+          {installable && !installed && (
+            <StatusRow
+              icon={Download}
+              label="Install SASI"
+              state="Your browser can install SASI as a standalone app"
+              tone="warn"
+              action={
+                <PrimaryButton onClick={() => void handleInstall()} className="h-8 shrink-0 px-3 text-[12px]" aria-label="Install SASI as an app">
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  Install
+                </PrimaryButton>
+              }
+            />
+          )}
+          {updateReady && (
+            <StatusRow
+              icon={RefreshCw}
+              label="Update ready"
+              state="A new version finished downloading in the background"
+              tone="warn"
+              action={
+                <PrimaryButton onClick={handleUpdate} className="h-8 shrink-0 px-3 text-[12px]" aria-label="Reload to update SASI">
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                  Reload
+                </PrimaryButton>
+              }
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="sasi-card p-5">
+        <p className="flex items-center gap-2 text-[13px] font-medium text-zinc-200">
+          <Info className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
+          What works offline — and what waits
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-[#66bb6a]/15 bg-[#66bb6a]/[0.04] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#a5d6a7]">Works offline</p>
+            <ul className="mt-1.5 space-y-1 text-[12px] leading-relaxed text-zinc-400">
+              <li>· Reading your cases, evidence and past briefings</li>
+              <li>· The map, incidents and everything already loaded</li>
+              <li>· Your notifications, settings and saved location</li>
+            </ul>
+          </div>
+          <div className="rounded-lg border border-[#ffa726]/15 bg-[#ffa726]/[0.04] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#ffcc80]">Needs a connection</p>
+            <ul className="mt-1.5 space-y-1 text-[12px] leading-relaxed text-zinc-400">
+              <li>· Asking SASI or writing a new briefing (AI needs the network)</li>
+              <li>· Submitting reports and approving actions</li>
+              <li>· Fresh incident data — everything resumes when you reconnect</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 
 function ToggleRow({
   title,
@@ -164,7 +376,18 @@ export default function SettingsView() {
   const t = useT();
   const navigate = useSasiStore((s) => s.navigate);
 
-  const [active, setActive] = useState<SectionId>("account");
+  /* the active section lives in the store so the command palette
+     (and future deep links) can land on a specific section —
+     derived directly from the store, so any surface that writes
+     settingsSection re-renders this view with no effect needed */
+  const storeSection = useSasiStore((s) => s.settingsSection);
+  const active = (
+    NAV.some((n) => n.id === storeSection) ? storeSection : "account"
+  ) as SectionId;
+  const setActive = (id: SectionId) => {
+    useSasiStore.setState({ settingsSection: id });
+  };
+
 
   /* --- privacy --- */
   const [storeEvidence, setStoreEvidence] = useState(true);
@@ -693,6 +916,8 @@ export default function SettingsView() {
             </div>
           </section>
         )}
+
+        {active === "app" && <AppOfflineSection />}
 
         {active === "data" && (
           <section aria-labelledby="settings-data" className="space-y-4">

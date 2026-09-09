@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BellOff,
   CheckCheck,
+  MapPin,
   Newspaper,
   Radio,
 } from "lucide-react";
@@ -43,6 +44,7 @@ export default function NotificationsView() {
   const markNotificationRead = useSasiStore((s) => s.markNotificationRead);
   const markAllNotificationsRead = useSasiStore((s) => s.markAllNotificationsRead);
   const openCase = useSasiStore((s) => s.openCase);
+  const focusOnMap = useSasiStore((s) => s.focusOnMap);
   const navigate = useSasiStore((s) => s.navigate);
   const cases = useSasiStore((s) => s.cases);
   const briefing = useSasiStore((s) => s.briefing);
@@ -259,16 +261,30 @@ export default function NotificationsView() {
             aria-label="Notifications"
             className="sasi-card mt-5 divide-y divide-white/[0.04] overflow-hidden"
           >
-            {filtered.map((n) => (
-              <NotificationRow
-                key={n.id}
-                n={n}
-                onOpen={() => {
-                  markNotificationRead(n.id);
-                  if (n.caseRef) openCase(n.caseRef);
-                }}
-              />
-            ))}
+            {filtered.map((n) => {
+              /* notifications carrying a case ref get a gold "View on map"
+                 affordance — focusOnMap resolves the user's own cases onto
+                 their saved location (and guards unknown refs honestly) */
+              const mappable = n.caseRef ? cases.some((c) => c.ref === n.caseRef) : false;
+              return (
+                <NotificationRow
+                  key={n.id}
+                  n={n}
+                  onOpen={() => {
+                    markNotificationRead(n.id);
+                    if (n.caseRef) openCase(n.caseRef);
+                  }}
+                  onViewOnMap={
+                    mappable && n.caseRef
+                      ? () => {
+                          markNotificationRead(n.id);
+                          focusOnMap(n.caseRef as string);
+                        }
+                      : undefined
+                  }
+                />
+              );
+            })}
           </div>
           {unread === 0 && (
             <p className="mt-4 flex items-center justify-center gap-1.5 text-[12px] text-zinc-600">

@@ -868,3 +868,104 @@
     animation: none;
   }
 }
+
+/* ============================================================
+   Round: PWA offline shell + map click-through + CASE watchlist
+   ============================================================ */
+
+/* Offline chip — bottom-left quiet status pill shown while the
+   device is offline. Amber accent (awareness, not alarm). */
+.sasi-offline-chip {
+  position: fixed;
+  left: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(92vw, 420px);
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 167, 38, 0.28);
+  background: rgba(20, 15, 8, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: #ffcc80;
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+.sasi-offline-chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    120px 40px at 18% 0%,
+    rgba(255, 167, 38, 0.09),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* Map click-through chip inside notification rows — gold variant
+   (the briefing card's blue variant stays for demo incidents;
+   a user's own case is gold, matching their map markers). */
+.sasi-chip-map-gold {
+  color: #8a7a4a;
+  transition:
+    color 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.sasi-chip-map-gold:hover {
+  color: #e3c567;
+  background: rgba(227, 197, 103, 0.07);
+  box-shadow: 0 0 14px -6px rgba(227, 197, 103, 0.45);
+}
+.sasi-chip-map-gold:focus-visible {
+  outline: 1px solid rgba(227, 197, 103, 0.55);
+  outline-offset: 1px;
+}
+
+/* Notification rows gain an action strip on hover/focus — the
+   "View on map" affordance slides in; reduced-motion collapses it. */
+.sasi-ntf-actions {
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+.sasi-ntf-row:hover .sasi-ntf-actions,
+.sasi-ntf-row:focus-within .sasi-ntf-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-ntf-actions {
+    transition: none;
+    transform: none;
+  }
+}
+/* touch devices have no hover — keep actions always visible there */
+@media (hover: none) {
+  .sasi-ntf-actions {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* print: never let the runtime chips onto paper */
+@media print {
+  .sasi-offline-chip {
+    display: none !important;
+  }
+}
+
+/* keyboard focus on a notification row tints the whole row quietly,
+   matching the hover state so focus is never invisible */
+.sasi-ntf-row:focus-within {
+  background-color: rgba(255, 255, 255, 0.03);
+}

@@ -11,6 +11,7 @@ import {
   FileText,
   Image as ImageIcon,
   Link2,
+  MapPin,
   MessageSquareQuote,
   ShieldAlert,
   Sparkles,
@@ -676,9 +677,14 @@ export function ActivityRow({ event }: { event: ActivityEvent }) {
 export function NotificationRow({
   n,
   onOpen,
+  onViewOnMap,
 }: {
   n: AppNotification;
   onOpen?: () => void;
+  /** set when the notification carries a mappable ref — adds a quiet gold
+      "View on map" affordance (visible on hover/focus-within, always on
+      touch) that focuses the civic map without leaving the list */
+  onViewOnMap?: () => void;
 }) {
   const tone =
     n.kind === "ACTION"
@@ -694,7 +700,7 @@ export function NotificationRow({
     <button
       onClick={onOpen}
       className={cn(
-        "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.03]",
+        "sasi-ntf-row group/ntf flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.03]",
         !n.read && "bg-white/[0.015]"
       )}
     >
@@ -718,6 +724,30 @@ export function NotificationRow({
         <span className="mt-0.5 line-clamp-2 block text-[12px] leading-relaxed text-zinc-500">
           {n.body}
         </span>
+        {onViewOnMap && (
+          <span className="sasi-ntf-actions mt-1 block">
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation(); // don't trigger the row's open-case click
+                onViewOnMap();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onViewOnMap();
+                }
+              }}
+              className="sasi-chip-map-gold inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
+              aria-label={`Show ${n.caseRef} on the civic map`}
+            >
+              <MapPin className="h-3 w-3" aria-hidden />
+              View on map
+            </span>
+          </span>
+        )}
       </span>
     </button>
   );
