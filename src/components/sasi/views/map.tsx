@@ -390,6 +390,8 @@ const MemoBase = memo(GautengBase);
 
 export default function MapView() {
   const openIncident = useSasiStore((s) => s.openIncident);
+  const mapFocusRef = useSasiStore((s) => s.mapFocusRef);
+  const clearMapFocus = useSasiStore((s) => s.clearMapFocus);
 
   const [query, setQuery] = useState("");
   const [services, setServices] = useState<Set<string>>(new Set());
@@ -410,9 +412,26 @@ export default function MapView() {
     });
   }, [query, services, statuses]);
 
+  /* briefing watchlist → map click-through: the focused incident is always
+     visible and pre-selected, bypassing the user's filters until cleared */
+  const focusIncident = useMemo(() => {
+    if (!mapFocusRef) return null;
+    const ref = mapFocusRef.toLowerCase();
+    return (
+      INCIDENTS.find(
+        (i) => i.ref.toLowerCase() === ref || i.id === ref
+      ) ?? null
+    );
+  }, [mapFocusRef]);
+
+  const effectiveFiltered = useMemo(() => {
+    if (!focusIncident || filtered.some((i) => i.id === focusIncident.id)) return filtered;
+    return [focusIncident, ...filtered];
+  }, [filtered, focusIncident]);
+
   const markers = useMemo<GautengMarker[]>(
     () =>
-      filtered.map((i) => ({
+      effectiveFiltered.map((i) => ({
         id: i.id,
         x: i.location.mapX ?? 50,
         y: i.location.mapY ?? 50,
@@ -421,10 +440,11 @@ export default function MapView() {
         size: 3,
         onClick: () => setSelectedId(i.id),
       })),
-    [filtered]
+    [effectiveFiltered]
   );
 
-  const selected = filtered.find((i) => i.id === selectedId) ?? null;
+  const selected =
+    effectiveFiltered.find((i) => i.id === (focusIncident?.id ?? selectedId)) ?? null;
   const activeFilterCount = services.size + statuses.size + (query.trim() ? 1 : 0);
 
   const clearFilters = () => {
@@ -458,13 +478,34 @@ export default function MapView() {
         aria-label="Civic intelligence map of Gauteng with incident markers"
       >
         <MemoBase />
-        <MemoMarkers markers={markers} selectedId={selectedId} onSelect={setSelectedId} />
+        <MemoMarkers markers={markers} selectedId={focusIncident?.id ?? selectedId} onSelect={setSelectedId} />
       </svg>
       <div
         className="pointer-events-none absolute inset-0"
         style={{ background: "radial-gradient(ellipse at 50% 42%, transparent 45%, rgba(0,0,0,0.55) 100%)" }}
         aria-hidden
       />
+
+      {/* briefing focus banner — honest origin + one-click clear */}
+      {focusIncident && (
+        <div className="sasi-pop absolute left-1/2 top-4 z-20 -translate-x-1/2">
+          <div className="sasi-map-focus flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#e3c567] sasi-breathe" aria-hidden />
+            <p className="whitespace-nowrap text-[11.5px] text-[#efe0a8]">
+              <span className="font-medium">{focusIncident.ref}</span>
+              <span className="hidden sm:inline"> · From your city briefing</span>
+            </p>
+            <button
+              onClick={clearMapFocus}
+              className="flex h-6 items-center gap-1 rounded-full border border-[#e3c567]/25 px-2 text-[10.5px] font-medium text-[#efe0a8] transition-colors hover:border-[#e3c567]/50 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e3c567]/60"
+              aria-label="Clear briefing focus and return to your filters"
+            >
+              <X className="h-3 w-3" aria-hidden />
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* desktop — floating filter panel */}
       <div className="absolute left-4 top-4 z-10 hidden w-64 lg:block">

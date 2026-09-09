@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { DEMO_NOW, INCIDENTS, POPULAR_SERVICES } from "@/lib/sasi/data";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import { SERVICES, timeAgo } from "@/lib/sasi/utils";
 import type { TimelineEvent, TrustStatus } from "@/lib/sasi/types";
 import {
@@ -44,10 +45,10 @@ const LATEST_INCIDENTS = [...INCIDENTS]
 const STATUS_ROW: TrustStatus[] = ["CONFIRMED", "REPORTED", "INFERRED", "UNVERIFIED"];
 
 const EXAMPLE_PROMPTS = [
-  "Why is my water off?",
-  "Report a burst pipe",
-  "Show incidents near me",
-];
+  "landing.quick.water",
+  "landing.quick.pipe",
+  "landing.quick.near",
+] as const;
 
 const DEMO_TIMELINE: TimelineEvent[] = [
   {
@@ -134,6 +135,7 @@ export default function LandingView() {
   const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
   const openService = useSasiStore((s) => s.openService);
   const openIncident = useSasiStore((s) => s.openIncident);
+  const t = useT();
 
   return (
     <div className="relative overflow-x-clip">
@@ -185,9 +187,9 @@ export default function LandingView() {
             variants={heroItem}
             className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl"
           >
-            Civic intelligence for{" "}
+            {t("landing.hero.a")}{" "}
             <span className="bg-gradient-to-r from-[#64b5f6] via-[#66bb6a] to-[#e3c567] bg-clip-text text-transparent">
-              South Africa
+              {t("landing.hero.b")}
             </span>
             .
           </motion.h1>
@@ -197,7 +199,7 @@ export default function LandingView() {
             variants={heroItem}
             className="mt-4 max-w-xl text-[14.5px] leading-relaxed text-zinc-400 sm:text-[15.5px]"
           >
-            Understand what is happening. Build the evidence. Take the next step.
+            {t("landing.hero.sub")}
           </motion.p>
 
           {/* CTAs */}
@@ -206,14 +208,14 @@ export default function LandingView() {
               onClick={() => navigate("report")}
               className="sasi-btn-sheen inline-flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-[13.5px] font-medium text-black transition-all hover:bg-zinc-200 active:scale-[0.98]"
             >
-              Tell SASI what is happening
+              {t("landing.cta.report")}
               <ArrowRight className="h-4 w-4" aria-hidden />
             </button>
             <button
               onClick={() => navigate("services")}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 px-5 text-[13.5px] font-medium text-zinc-300 transition-all hover:border-white/20 hover:bg-white/[0.04] hover:text-white active:scale-[0.98]"
             >
-              Explore civic services
+              {t("landing.cta.services")}
             </button>
           </motion.div>
 
@@ -227,7 +229,7 @@ export default function LandingView() {
               >
                 <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
                 <span className="flex-1 truncate text-[13.5px] text-zinc-500">
-                  Search services, cases, incidents or ask SASI…
+                  {t("shell.search")}
                 </span>
                 <kbd className="hidden shrink-0 items-center rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 sm:inline-flex">
                   ⌘K
@@ -247,7 +249,7 @@ export default function LandingView() {
                     className="h-1 w-1 rounded-full"
                     style={{ background: "linear-gradient(90deg, #64b5f6, #e3c567)" }}
                   />
-                  {prompt}
+                  {t(prompt)}
                 </button>
               ))}
             </div>

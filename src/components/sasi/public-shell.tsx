@@ -5,20 +5,22 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import type { View } from "@/lib/sasi/types";
 import { SasiLogo } from "./primitives";
 
 const NAV: { view: View; label: string }[] = [
-  { view: "services", label: "Services" },
-  { view: "how-it-works", label: "How it works" },
-  { view: "about", label: "About" },
-  { view: "security", label: "Security" },
+  { view: "services", label: "landing.nav.services" },
+  { view: "how-it-works", label: "landing.nav.how" },
+  { view: "about", label: "landing.nav.about" },
+  { view: "security", label: "landing.nav.security" },
 ];
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const navigate = useSasiStore((s) => s.navigate);
   const view = useSasiStore((s) => s.view);
   const authed = useSasiStore((s) => s.authed);
+  const t = useT();
   const [menuOpen, setMenuOpen] = useState(false);
   const isLanding = view === "landing";
 
@@ -47,7 +49,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                     : "text-zinc-500 hover:text-zinc-200"
                 )}
               >
-                {item.label}
+                {t(item.label)}
               </button>
             ))}
           </nav>
@@ -57,13 +59,13 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               onClick={() => navigate(authed ? "dashboard" : "login")}
               className="rounded-lg px-3 py-1.5 text-[13px] text-zinc-400 transition hover:text-white"
             >
-              {authed ? "Go to dashboard" : "Sign in"}
+              {authed ? t("public.go-to-dashboard") : t("public.sign-in")}
             </button>
             <button
               onClick={() => navigate("report")}
               className="sasi-btn-sheen rounded-lg bg-white px-3.5 py-1.5 text-[13px] font-medium text-black transition hover:bg-zinc-200 active:scale-[0.98]"
             >
-              Tell SASI what is happening
+              {t("landing.cta.report")}
             </button>
           </div>
 
@@ -89,7 +91,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                   }}
                   className="rounded-lg px-3 py-2.5 text-left text-[14px] text-zinc-300 hover:bg-white/[0.04]"
                 >
-                  {item.label}
+                  {t(item.label)}
                 </button>
               ))}
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -100,7 +102,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                   }}
                   className="rounded-lg border border-white/10 py-2.5 text-[13px] text-zinc-300"
                 >
-                  {authed ? "Go to dashboard" : "Sign in"}
+                  {authed ? t("public.go-to-dashboard") : t("public.sign-in")}
                 </button>
                 <button
                   onClick={() => {
@@ -146,7 +148,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                         onClick={() => navigate(item.view)}
                         className="transition hover:text-zinc-200"
                       >
-                        {item.label}
+                        {t(item.label)}
                       </button>
                     </li>
                   ))}
@@ -199,7 +201,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                       onClick={() => navigate(authed ? "dashboard" : "login")}
                       className="transition hover:text-zinc-200"
                     >
-                      {authed ? "Go to dashboard" : "Sign in"}
+                      {authed ? t("public.go-to-dashboard") : t("public.sign-in")}
                     </button>
                   </li>
                 </ul>

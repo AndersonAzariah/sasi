@@ -8,6 +8,7 @@ import {
   Eye,
   History,
   Leaf,
+  MapPin,
   RefreshCw,
   Newspaper,
   Siren,
@@ -68,10 +69,12 @@ function BriefingBody({
   briefing,
   onRef,
   onAsk,
+  onMap,
 }: {
   briefing: CityBriefing;
   onRef: (ref: string) => void;
   onAsk: (section: BriefingSection) => void;
+  onMap: (ref: string) => void;
 }) {
   return (
     <>
@@ -111,12 +114,28 @@ function BriefingBody({
             Worth watching
           </p>
           <ul className="mt-2 space-y-1.5">
-            {briefing.watchlist.map((w, i) => (
-              <li key={i} className="flex gap-2 text-[12.5px] leading-relaxed text-zinc-300">
-                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600" aria-hidden />
-                <RichText content={w} onRef={onRef} className="min-w-0 flex-1 [&>div]:space-y-0" />
-              </li>
-            ))}
+            {briefing.watchlist.map((w, i) => {
+              /* watchlist rows that cite a demo incident ref get a map click-through */
+              const incRef = /INC-\d{3,4}/i.exec(w)?.[0];
+              return (
+                <li key={i} className="flex gap-2 text-[12.5px] leading-relaxed text-zinc-300">
+                  <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <RichText content={w} onRef={onRef} className="min-w-0 [&>div]:space-y-0" />
+                    {incRef && (
+                      <button
+                        onClick={() => onMap(incRef)}
+                        className="sasi-chip-map mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500 transition-colors hover:text-[#64b5f6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#64b5f6]/50"
+                        aria-label={`Show ${incRef} on the civic map`}
+                      >
+                        <MapPin className="h-3 w-3" aria-hidden />
+                        View on map
+                      </button>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -186,6 +205,7 @@ export function CityBriefingCard() {
   const generateBriefing = useSasiStore((s) => s.generateBriefing);
   const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
   const navigate = useSasiStore((s) => s.navigate);
+  const focusOnMap = useSasiStore((s) => s.focusOnMap);
   const cases = useSasiStore((s) => s.cases);
   const openCase = useSasiStore((s) => s.openCase);
   const openIncident = useSasiStore((s) => s.openIncident);
@@ -221,6 +241,9 @@ export function CityBriefingCard() {
     setPendingAsk(q);
     navigate("ask-sasi");
   };
+
+  /* watchlist → map: pre-select the cited incident (store guards unknown refs) */
+  const mapFromWatchlist = (ref: string) => focusOnMap(ref);
 
   /* past items exclude what is currently shown as "today" (or being viewed) */
   const pastItems = useMemo(
@@ -328,7 +351,7 @@ export function CityBriefingCard() {
 
       {/* ---------- briefing body (today or reopened) ---------- */}
       {shown && !busy && (
-        <BriefingBody briefing={shown} onRef={handleRef} onAsk={askAboutSection} />
+        <BriefingBody briefing={shown} onRef={handleRef} onAsk={askAboutSection} onMap={mapFromWatchlist} />
       )}
 
       {/* ---------- past briefings ---------- */}

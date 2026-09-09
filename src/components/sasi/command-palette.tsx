@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
 import { CASES, EVIDENCE, INCIDENTS } from "@/lib/sasi/data";
+import { LANGUAGES, translate } from "@/lib/sasi/i18n";
 import { SERVICES as SERVICE_META } from "@/lib/sasi/utils";
 import { ServiceIcon } from "./primitives";
 import { Bot } from "lucide-react";
@@ -175,6 +176,19 @@ export function CommandPalette() {
         hint: "Go to",
         keywords: `go navigate ${n.label}`,
         perform: () => navigate(n.view),
+      });
+    });
+
+    // Language — instant switch, current language first (excluded)
+    const currentLang = useSasiStore.getState().lang;
+    LANGUAGES.filter((l) => l.code !== currentLang).forEach((l) => {
+      out.push({
+        id: `lang-${l.code}`,
+        group: "Language",
+        label: `Switch to ${l.label}`,
+        hint: translate(currentLang, "settings.language.interface"),
+        keywords: `language taal ulimi limi switch ${l.label} ${l.english}`,
+        perform: () => useSasiStore.getState().setLang(l.code),
       });
     });
 

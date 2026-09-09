@@ -273,6 +273,8 @@ function schedulePostApproval(
     );
     st.setCaseAIState(caseId, "COMPLETE");
     st.persistCaseById(caseId);
+    /* live digest: the completion is a real signal worth a notification */
+    st.notifyInvestigationComplete(caseId);
   });
 }
 

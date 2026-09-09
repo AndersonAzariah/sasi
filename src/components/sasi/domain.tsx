@@ -701,8 +701,15 @@ export function NotificationRow({
       <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", tone, !n.read && "sasi-breathe")} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center justify-between gap-2">
-          <span className={cn("truncate text-[13px]", n.read ? "font-normal text-zinc-400" : "font-medium text-white")}>
-            {n.title}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={cn("truncate text-[13px]", n.read ? "font-normal text-zinc-400" : "font-medium text-white")}>
+              {n.title}
+            </span>
+            {n.live && (
+              <span className="sasi-live-tag shrink-0" aria-label="Live event">
+                LIVE
+              </span>
+            )}
           </span>
           <span className="shrink-0 font-mono text-[10px] text-zinc-600">
             {timeAgo(n.at)}

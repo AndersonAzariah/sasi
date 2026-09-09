@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { DEMO_USER, GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
+import { LANGUAGES, PLANNED_LANGUAGES, useT } from "@/lib/sasi/i18n";
+import type { Lang } from "@/lib/sasi/types";
 import { locationLabel } from "@/lib/sasi/utils";
 import {
   DemoBadge,
@@ -65,15 +67,6 @@ const NAV: { id: SectionId; label: string; icon: typeof User }[] = [
   { id: "ai", label: "AI permissions", icon: Sparkles },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "data", label: "Data", icon: Database },
-];
-
-const LANGUAGES = [
-  { code: "zu", label: "isiZulu" },
-  { code: "st", label: "Sesotho" },
-  { code: "tn", label: "Setswana" },
-  { code: "nso", label: "Sepedi" },
-  { code: "af", label: "Afrikaans" },
-  { code: "xh", label: "isiXhosa" },
 ];
 
 const TEXT_SIZES = [14, 15, 16, 17, 18];
@@ -125,6 +118,7 @@ export default function SettingsView() {
   const setSavedLocation = useSasiStore((s) => s.setSavedLocation);
   const cases = useSasiStore((s) => s.cases);
   const evidence = useSasiStore((s) => s.evidence);
+  const t = useT();
   const navigate = useSasiStore((s) => s.navigate);
 
   const [active, setActive] = useState<SectionId>("account");
@@ -144,8 +138,9 @@ export default function SettingsView() {
   const [municipality, setMunicipality] = useState(DEMO_USER.location.municipality);
   const [city, setCity] = useState(savedLocation.city);
 
-  /* --- language --- */
-  const [language, setLanguage] = useState("en");
+  /* --- language (real i18n — see lib/sasi/i18n.ts) --- */
+  const lang = useSasiStore((s) => s.lang);
+  const setLang = useSasiStore((s) => s.setLang);
 
   /* --- accessibility --- */
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -430,31 +425,46 @@ export default function SettingsView() {
         {active === "language" && (
           <section aria-labelledby="settings-language" className="sasi-card p-5">
             <SectionLabel>Language</SectionLabel>
-            <h2 id="settings-language" className="mt-1 text-[15px] font-semibold text-white">Interface language</h2>
+            <h2 id="settings-language" className="mt-1 text-[15px] font-semibold text-white">{t("settings.language.interface")}</h2>
             <div className="mt-4 max-w-sm">
               <label htmlFor="language-select" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
-                Language
+                {t("settings.language.label")}
               </label>
-              <Select value={language} onValueChange={setLanguage}>
+              <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
                 <SelectTrigger id="language-select" className="w-full text-[13px]" aria-label="Language">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en" className="text-[13px]">
-                    English
-                  </SelectItem>
                   {LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code} className="text-[13px]">
+                      {l.label}
+                      <span className="ml-1.5 text-[10.5px] text-zinc-600">· {l.note}</span>
+                    </SelectItem>
+                  ))}
+                  {PLANNED_LANGUAGES.map((l) => (
                     <SelectItem key={l.code} value={l.code} disabled className="text-[13px]">
-                      {l.label} — coming soon
+                      {l.label} — {t("settings.language.coming")}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="mt-3 text-[12px] leading-relaxed text-zinc-600">
-                English is the only working language in this demo. Additional South African
-                languages are planned — reports written in them are accepted, translation of the
-                interface is coming soon.
-              </p>
+              <div className="mt-3 rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                <p className="text-[11.5px] font-medium text-zinc-300">Honest coverage</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
+                  English, isiZulu and Afrikaans translate the app shell (sidebar, topbar, mobile
+                  nav), the landing page and shared controls — switch now and those surfaces
+                  respond instantly. Individual views remain English for this demo; reports written
+                  in any language are accepted, and deeper translation is planned.
+                </p>
+              </div>
+              {lang !== "en" && (
+                <button
+                  onClick={() => setLang("en")}
+                  className="mt-2.5 text-[12px] font-medium text-[#e3c567] transition-colors hover:text-[#f0d98c]"
+                >
+                  Back to English
+                </button>
+              )}
             </div>
           </section>
         )}

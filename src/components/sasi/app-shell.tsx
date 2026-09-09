@@ -20,12 +20,13 @@ import {
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
 import { DEMO_USER } from "@/lib/sasi/data";
+import { useT } from "@/lib/sasi/i18n";
 import type { View } from "@/lib/sasi/types";
 import { SasiLogo } from "./primitives";
 import { NotificationRow } from "./domain";
 
 /* ============================================================
-   NAV MODEL
+   NAV MODEL — labels are i18n keys (see lib/sasi/i18n.ts)
    ============================================================ */
 
 const NAV_SECTIONS: {
@@ -33,38 +34,38 @@ const NAV_SECTIONS: {
   items: { view: View; label: string; icon: typeof Search }[];
 }[] = [
   {
-    label: "Overview",
+    label: "nav.overview",
     items: [
-      { view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { view: "ask-sasi", label: "Ask SASI", icon: Bot },
+      { view: "dashboard", label: "nav.dashboard", icon: LayoutDashboard },
+      { view: "ask-sasi", label: "nav.ask-sasi", icon: Bot },
     ],
   },
   {
-    label: "Investigate",
+    label: "nav.investigate",
     items: [
-      { view: "investigate", label: "Investigate", icon: Sparkles },
-      { view: "cases", label: "Cases", icon: FolderLock },
-      { view: "incidents", label: "Incidents", icon: Zap },
-      { view: "map", label: "Map", icon: Map },
+      { view: "investigate", label: "nav.investigate.item", icon: Sparkles },
+      { view: "cases", label: "nav.cases", icon: FolderLock },
+      { view: "incidents", label: "nav.incidents", icon: Zap },
+      { view: "map", label: "nav.map", icon: Map },
     ],
   },
   {
-    label: "Evidence",
+    label: "nav.evidence",
     items: [
-      { view: "evidence", label: "Evidence", icon: FolderLock },
-      { view: "activity", label: "Activity", icon: Activity },
+      { view: "evidence", label: "nav.evidence.item", icon: FolderLock },
+      { view: "activity", label: "nav.activity", icon: Activity },
     ],
   },
   {
-    label: "System",
+    label: "nav.system",
     items: [
-      { view: "notifications", label: "Notifications", icon: Bell },
-      { view: "settings", label: "Settings", icon: Settings },
+      { view: "notifications", label: "nav.notifications", icon: Bell },
+      { view: "settings", label: "nav.settings", icon: Settings },
     ],
   },
 ];
 
-const SERVICES_SHORTCUT = { view: "services" as View, label: "Services", icon: ShieldCheck };
+const SERVICES_SHORTCUT = { view: "services" as View, label: "nav.services", icon: ShieldCheck };
 
 /* ============================================================
    SIDEBAR
@@ -124,6 +125,7 @@ function Sidebar() {
   const view = useSasiStore((s) => s.view);
   const notifications = useSasiStore((s) => s.notifications);
   const navigate = useSasiStore((s) => s.navigate);
+  const t = useT();
   const unread = notifications.filter((n) => !n.read).length;
 
   return (
@@ -138,13 +140,14 @@ function Sidebar() {
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
-              {section.label}
+              {t(section.label)}
             </p>
             <div className="space-y-px">
               {section.items.map((item) => (
                 <SidebarLink
                   key={item.view}
                   {...item}
+                  label={t(item.label)}
                   active={view === item.view}
                   badge={item.view === "notifications" ? unread : undefined}
                 />
@@ -154,10 +157,11 @@ function Sidebar() {
         ))}
         <div>
           <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
-            Services
+            {t("nav.services")}
           </p>
           <SidebarLink
             {...SERVICES_SHORTCUT}
+            label={t(SERVICES_SHORTCUT.label)}
             active={view === "services" || view === "service-detail"}
           />
         </div>
@@ -193,7 +197,7 @@ function Sidebar() {
           )}
         >
           <Settings className="h-3.5 w-3.5" aria-hidden />
-          Admin foundation
+          {t("nav.admin")}
           <span className="ml-auto rounded border border-white/8 px-1 py-px font-mono text-[8.5px] tracking-widest text-zinc-600">
             DEMO
           </span>
@@ -214,6 +218,7 @@ function Topbar() {
   const [ntfOpen, setNtfOpen] = useState(false);
   const notifications = useSasiStore((s) => s.notifications);
   const markAll = useSasiStore((s) => s.markAllNotificationsRead);
+  const t = useT();
   const unread = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
   return (
@@ -231,7 +236,7 @@ function Topbar() {
       >
         <Search className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
         <span className="flex-1 truncate text-[13px] text-zinc-500">
-          Search services, cases, incidents or ask SASI…
+          {t("shell.search")}
         </span>
         <kbd className="hidden items-center gap-0.5 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-500 lg:flex">
           <CommandIcon className="h-2.5 w-2.5" />K
@@ -249,7 +254,7 @@ function Topbar() {
 
         <button
           className="hidden h-9 items-center gap-1.5 rounded-lg border border-white/8 bg-white/[0.02] px-2.5 text-[12px] text-zinc-400 transition hover:border-white/15 hover:text-zinc-200 xl:flex"
-          aria-label="Saved location"
+          aria-label={t("shell.saved-location")}
           onClick={() => navigate("settings")}
         >
           <Map className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
@@ -261,7 +266,7 @@ function Topbar() {
           <button
             onClick={() => setNtfOpen((o) => !o)}
             className="relative flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.04] hover:text-white"
-            aria-label={`Notifications${unread ? ` (${unread} unread)` : ""}`}
+            aria-label={`${t("shell.notifications")}${unread ? ` (${unread} unread)` : ""}`}
             aria-expanded={ntfOpen}
           >
             <Bell className="h-[17px] w-[17px]" />
@@ -281,16 +286,16 @@ function Topbar() {
               />
               <div
                 role="dialog"
-                aria-label="Notifications"
+                aria-label={t("shell.notifications")}
                 className="sasi-card sasi-pop absolute right-0 top-11 z-50 w-[min(92vw,380px)] overflow-hidden bg-[#0d0e10] shadow-2xl shadow-black/60"
               >
                 <div className="flex items-center justify-between border-b border-white/6 px-3 py-2.5">
-                  <p className="text-[12.5px] font-semibold text-white">Notifications</p>
+                  <p className="text-[12.5px] font-semibold text-white">{t("shell.notifications")}</p>
                   <button
                     onClick={() => { markAll(); }}
                     className="text-[11.5px] text-zinc-500 transition hover:text-white"
                   >
-                    Mark all read
+                    {t("shell.mark-all-read")}
                   </button>
                 </div>
                 <div className="sasi-scroll max-h-[380px] divide-y divide-white/[0.04] overflow-y-auto">
@@ -312,7 +317,7 @@ function Topbar() {
                   }}
                   className="block w-full border-t border-white/6 py-2.5 text-center text-[12px] text-zinc-500 transition hover:text-white"
                 >
-                  View all notifications
+                  {t("shell.view-all-notifications")}
                 </button>
               </div>
             </>
@@ -337,16 +342,17 @@ function Topbar() {
    ============================================================ */
 
 const MOBILE_NAV: { view: View; label: string; icon: typeof Search }[] = [
-  { view: "dashboard", label: "Home", icon: LayoutDashboard },
-  { view: "investigate", label: "Investigate", icon: Sparkles },
-  { view: "cases", label: "Cases", icon: FolderLock },
-  { view: "map", label: "Map", icon: Map },
-  { view: "profile", label: "Profile", icon: CircleUser },
+  { view: "dashboard", label: "nav.home", icon: LayoutDashboard },
+  { view: "investigate", label: "nav.investigate.item", icon: Sparkles },
+  { view: "cases", label: "nav.cases", icon: FolderLock },
+  { view: "map", label: "nav.map", icon: Map },
+  { view: "profile", label: "nav.profile", icon: CircleUser },
 ];
 
 function MobileNav() {
   const view = useSasiStore((s) => s.view);
   const navigate = useSasiStore((s) => s.navigate);
+  const t = useT();
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#070708]/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
@@ -386,7 +392,7 @@ function MobileNav() {
                   active ? "text-white" : "text-zinc-600"
                 )}
               >
-                {item.label}
+                {t(item.label)}
               </span>
             </button>
           );
@@ -403,15 +409,16 @@ function MobileNav() {
 function FloatingAskButton() {
   const navigate = useSasiStore((s) => s.navigate);
   const view = useSasiStore((s) => s.view);
+  const t = useT();
   if (view === "ask-sasi") return null;
   return (
     <button
       onClick={() => navigate("ask-sasi")}
       className="sasi-glow-multi fixed bottom-[72px] right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-white pl-3.5 pr-4 text-[13px] font-semibold text-black transition-transform active:scale-95 lg:hidden"
-      aria-label="Ask SASI anything"
+      aria-label={t("shell.floating-ask")}
     >
       <Sparkles className="h-4 w-4" aria-hidden />
-      Ask SASI
+      {t("shell.floating-ask")}
     </button>
   );
 }
