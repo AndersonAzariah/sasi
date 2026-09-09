@@ -1,8 +1,7 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// SASI — persistence schema.
+// The product is a demo-first single-route SPA; these tables back the
+// "survive a reload" layer: user-created cases (reports), Ask SASI chat
+// history and saved preferences, keyed by an anonymous browser session id.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +12,37 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+/// A case created by the user through the report wizard.
+/// The full SasiCase payload is stored as JSON so the client can
+/// rehydrate the exact shape it knows how to render.
+model CaseRecord {
   id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  ref       String   @unique // CASE-000124
+  sessionId String
+  service   String
+  title     String
+  payload   String // full SasiCase JSON
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([sessionId, createdAt])
 }
 
-model Post {
+/// One Ask SASI chat message (user or assistant).
+model ChatMessage {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  sessionId String
+  role      String // "user" | "assistant"
+  content   String
+  refs      String? // JSON array of "CASE-xxxxxx" / "INC-xxxx" strings
   createdAt DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+/// Per-session preferences (currently the saved location).
+model Profile {
+  sessionId String   @id
+  location  String? // JSON { province, city, suburb }
   updatedAt DateTime @updatedAt
 }

@@ -507,7 +507,7 @@ export function PrimaryButton({
   return (
     <button
       className={cn(
-        "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-4 text-[13px] font-medium text-black transition-all hover:bg-zinc-200 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
+        "sasi-btn-sheen inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-white px-4 text-[13px] font-medium text-black transition-all hover:bg-zinc-200 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50",
         className
       )}
       {...props}

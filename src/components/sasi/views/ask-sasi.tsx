@@ -6,8 +6,10 @@ import {
   AlertTriangle,
   ArrowUp,
   Check,
+  CloudCheck,
   Copy,
   Eraser,
+  FilePlus2,
   FileWarning,
   Lightbulb,
   MapPin,
@@ -166,12 +168,15 @@ function TypingDots() {
 function AssistantMessage({
   msg,
   onRef,
+  onDraftReport,
 }: {
   msg: ChatMessage;
   onRef: (ref: string) => void;
+  onDraftReport: (id: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const isError = msg.state === "error";
+  const isStreaming = msg.state === "streaming" || msg.state === "sending";
 
   const copy = async () => {
     try {
@@ -206,7 +211,8 @@ function AssistantMessage({
         <div
           className={cn(
             "sasi-card rounded-xl rounded-tl-sm px-3.5 py-2.5 text-[13px] leading-relaxed text-zinc-300",
-            isError && "border-[#ef5350]/25 bg-[#ef5350]/[0.04] text-[#fda4a0]"
+            isError && "border-[#ef5350]/25 bg-[#ef5350]/[0.04] text-[#fda4a0]",
+            isStreaming && "border-[#e3c567]/20"
           )}
         >
           {msg.state === "sending" && !msg.content ? (
@@ -214,9 +220,25 @@ function AssistantMessage({
               <TypingDots />
             </div>
           ) : (
-            <RichText content={msg.content} onRef={onRef} />
+            <div className="inline">
+              <RichText content={msg.content} onRef={onRef} />
+              {isStreaming && msg.content && <span className="sasi-caret" aria-hidden />}
+            </div>
           )}
         </div>
+
+        {msg.state === "done" && !isError && msg.actions?.report && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onDraftReport(msg.id)}
+              className="group/chip flex h-7 items-center gap-1.5 rounded-full border border-[#e3c567]/30 bg-[#e3c567]/[0.08] pl-2 pr-2.5 text-[11px] font-medium text-[#e3c567] transition hover:border-[#e3c567]/55 hover:bg-[#e3c567]/[0.14]"
+              aria-label="Draft a report from this conversation"
+            >
+              <FilePlus2 className="h-3 w-3 transition group-hover/chip:scale-110" aria-hidden />
+              Draft a report from this
+            </button>
+          </div>
+        )}
 
         {msg.state === "done" && !isError && msg.content && (
           <button
@@ -255,6 +277,7 @@ export default function AskSasiView() {
   const openIncident = useSasiStore((s) => s.openIncident);
   const navigate = useSasiStore((s) => s.navigate);
   const savedLocation = useSasiStore((s) => s.savedLocation);
+  const draftReportFromChat = useSasiStore((s) => s.draftReportFromChat);
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -270,7 +293,11 @@ export default function AskSasiView() {
     }
   }, [pendingAsk, setPendingAsk, askSasi]);
 
-  /* keep the newest message in view */
+  /* keep the newest message in view — also follows live streaming growth */
+  const lastAssistantLen =
+    chatMessages.length > 0 && chatMessages[chatMessages.length - 1].role === "assistant"
+      ? chatMessages[chatMessages.length - 1].content.length
+      : 0;
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -278,7 +305,7 @@ export default function AskSasiView() {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     });
     return () => cancelAnimationFrame(id);
-  }, [chatMessages.length, chatBusy]);
+  }, [chatMessages.length, chatBusy, lastAssistantLen]);
 
   const send = (text?: string) => {
     const q = (text ?? input).trim();
@@ -328,6 +355,13 @@ export default function AskSasiView() {
             <MapPin className="h-3 w-3 text-zinc-500" aria-hidden />
             {savedLocation.city}
           </button>
+          <span
+            className="hidden h-8 items-center gap-1.5 rounded-lg border border-[#66bb6a]/20 bg-[#66bb6a]/[0.06] px-2.5 text-[11px] text-[#8fd694] md:flex"
+            title="Chat history, reports and your location are saved for this browser"
+          >
+            <CloudCheck className="h-3.5 w-3.5" aria-hidden />
+            Saved
+          </span>
           {!empty && (
             <button
               onClick={clearChat}
@@ -418,7 +452,12 @@ export default function AskSasiView() {
                     </div>
                   </motion.div>
                 ) : (
-                  <AssistantMessage key={m.id} msg={m} onRef={onRef} />
+                  <AssistantMessage
+                    key={m.id}
+                    msg={m}
+                    onRef={onRef}
+                    onDraftReport={draftReportFromChat}
+                  />
                 )
               )}
               <AnimatePresence>
@@ -430,7 +469,9 @@ export default function AskSasiView() {
                     className="flex items-center gap-2 pl-1 text-[11px] text-zinc-600"
                   >
                     <Lightbulb className="h-3 w-3 text-[#e3c567]/60" aria-hidden />
-                    SASI is checking public information and your case context…
+                    {lastAssistantLen > 0
+                      ? "SASI is answering live — you can keep reading while it streams."
+                      : "SASI is checking public information and your case context…"}
                   </motion.div>
                 )}
               </AnimatePresence>

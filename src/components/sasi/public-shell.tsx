@@ -60,7 +60,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             </button>
             <button
               onClick={() => navigate("report")}
-              className="rounded-lg bg-white px-3.5 py-1.5 text-[13px] font-medium text-black transition hover:bg-zinc-200 active:scale-[0.98]"
+              className="sasi-btn-sheen rounded-lg bg-white px-3.5 py-1.5 text-[13px] font-medium text-black transition hover:bg-zinc-200 active:scale-[0.98]"
             >
               Tell SASI what is happening
             </button>

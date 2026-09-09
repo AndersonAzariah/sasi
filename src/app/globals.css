@@ -440,3 +440,98 @@
     scroll-behavior: auto;
   }
 }
+
+/* ============================================================
+   MICRO-DETAILS — streaming caret, skeletons, button sheen
+   ============================================================ */
+
+/* Live-streaming caret for Ask SASI replies (blinking gold block) */
+.sasi-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  border-radius: 1.5px;
+  background: linear-gradient(180deg, #e3c567, #b99a3f);
+  box-shadow: 0 0 8px rgba(227, 197, 103, 0.55);
+  animation: sasi-caret-blink 0.9s steps(2, start) infinite;
+}
+@keyframes sasi-caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Shimmer sweep for loading surfaces */
+.sasi-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 8px;
+}
+.sasi-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.07),
+    transparent
+  );
+  animation: sasi-skeleton-sweep 1.6s ease-in-out infinite;
+}
+@keyframes sasi-skeleton-sweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Sheen sweep on hover for hero CTAs */
+.sasi-btn-sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.sasi-btn-sheen::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: -30%;
+  width: 36%;
+  transform: skewX(-18deg) translateX(-160%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.28),
+    transparent
+  );
+  transition: transform 0.75s cubic-bezier(0.23, 1, 0.32, 1);
+  pointer-events: none;
+}
+.sasi-btn-sheen:hover::after {
+  transform: skewX(-18deg) translateX(560%);
+}
+
+/* Focus ring unification for toast + chips */
+.sasi-chip-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(227, 197, 103, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sasi-caret {
+    animation: none;
+    opacity: 0.8;
+  }
+  .sasi-skeleton::after {
+    animation: none;
+    display: none;
+  }
+  .sasi-btn-sheen::after {
+    display: none;
+  }
+}

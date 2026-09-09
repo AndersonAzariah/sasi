@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Toaster } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
 import type { View } from "@/lib/sasi/types";
 import { AppShell } from "./app-shell";
@@ -138,12 +139,15 @@ function ViewRenderer() {
 
 export function SasiApp() {
   const view = useSasiStore((s) => s.view);
+  const hydrate = useSasiStore((s) => s.hydrate);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // pull persisted chat / cases / location while the splash is up
+    void hydrate();
     const t = setTimeout(() => setMounted(true), 650);
     return () => clearTimeout(t);
-  }, []);
+  }, [hydrate]);
 
   if (!mounted) return <SplashScreen />;
 
@@ -161,6 +165,20 @@ export function SasiApp() {
         </AppShell>
       )}
       <CommandPalette />
+      <Toaster
+        position="bottom-right"
+        theme="dark"
+        gap={8}
+        toastOptions={{
+          classNames: {
+            toast:
+              "!bg-zinc-950 !border !border-white/10 !text-zinc-100 !shadow-[0_12px_40px_-12px_rgba(0,0,0,0.9)] !rounded-xl",
+            title: "!text-[13px] !font-semibold",
+            description: "!text-zinc-400 !text-[12px]",
+            actionButton: "!bg-[#E5484D] !text-white",
+          },
+        }}
+      />
     </div>
   );
 }

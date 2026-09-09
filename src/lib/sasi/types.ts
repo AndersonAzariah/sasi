@@ -275,10 +275,15 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   at: string; // ISO
-  /** UI delivery state — assistant messages stream "done" on arrival */
-  state: "sending" | "done" | "error";
+  /** UI delivery state — assistant messages arrive as an SSE stream */
+  state: "sending" | "streaming" | "done" | "error";
   /** civic refs detected in the message body (CASE-xxxxxx / INC-xxxx) */
   refs?: string[];
+  /** suggested follow-up actions rendered as chips under the message */
+  actions?: {
+    /** reply proposes filing a report → chip deep-links into the report wizard */
+    report?: boolean;
+  };
 }
 
 export type View =

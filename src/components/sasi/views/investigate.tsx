@@ -272,6 +272,7 @@ function schedulePostApproval(
       "Verification completed"
     );
     st.setCaseAIState(caseId, "COMPLETE");
+    st.persistCaseById(caseId);
   });
 }
 

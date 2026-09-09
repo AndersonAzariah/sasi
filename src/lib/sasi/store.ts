@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { toast } from "sonner";
 import type {
   AppNotification,
   ChatMessage,
@@ -17,6 +18,7 @@ import {
   FINDINGS,
   NOTIFICATIONS,
 } from "./data";
+import { getSessionId } from "./utils";
 
 interface SasiState {
   /* ---- navigation (client-side router; the product ships on a single route) ---- */
@@ -45,6 +47,10 @@ interface SasiState {
   openIncident: (ref: string) => void;
   openService: (key: string) => void;
 
+  /* ---- persistence ("survive a reload" layer) ---- */
+  hydrated: boolean;
+  hydrate: () => Promise<void>;
+
   /* ---- report flow ---- */
   reportDraft: {
     service: string;
@@ -66,6 +72,8 @@ interface SasiState {
   addCaseEvent: (caseId: string, event: SasiCase["events"][number]) => void;
   addFinding: (caseId: string, finding: Finding) => void;
   addEvidence: (item: EvidenceItem) => void;
+  /** snapshot a case to the server store (best-effort) */
+  persistCaseById: (caseId: string) => void;
 
   /* ---- actions / approval ---- */
   approveAction: (caseId: string) => void;
@@ -80,7 +88,7 @@ interface SasiState {
   savedLocation: { province: string; city: string; suburb: string };
   setSavedLocation: (loc: Partial<SasiState["savedLocation"]>) => void;
 
-  /* ---- Ask SASI (LLM chat) ---- */
+  /* ---- Ask SASI (LLM chat, SSE streaming + persisted) ---- */
   chatMessages: ChatMessage[];
   chatBusy: boolean;
   /** question queued from the palette / other views — consumed by the chat view */
@@ -88,10 +96,40 @@ interface SasiState {
   setPendingAsk: (q: string | null) => void;
   askSasi: (question: string) => Promise<void>;
   clearChat: () => void;
+
+  /* ---- chat → report loop ---- */
+  /** pre-fill the report wizard from an assistant suggestion and open it */
+  draftReportFromChat: (messageId: string) => void;
 }
 
 let caseCounter = 124;
 let eventCounter = 100;
+
+/* ---------- persistence helpers (fire-and-forget; the demo never blocks on storage) ---------- */
+
+async function persistCase(c: SasiCase) {
+  try {
+    await fetch("/api/sasi/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "case", sessionId: getSessionId(), case: c }),
+    });
+  } catch {
+    /* offline / demo — the in-memory case still works */
+  }
+}
+
+let locationSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function persistLocation(loc: SasiState["savedLocation"]) {
+  if (locationSaveTimer) clearTimeout(locationSaveTimer);
+  locationSaveTimer = setTimeout(() => {
+    void fetch("/api/sasi/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "location", sessionId: getSessionId(), location: loc }),
+    }).catch(() => undefined);
+  }, 600);
+}
 
 export const useSasiStore = create<SasiState>((set, get) => ({
   view: "landing",
@@ -136,6 +174,57 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     set({ activeService: key, view: "service-detail", param: key, commandOpen: false });
   },
 
+  /* ------------------------------------------------------------------
+     Hydrate — load the user's cases, chat history and saved location
+     from /api/sasi/state (keyed by an anonymous browser session id).
+     Runs once while the splash screen is up; failures are silent and
+     the demo falls back to its in-memory dataset.
+     ------------------------------------------------------------------ */
+  hydrated: false,
+  hydrate: async () => {
+    if (get().hydrated || typeof window === "undefined") return;
+    set({ hydrated: true }); // guard against double-invoke before the fetch resolves
+    try {
+      const res = await fetch(`/api/sasi/state?sessionId=${encodeURIComponent(getSessionId())}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        cases?: SasiCase[];
+        chat?: {
+          id: string;
+          role: "user" | "assistant";
+          content: string;
+          at: string;
+          refs?: string[];
+        }[];
+        location?: { province: string; city: string; suburb: string };
+      };
+
+      set((s) => {
+        const userCases = (data.cases ?? []).filter(
+          (c) => !s.cases.some((existing) => existing.ref === c.ref)
+        );
+        const chat =
+          s.chatMessages.length === 0 && (data.chat?.length ?? 0) > 0
+            ? (data.chat ?? []).map<ChatMessage>((m) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                at: m.at,
+                state: "done",
+                refs: m.refs,
+              }))
+            : s.chatMessages;
+        return {
+          cases: userCases.length ? [...userCases, ...s.cases] : s.cases,
+          chatMessages: chat,
+          savedLocation: data.location ?? s.savedLocation,
+        };
+      });
+    } catch {
+      /* offline / cold DB — demo continues from memory */
+    }
+  },
+
   reportDraft: null,
   setReportDraft: (draft) =>
     set((s) => ({
@@ -152,10 +241,10 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       impact: "",
       evidenceNote: "",
     };
-    const ref = `CASE-0001${caseCounter++}`.replace("00010", "0001").slice(0, 11);
-    const finalRef = `CASE-${String(caseCounter - 1).padStart(6, "0")}`;
     const nowIso = new Date().toISOString();
-    const id = `case-new-${caseCounter - 1}`;
+    const id = `case-new-${caseCounter}`;
+    const finalRef = `CASE-${String(caseCounter).padStart(6, "0")}`;
+    caseCounter += 1;
     const newCase: SasiCase = {
       id,
       ref: finalRef,
@@ -191,8 +280,10 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       findings: { ...s.findings, [id]: [] },
       reportDraft: null,
     }));
-    void ref;
-    void DEMO_NOW;
+    void persistCase(newCase);
+    toast.success(`Report ${finalRef} created`, {
+      description: "Saved to this browser — it will still be here when you come back.",
+    });
     return finalRef;
   },
 
@@ -212,6 +303,8 @@ export const useSasiStore = create<SasiState>((set, get) => ({
           : c
       ),
     }));
+    const c = get().cases.find((x) => x.id === caseId);
+    if (c) void persistCase(c);
   },
   setCaseAIState: (caseId, state) =>
     set((s) => ({
@@ -230,6 +323,10 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       findings: { ...s.findings, [caseId]: [...(s.findings[caseId] ?? []), finding] },
     })),
   addEvidence: (item) => set((s) => ({ evidence: [item, ...s.evidence] })),
+  persistCaseById: (caseId) => {
+    const c = get().cases.find((x) => x.id === caseId);
+    if (c) void persistCase(c);
+  },
 
   approveAction: (caseId) => {
     const c = get().cases.find((x) => x.id === caseId);
@@ -256,6 +353,10 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         ...s.notifications,
       ],
     }));
+    void persistCase(get().cases.find((x) => x.id === caseId) ?? c);
+    toast.success("Action approved — SASI is executing", {
+      description: `${c.ref} · ${c.proposedAction?.title ?? ""}`.trim(),
+    });
   },
   rejectAction: (caseId) => {
     const c = get().cases.find((x) => x.id === caseId);
@@ -268,6 +369,10 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       label: "You rejected the action",
       detail: "SASI will not proceed. You can revisit this later.",
       kind: "action",
+    });
+    void persistCase(get().cases.find((x) => x.id === caseId) ?? c);
+    toast("Action rejected — SASI paused", {
+      description: `${c.ref} · nothing was sent. You can revisit this later.`,
     });
   },
   setActionState: (caseId, state) =>
@@ -284,20 +389,33 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     })),
 
   savedLocation: { province: "Gauteng", city: "Johannesburg", suburb: "Melrose" },
-  setSavedLocation: (loc) =>
-    set((s) => ({ savedLocation: { ...s.savedLocation, ...loc } })),
+  setSavedLocation: (loc) => {
+    set((s) => ({ savedLocation: { ...s.savedLocation, ...loc } }));
+    persistLocation(get().savedLocation);
+  },
 
   /* ------------------------------------------------------------------
      Ask SASI — free-text civic assistant backed by /api/sasi/ask.
-     The API carries the conversation server-side; here we only track
-     visible messages + busy state. On failure the user gets an honest
-     error bubble instead of a fabricated answer.
+     The reply arrives as Server-Sent Events: deltas append to the
+     assistant bubble in real time, the done event carries refs and
+     suggested follow-up actions. The server persists both sides of
+     the conversation per browser session. On failure the user gets
+     an honest error bubble instead of a fabricated answer.
      ------------------------------------------------------------------ */
   chatMessages: [],
   chatBusy: false,
   pendingAsk: null,
   setPendingAsk: (q) => set({ pendingAsk: q }),
-  clearChat: () => set({ chatMessages: [], pendingAsk: null }),
+  clearChat: () => {
+    set({ chatMessages: [], pendingAsk: null });
+    void fetch(
+      `/api/sasi/state?sessionId=${encodeURIComponent(getSessionId())}&scope=chat`,
+      { method: "DELETE" }
+    ).catch(() => undefined);
+    toast("Conversation cleared", {
+      description: "Chat history was removed from this browser and from SASI's memory.",
+    });
+  },
   askSasi: async (question) => {
     const trimmed = question.trim();
     if (!trimmed || get().chatBusy) return;
@@ -319,6 +437,13 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       chatBusy: true,
     });
 
+    const patchReply = (patch: Partial<ChatMessage>) =>
+      set((s) => ({
+        chatMessages: s.chatMessages.map((m) =>
+          m.id === replyId ? { ...m, ...patch } : m
+        ),
+      }));
+
     try {
       const res = await fetch("/api/sasi/ask", {
         method: "POST",
@@ -329,34 +454,138 @@ export const useSasiStore = create<SasiState>((set, get) => ({
             .slice(-10)
             .map((m) => ({ role: m.role, content: m.content })),
           location: get().savedLocation,
+          sessionId: getSessionId(),
+          stream: true,
         }),
       });
-      const data = (await res.json()) as { reply?: string; refs?: string[]; error?: string };
-      if (!res.ok || !data.reply) throw new Error(data.error ?? "SASI could not answer right now.");
-      set((s) => ({
-        chatMessages: s.chatMessages.map((m) =>
-          m.id === replyId
-            ? { ...m, content: data.reply as string, refs: data.refs, state: "done" }
-            : m
-        ),
-        chatBusy: false,
-      }));
-    } catch (err) {
-      set((s) => ({
-        chatMessages: s.chatMessages.map((m) =>
-          m.id === replyId
-            ? {
-                ...m,
-                content:
-                  err instanceof Error && err.message
-                    ? err.message
-                    : "SASI could not reach the assistant service. Please try again.",
+
+      const contentType = res.headers.get("content-type") ?? "";
+
+      /* ---- SSE streaming path ---- */
+      if (res.ok && contentType.includes("text/event-stream") && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finished = false;
+
+        const handleEvent = (raw: string) => {
+          const line = raw.trim();
+          if (!line.startsWith("data:")) return;
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") return;
+          try {
+            const evt = JSON.parse(data) as {
+              type: string;
+              text?: string;
+              refs?: string[];
+              suggestReport?: boolean;
+              message?: string;
+            };
+            if (evt.type === "delta" && typeof evt.text === "string") {
+              // append incrementally (read current content from state)
+              const current = get().chatMessages.find((m) => m.id === replyId);
+              patchReply({ state: "streaming", content: (current?.content ?? "") + evt.text });
+            } else if (evt.type === "done") {
+              finished = true;
+              patchReply({
+                state: "done",
+                refs: evt.refs,
+                actions: evt.suggestReport ? { report: true } : undefined,
+              });
+            } else if (evt.type === "error") {
+              finished = true;
+              patchReply({
                 state: "error",
-              }
-            : m
-        ),
-        chatBusy: false,
-      }));
+                content: evt.message ?? "SASI could not answer right now.",
+              });
+            }
+          } catch {
+            /* partial JSON — ignore */
+          }
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let sep: number;
+          while ((sep = buffer.indexOf("\n")) !== -1) {
+            const line = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 1);
+            if (line.trim()) handleEvent(line);
+          }
+        }
+        if (buffer.trim()) handleEvent(buffer);
+
+        if (!finished) {
+          // stream ended without an explicit done/error — treat as done if we have text
+          const current = get().chatMessages.find((m) => m.id === replyId);
+          patchReply({
+            state: (current?.content?.length ?? 0) > 0 ? "done" : "error",
+            content:
+              (current?.content?.length ?? 0) > 0
+                ? current?.content
+                : "The reply stream ended unexpectedly. Please try again.",
+          });
+        }
+        set({ chatBusy: false });
+        return;
+      }
+
+      /* ---- JSON fallback path (older client/server mismatch) ---- */
+      const data = (await res.json()) as {
+        reply?: string;
+        refs?: string[];
+        suggestReport?: boolean;
+        error?: string;
+      };
+      if (!res.ok || !data.reply) throw new Error(data.error ?? "SASI could not answer right now.");
+      patchReply({
+        content: data.reply,
+        refs: data.refs,
+        actions: data.suggestReport ? { report: true } : undefined,
+        state: "done",
+      });
+      set({ chatBusy: false });
+    } catch (err) {
+      patchReply({
+        content:
+          err instanceof Error && err.message
+            ? err.message
+            : "SASI could not reach the assistant service. Please try again.",
+        state: "error",
+      });
+      set({ chatBusy: false });
+    }
+  },
+
+  draftReportFromChat: (messageId) => {
+    const msgs = get().chatMessages;
+    const idx = msgs.findIndex((m) => m.id === messageId);
+    const msg = msgs[idx];
+    const lastUser = [...msgs.slice(0, idx < 0 ? msgs.length : idx)]
+      .reverse()
+      .find((m) => m.role === "user");
+    const problem = (lastUser?.content ?? "").slice(0, 160) || "";
+    set((s) => ({
+      reportDraft: {
+        service: s.reportDraft?.service ?? "water",
+        problem,
+        location: s.savedLocation.suburb
+          ? `${s.savedLocation.suburb}, ${s.savedLocation.city}`
+          : s.savedLocation.city,
+        when: s.reportDraft?.when ?? "today",
+        impact: s.reportDraft?.impact ?? "",
+        evidenceNote: s.reportDraft?.evidenceNote ?? "",
+      },
+      view: "report",
+      param: null,
+      commandOpen: false,
+    }));
+    if (msg) {
+      toast("Report wizard pre-filled", {
+        description: "Your conversation gave SASI a head start — review and continue.",
+      });
     }
   },
 }));

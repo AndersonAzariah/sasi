@@ -261,3 +261,29 @@ export function caseProgress(status: CaseStatus): number {
       return 100;
   }
 }
+
+/* ---------- Anonymous browser session ---------- */
+
+const SESSION_KEY = "sasi.sessionId";
+
+/**
+ * Stable per-browser session id used to key server-side persistence
+ * (chat history, user-created cases, saved location). Created lazily
+ * on first use — always after mount, so it never affects hydration.
+ */
+export function getSessionId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const existing = window.localStorage.getItem(SESSION_KEY);
+    if (existing) return existing;
+    const fresh =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    window.localStorage.setItem(SESSION_KEY, fresh);
+    return fresh;
+  } catch {
+    /* private mode / storage blocked — degrade to in-memory session */
+    return "sasi-anon";
+  }
+}
