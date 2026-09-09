@@ -208,8 +208,8 @@ export type NotificationKind =
 /* ---------- notification preferences (Settings → Notifications) ---------- */
 
 /** Which event families SASI is allowed to raise a live notification for.
- *  Keys mirror the Settings toggles 1:1; `briefing` updates are the digest
- *  heartbeat and stay always-on (documented honestly in the Settings note). */
+ *  Keys mirror the Settings toggles 1:1, including the briefing digest
+ *  heartbeat — the user can quiet it too (its toggle documents the tradeoff). */
 export interface NtfPrefs {
   /** status changes + new events on the user's cases (kind CASE) */
   case: boolean;
@@ -219,6 +219,8 @@ export interface NtfPrefs {
   action: boolean;
   /** urgent confirmed incidents near the saved location (kind SYSTEM) */
   service: boolean;
+  /** daily/city briefing ready notices (kind UPDATE — the digest heartbeat) */
+  digest: boolean;
 }
 
 export interface AppNotification {

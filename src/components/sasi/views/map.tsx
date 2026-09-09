@@ -4,13 +4,15 @@ import { memo, useMemo, useState } from "react";
 import { Crosshair, Map as MapIcon, Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import { INCIDENTS } from "@/lib/sasi/data";
-import type { Incident, TrustStatus } from "@/lib/sasi/types";
+import type { Incident, SasiCase, TrustStatus } from "@/lib/sasi/types";
 import { SERVICES, timeAgo } from "@/lib/sasi/utils";
 import {
+  CaseStatusBadge,
   DemoBadge,
-  PrimaryButton,
   PriorityBadge,
+  PrimaryButton,
   ServiceIcon,
   SERVICE_TINT,
   StatusBadge,
@@ -23,6 +25,8 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, D
    Stylized Gauteng map — pure SVG, no tiles, no network.
    Coordinate convention: viewBox 0 0 100 100; incidents carry
    location.mapX / location.mapY in that same space.
+   The user's own reports are placed near their saved location
+   with a deterministic per-ref jitter (stable across renders).
    ============================================================ */
 
 const PROVINCE_PATH =
@@ -54,6 +58,29 @@ const CITY_LABELS: { x: number; y: number; name: string }[] = [
   { x: 74, y: 51, name: "Benoni" },
 ];
 
+/** city → stylised coords (reuse the label table so they always agree) */
+const CITY_COORDS: Record<string, { x: number; y: number }> = Object.fromEntries(
+  CITY_LABELS.map((c) => [c.name.toLowerCase(), { x: c.x, y: c.y }])
+);
+
+/** deterministic pseudo-jitter so user-case markers don't stack on one dot */
+function jitterFrom(seed: string, span = 3.2): { dx: number; dy: number } {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  const unit = ((h >>> 0) % 1000) / 1000; // 0..1, stable per seed
+  const angle = (((h >>> 7) % 360) * Math.PI) / 180;
+  const r = 1.3 + unit * span;
+  return { dx: Math.cos(angle) * r, dy: Math.sin(angle) * r * 0.82 };
+}
+
+/** place a user report near their saved city (falls back to Johannesburg) */
+export function placeAtCity(city: string, seed: string): { x: number; y: number } {
+  const base =
+    CITY_COORDS[city.trim().toLowerCase()] ?? CITY_COORDS["johannesburg"] ?? { x: 51, y: 60 };
+  const j = jitterFrom(seed);
+  return { x: base.x + j.dx, y: base.y + j.dy };
+}
+
 export const MARKER_COLOR: Record<string, string> = {
   URGENT: "#ef5350",
   CONFIRMED: "#66bb6a",
@@ -63,11 +90,14 @@ export const MARKER_COLOR: Record<string, string> = {
   UNVERIFIED: "#a1a1aa",
 };
 
-const LEGEND: { label: string; color: string }[] = [
-  { label: "Urgent", color: "#ef5350" },
-  { label: "Confirmed", color: "#66bb6a" },
-  { label: "Reported", color: "#64b5f6" },
-  { label: "Resolved", color: "#4b5563" },
+/** user-placed reports get the national-light gold so they read as "yours" */
+export const USER_CASE_COLOR = "#e3c567";
+
+const LEGEND: { key: "status.urgent" | "status.confirmed" | "status.reported" | "status.resolved"; color: string }[] = [
+  { key: "status.urgent", color: "#ef5350" },
+  { key: "status.confirmed", color: "#66bb6a" },
+  { key: "status.reported", color: "#64b5f6" },
+  { key: "status.resolved", color: "#4b5563" },
 ];
 
 /* ---------- shared internals ---------- */
@@ -113,6 +143,8 @@ export interface GautengMarker {
   color: string;
   label?: string;
   size?: number;
+  /** marker provenance — picks the a11y label + selection ring treatment */
+  kind?: "incident" | "case";
   onClick?: () => void;
 }
 
@@ -130,6 +162,10 @@ function MapMarkers({
       {markers.map((m) => {
         const selected = m.id === selectedId;
         const r = m.size ?? 3;
+        const ariaKind =
+          m.kind === "case"
+            ? "Your report marker"
+            : "Incident marker";
         return (
           <g
             key={m.id}
@@ -137,7 +173,7 @@ function MapMarkers({
             className="cursor-pointer outline-none"
             role="button"
             tabIndex={0}
-            aria-label={m.label ? `Incident marker ${m.label}` : "Incident marker"}
+            aria-label={m.label ? `${ariaKind} ${m.label}` : `${ariaKind} — untitled`}
             onClick={() => {
               m.onClick?.();
               onSelect?.(m.id);
@@ -166,10 +202,46 @@ function MapMarkers({
               />
             )}
             <circle r={r} fill={m.color} stroke="#0a0b0d" strokeWidth={0.7} />
+            {m.kind === "case" && (
+              /* quiet inner core so user reports read distinct from incidents */
+              <circle r={r * 0.38} fill="#0a0b0d" opacity={0.55} pointerEvents="none" />
+            )}
             {selected && <circle r={1.1} fill="#ffffff" pointerEvents="none" />}
           </g>
         );
       })}
+    </g>
+  );
+}
+
+/** "You are here" — quiet gold home marker at the saved location (non-interactive) */
+function HomeMarker({ x, y, label }: { x: number; y: number; label: string }) {
+  return (
+    <g
+      transform={`translate(${x} ${y})`}
+      className="pointer-events-none"
+      aria-hidden
+    >
+      <circle
+        r={5.2}
+        fill="none"
+        stroke={USER_CASE_COLOR}
+        strokeOpacity={0.4}
+        strokeWidth={0.35}
+        strokeDasharray="1.1 1.5"
+        className="sasi-home-ring"
+      />
+      <circle r={1.55} fill={USER_CASE_COLOR} stroke="#0a0b0d" strokeWidth={0.5} />
+      <text
+        y={-6.6}
+        textAnchor="middle"
+        fontSize={2.3}
+        fill={USER_CASE_COLOR}
+        opacity={0.85}
+        className="font-mono"
+      >
+        {label}
+      </text>
     </g>
   );
 }
@@ -247,6 +319,7 @@ function MapFilterControls({
   shown: number;
   total: number;
 }) {
+  const t = useT();
   return (
     <div className="space-y-3">
       <div className="relative">
@@ -254,15 +327,15 @@ function MapFilterControls({
         <Input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search incidents…"
-          aria-label="Search incidents on map"
+          placeholder={t("map.search")}
+          aria-label={t("map.search-aria")}
           className="h-8 rounded-lg border-white/10 bg-white/[0.03] pl-8 text-[12.5px] text-white placeholder:text-zinc-600"
         />
       </div>
 
       <div>
         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
-          Service
+          {t("map.service")}
         </p>
         <div className="space-y-1.5">
           {MAP_SERVICES.map((s) => (
@@ -273,7 +346,7 @@ function MapFilterControls({
               <Checkbox
                 checked={services.has(s)}
                 onCheckedChange={() => onToggleService(s)}
-                aria-label={`Filter by ${SERVICES[s].label}`}
+                aria-label={`${t("map.service")}: ${SERVICES[s].label}`}
                 className="border-white/20 bg-transparent data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-black"
               />
               <span className={cn("flex items-center gap-1.5", SERVICE_TINT[s])}>
@@ -287,11 +360,19 @@ function MapFilterControls({
 
       <div>
         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
-          Status
+          {t("map.status")}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {MAP_STATUSES.map((st) => {
             const active = statuses.has(st);
+            const statusKey =
+              st === "URGENT"
+                ? "status.urgent"
+                : st === "CONFIRMED"
+                  ? "status.confirmed"
+                  : st === "REPORTED"
+                    ? "status.reported"
+                    : "status.resolved";
             return (
               <button
                 key={st}
@@ -310,7 +391,7 @@ function MapFilterControls({
                   style={{ backgroundColor: MARKER_COLOR[st] }}
                   aria-hidden
                 />
-                {st === "URGENT" ? "Urgent" : st === "CONFIRMED" ? "Confirmed" : st === "REPORTED" ? "Reported" : "Resolved"}
+                {t(statusKey)}
               </button>
             );
           })}
@@ -318,7 +399,9 @@ function MapFilterControls({
       </div>
 
       <p className="border-t border-white/5 pt-2 font-mono text-[10px] tracking-wide text-zinc-600">
-        {shown} of {total} demo incidents shown
+        {t("map.shown")
+          .replace("{shown}", String(shown))
+          .replace("{total}", String(total))}
       </p>
     </div>
   );
@@ -333,6 +416,7 @@ function SelectedIncidentSummary({
   onOpen: () => void;
   compact?: boolean;
 }) {
+  const t = useT();
   return (
     <div>
       <div className="flex items-start justify-between gap-2">
@@ -372,14 +456,84 @@ function SelectedIncidentSummary({
           {incident.location.city}
         </p>
         <p className="text-[11px] text-zinc-600">
-          Updated {timeAgo(incident.updatedAt)} · {incident.sourceIds.length} public source
-          {incident.sourceIds.length === 1 ? "" : "s"}
+          {t("map.updated").replace("{t}", timeAgo(incident.updatedAt))} ·{" "}
+          {incident.sourceIds.length === 1
+            ? t("map.sources-one").replace("{n}", "1")
+            : t("map.sources-many").replace("{n}", String(incident.sourceIds.length))}
         </p>
       </div>
 
       <PrimaryButton onClick={onOpen} className="mt-3 h-11 w-full lg:h-9" aria-label={`Open incident ${incident.ref}`}>
         <MapIcon className="h-3.5 w-3.5" aria-hidden />
-        Open incident
+        {t("map.open-incident")}
+      </PrimaryButton>
+    </div>
+  );
+}
+
+/* ---------- the user's own report (placed at their saved location) ---------- */
+
+function SelectedCaseSummary({
+  c,
+  onOpen,
+  compact = false,
+}: {
+  c: SasiCase;
+  onOpen: () => void;
+  compact?: boolean;
+}) {
+  const t = useT();
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#e3c567]/20 bg-[#e3c567]/[0.06]",
+              SERVICE_TINT[c.service]
+            )}
+          >
+            <ServiceIcon service={c.service} className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium text-white">{c.title}</p>
+            <p className="mt-0.5 font-mono text-[10px] tracking-wider text-zinc-600">{c.ref}</p>
+          </div>
+        </div>
+        <span
+          className="sasi-live-tag inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[9px] tracking-[0.12em]"
+          title="This is your own report — placed near your saved location"
+        >
+          {t("map.your-report-tag").toUpperCase()}
+        </span>
+      </div>
+
+      {!compact && c.description && (
+        <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-zinc-500">
+          {c.description}
+        </p>
+      )}
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <CaseStatusBadge status={c.status} />
+        <PriorityBadge priority={c.priority} />
+      </div>
+
+      <div className="mt-2.5 space-y-0.5 border-t border-white/5 pt-2.5 text-[11.5px] text-zinc-500">
+        <p className="truncate">
+          {c.location.suburb ? `${c.location.suburb}, ` : ""}
+          {c.location.city}
+        </p>
+        <p className="text-[11px] text-zinc-600">
+          {t("map.filed").replace("{t}", timeAgo(c.createdAt))}
+        </p>
+      </div>
+
+      <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">{t("map.saved-note")}</p>
+
+      <PrimaryButton onClick={onOpen} className="mt-3 h-11 w-full lg:h-9" aria-label={`Open case ${c.ref}`}>
+        <MapIcon className="h-3.5 w-3.5" aria-hidden />
+        {t("map.open-case")}
       </PrimaryButton>
     </div>
   );
@@ -390,14 +544,28 @@ const MemoBase = memo(GautengBase);
 
 export default function MapView() {
   const openIncident = useSasiStore((s) => s.openIncident);
+  const openCase = useSasiStore((s) => s.openCase);
   const mapFocusRef = useSasiStore((s) => s.mapFocusRef);
   const clearMapFocus = useSasiStore((s) => s.clearMapFocus);
+  const cases = useSasiStore((s) => s.cases);
+  const savedLocation = useSasiStore((s) => s.savedLocation);
+  const t = useT();
 
   const [query, setQuery] = useState("");
   const [services, setServices] = useState<Set<string>>(new Set());
   const [statuses, setStatuses] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  /* the user's own reports — placed near their saved location, always visible */
+  const userCases = useMemo(
+    () => cases.filter((c) => c.id.startsWith("case-new-")),
+    [cases]
+  );
+  const home = useMemo(
+    () => placeAtCity(savedLocation.city, "sasi-home"),
+    [savedLocation.city]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -412,10 +580,15 @@ export default function MapView() {
     });
   }, [query, services, statuses]);
 
-  /* briefing watchlist → map click-through: the focused incident is always
-     visible and pre-selected, bypassing the user's filters until cleared */
+  /* briefing watchlist → map click-through: the focused ref (incident OR the
+     user's own case) is always visible and pre-selected, bypassing filters */
+  const focusCase = useMemo(() => {
+    if (!mapFocusRef || !mapFocusRef.startsWith("CASE-")) return null;
+    return cases.find((c) => c.ref.toUpperCase() === mapFocusRef) ?? null;
+  }, [mapFocusRef, cases]);
+
   const focusIncident = useMemo(() => {
-    if (!mapFocusRef) return null;
+    if (!mapFocusRef || mapFocusRef.startsWith("CASE-")) return null;
     const ref = mapFocusRef.toLowerCase();
     return (
       INCIDENTS.find(
@@ -429,7 +602,25 @@ export default function MapView() {
     return [focusIncident, ...filtered];
   }, [filtered, focusIncident]);
 
-  const markers = useMemo<GautengMarker[]>(
+  const caseMarkers = useMemo<GautengMarker[]>(
+    () =>
+      userCases.map((c) => {
+        const pos = placeAtCity(c.location.city || savedLocation.city, c.ref);
+        return {
+          id: c.id,
+          x: pos.x,
+          y: pos.y,
+          color: USER_CASE_COLOR,
+          label: `${c.ref} — ${c.title}`,
+          size: 2.7,
+          kind: "case" as const,
+          onClick: () => setSelectedId(c.id),
+        };
+      }),
+    [userCases, savedLocation.city]
+  );
+
+  const incidentMarkers = useMemo<GautengMarker[]>(
     () =>
       effectiveFiltered.map((i) => ({
         id: i.id,
@@ -438,13 +629,27 @@ export default function MapView() {
         color: MARKER_COLOR[i.status] ?? "#a1a1aa",
         label: `${i.ref} — ${i.title}`,
         size: 3,
+        kind: "incident" as const,
         onClick: () => setSelectedId(i.id),
       })),
     [effectiveFiltered]
   );
 
-  const selected =
-    effectiveFiltered.find((i) => i.id === (focusIncident?.id ?? selectedId)) ?? null;
+  const markers = useMemo(
+    () => [...incidentMarkers, ...caseMarkers],
+    [incidentMarkers, caseMarkers]
+  );
+
+  /* selection: a case id wins; otherwise resolve the incident panel */
+  const focusCaseId = focusCase?.id ?? null;
+  const selectedCase =
+    focusCaseId || (selectedId?.startsWith("case-new-") ?? false)
+      ? userCases.find((c) => c.id === (focusCaseId ?? selectedId)) ?? null
+      : null;
+  const selectedIncident = selectedCase
+    ? null
+    : effectiveFiltered.find((i) => i.id === (focusIncident?.id ?? selectedId)) ?? null;
+  const selected = selectedCase ?? selectedIncident;
   const activeFilterCount = services.size + statuses.size + (query.trim() ? 1 : 0);
 
   const clearFilters = () => {
@@ -466,6 +671,12 @@ export default function MapView() {
     />
   );
 
+  const summaryPanel = selectedCase ? (
+    <SelectedCaseSummary c={selectedCase} onOpen={() => openCase(selectedCase.ref)} />
+  ) : selectedIncident ? (
+    <SelectedIncidentSummary incident={selectedIncident} onOpen={() => openIncident(selectedIncident.id)} />
+  ) : null;
+
   return (
     <div className="relative -mb-24 h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-[#0a0b0d] lg:-mb-8">
       {/* base map */}
@@ -475,10 +686,11 @@ export default function MapView() {
         preserveAspectRatio="xMidYMid meet"
         className="absolute inset-0 h-full w-full"
         role="img"
-        aria-label="Civic intelligence map of Gauteng with incident markers"
+        aria-label="Civic intelligence map of Gauteng with incident markers and your reports"
       >
         <MemoBase />
-        <MemoMarkers markers={markers} selectedId={focusIncident?.id ?? selectedId} onSelect={setSelectedId} />
+        <HomeMarker x={home.x} y={home.y} label={t("map.you-are-here")} />
+        <MemoMarkers markers={markers} selectedId={focusCase?.id ?? focusIncident?.id ?? selectedId} onSelect={setSelectedId} />
       </svg>
       <div
         className="pointer-events-none absolute inset-0"
@@ -487,13 +699,16 @@ export default function MapView() {
       />
 
       {/* briefing focus banner — honest origin + one-click clear */}
-      {focusIncident && (
+      {(focusIncident || focusCase) && (
         <div className="sasi-pop absolute left-1/2 top-4 z-20 -translate-x-1/2">
           <div className="sasi-map-focus flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#e3c567] sasi-breathe" aria-hidden />
             <p className="whitespace-nowrap text-[11.5px] text-[#efe0a8]">
-              <span className="font-medium">{focusIncident.ref}</span>
-              <span className="hidden sm:inline"> · From your city briefing</span>
+              <span className="font-medium">{focusCase?.ref ?? focusIncident?.ref}</span>
+              <span className="hidden sm:inline">
+                {" "}
+                · {focusCase ? t("map.your-report-tag") : t("map.from-briefing")}
+              </span>
             </p>
             <button
               onClick={clearMapFocus}
@@ -501,7 +716,7 @@ export default function MapView() {
               aria-label="Clear briefing focus and return to your filters"
             >
               <X className="h-3 w-3" aria-hidden />
-              Clear
+              {t("map.clear")}
             </button>
           </div>
         </div>
@@ -512,7 +727,7 @@ export default function MapView() {
         <div className="sasi-card p-3">
           <div className="mb-2.5 flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-              Map filters
+              {t("map.filters")}
             </p>
             {activeFilterCount > 0 && (
               <button
@@ -521,7 +736,7 @@ export default function MapView() {
                 className="inline-flex items-center gap-1 text-[10.5px] text-zinc-500 transition-colors hover:text-zinc-200"
                 aria-label="Clear map filters"
               >
-                <X className="h-3 w-3" aria-hidden /> Clear
+                <X className="h-3 w-3" aria-hidden /> {t("map.clear")}
               </button>
             )}
           </div>
@@ -532,28 +747,29 @@ export default function MapView() {
       {/* desktop — floating detail panel */}
       <div className="absolute right-4 top-4 z-10 hidden w-80 lg:block">
         <div className="sasi-card p-4">
-          {selected ? (
-            <SelectedIncidentSummary incident={selected} onOpen={() => openIncident(selected.id)} />
-          ) : (
+          {summaryPanel ?? (
             <div className="flex flex-col items-center py-6 text-center">
               <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03]">
                 <Crosshair className="h-4.5 w-4.5 text-zinc-500" aria-hidden />
               </span>
-              <p className="text-[13px] font-medium text-white">Select a marker</p>
+              <p className="text-[13px] font-medium text-white">{t("map.select-marker")}</p>
               <p className="mt-1 max-w-[240px] text-[12px] leading-relaxed text-zinc-500">
-                Markers are colour-coded by trust status. Choose one to see the incident summary
-                here.
+                {t("map.select-hint")}
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-1.5">
                 {LEGEND.map((l) => (
                   <span
-                    key={l.label}
+                    key={l.key}
                     className="inline-flex items-center gap-1.5 rounded-full border border-white/8 px-2 py-0.5 text-[10px] text-zinc-400"
                   >
                     <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: l.color }} aria-hidden />
-                    {l.label}
+                    {t(l.key)}
                   </span>
                 ))}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e3c567]/25 bg-[#e3c567]/[0.06] px-2 py-0.5 text-[10px] text-[#e3c567]">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: USER_CASE_COLOR }} aria-hidden />
+                  {t("map.your-reports")}
+                </span>
               </div>
             </div>
           )}
@@ -564,14 +780,18 @@ export default function MapView() {
       <div className="absolute bottom-4 left-4 z-10 hidden lg:block">
         <div className="sasi-card flex items-center gap-3.5 px-3.5 py-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
-            Status
+            {t("map.status")}
           </span>
           {LEGEND.map((l) => (
-            <span key={l.label} className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
+            <span key={l.key} className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: l.color }} aria-hidden />
-              {l.label}
+              {t(l.key)}
             </span>
           ))}
+          <span className="inline-flex items-center gap-1.5 border-l border-white/8 pl-3 text-[11px] text-[#e3c567]">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: USER_CASE_COLOR }} aria-hidden />
+            {t("map.your-reports")}
+          </span>
           <span className="border-l border-white/8 pl-3 font-mono text-[9px] tracking-[0.14em] text-zinc-700">
             STYLISED · NOT TO SCALE
           </span>
@@ -593,11 +813,21 @@ export default function MapView() {
         )}
       </button>
 
-      {/* mobile — selected incident bottom card (above bottom nav) */}
-      {selected && (
+      {/* mobile — selected summary bottom card (above bottom nav) */}
+      {summaryPanel && (
         <div className="absolute inset-x-4 bottom-20 z-10 lg:hidden">
           <div className="sasi-card p-3.5">
-            <SelectedIncidentSummary incident={selected} onOpen={() => openIncident(selected.id)} compact />
+            {selectedCase ? (
+              <SelectedCaseSummary c={selectedCase} onOpen={() => openCase(selectedCase.ref)} compact />
+            ) : (
+              selectedIncident && (
+                <SelectedIncidentSummary
+                  incident={selectedIncident}
+                  onOpen={() => openIncident(selectedIncident.id)}
+                  compact
+                />
+              )
+            )}
           </div>
         </div>
       )}
@@ -606,15 +836,15 @@ export default function MapView() {
       {filtered.length === 0 && (
         <div className="absolute left-1/2 top-16 z-10 w-[calc(100%-2rem)] max-w-xs -translate-x-1/2 lg:left-auto lg:right-4 lg:top-40 lg:w-80 lg:translate-x-0">
           <div className="sasi-card p-3.5 text-center">
-            <p className="text-[12.5px] font-medium text-white">No incidents match these filters</p>
-            <p className="mt-1 text-[11.5px] text-zinc-500">Widen the service or status filters.</p>
+            <p className="text-[12.5px] font-medium text-white">{t("map.none-title")}</p>
+            <p className="mt-1 text-[11.5px] text-zinc-500">{t("map.none-hint")}</p>
             {activeFilterCount > 0 && (
               <button
                 type="button"
                 onClick={clearFilters}
                 className="mt-2.5 text-[11.5px] font-medium text-zinc-300 underline underline-offset-4 hover:text-white"
               >
-                Clear all filters
+                {t("map.clear-all")}
               </button>
             )}
           </div>
@@ -625,9 +855,9 @@ export default function MapView() {
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerContent className="border-white/10 bg-[#0b0c0e] text-white">
           <DrawerHeader className="pb-1 text-left">
-            <DrawerTitle className="text-[14px] font-semibold text-white">Map filters</DrawerTitle>
+            <DrawerTitle className="text-[14px] font-semibold text-white">{t("map.filters")}</DrawerTitle>
             <DrawerDescription className="text-[12px] text-zinc-500">
-              Filter the demo incidents shown on the map.
+              {t("map.filters.description")}
             </DrawerDescription>
           </DrawerHeader>
           <div className="sasi-scroll max-h-[55vh] overflow-y-auto px-4 pb-2">{filtersNode}</div>
@@ -635,11 +865,15 @@ export default function MapView() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {LEGEND.map((l) => (
-                  <span key={l.label} className="inline-flex items-center gap-1 text-[10.5px] text-zinc-400">
+                  <span key={l.key} className="inline-flex items-center gap-1 text-[10.5px] text-zinc-400">
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: l.color }} aria-hidden />
-                    {l.label}
+                    {t(l.key)}
                   </span>
                 ))}
+                <span className="inline-flex items-center gap-1 text-[10.5px] text-[#e3c567]">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: USER_CASE_COLOR }} aria-hidden />
+                  {t("map.your-reports")}
+                </span>
               </div>
               <span className="font-mono text-[9px] tracking-[0.14em] text-zinc-700">DEMO</span>
             </div>
@@ -650,7 +884,9 @@ export default function MapView() {
               onClick={() => setDrawerOpen(false)}
               aria-label="Show filtered incidents on map"
             >
-              Show {filtered.length} incident{filtered.length === 1 ? "" : "s"}
+              {filtered.length === 1
+                ? t("map.show-one")
+                : t("map.show-many").replace("{n}", String(filtered.length))}
             </PrimaryButton>
           </DrawerFooter>
         </DrawerContent>

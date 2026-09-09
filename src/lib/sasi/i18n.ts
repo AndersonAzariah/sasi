@@ -14,7 +14,8 @@
    - Missing zu/af values fall back to English rather than breaking.
    Coverage today: app shell (sidebar, topbar, mobile nav), landing
    hero + primary CTAs, public header CTAs, notification panel chrome,
-   dashboard / cases / notifications views, settings language section.
+   dashboard / cases / notifications / incidents / map views, settings
+   language section.
    Remaining views (case detail, report wizard, etc.) keep English
    (noted honestly in Settings).
    ============================================================ */
@@ -38,13 +39,13 @@ export const LANGUAGES: {
     code: "zu",
     label: "isiZulu",
     english: "Zulu",
-    note: "Shell, landing, dashboard, cases, notifications and shared controls.",
+    note: "Shell, landing, dashboard, cases, notifications, incidents, map and shared controls.",
   },
   {
     code: "af",
     label: "Afrikaans",
     english: "Afrikaans",
-    note: "Shell, landing, dashboard, cases, notifications and shared controls.",
+    note: "Shell, landing, dashboard, cases, notifications, incidents, map and shared controls.",
   },
 ];
 
@@ -497,6 +498,192 @@ const DICT: Dict = {
     en: "All caught up — every notification has been read.",
     zu: "Konke kuqediwe — yonke izaziso ziphofundiwe.",
     af: "Heeltemal op datum — elke kennisgewing is gelees.",
+  },
+
+  /* ============================================================
+     SHARED status + severity labels (incidents + map views)
+     ============================================================ */
+  "status.confirmed": { en: "Confirmed", zu: "Kuqinisekisiwe", af: "Bevestig" },
+  "status.reported": { en: "Reported", zu: "Kubikiwe", af: "Gerapporteer" },
+  "status.urgent": { en: "Urgent", zu: "Okuphuthumayo", af: "Dringend" },
+  "status.resolved": { en: "Resolved", zu: "Kuxazululiwe", af: "Opgelos" },
+  "sev.low": { en: "Low", zu: "Ephansi", af: "Laag" },
+  "sev.medium": { en: "Medium", zu: "Esemaphakathi", af: "Medium" },
+  "sev.high": { en: "High", zu: "Ephezulu", af: "Hoog" },
+  "sev.critical": { en: "Critical", zu: "Okubucayi", af: "Kritiek" },
+
+  /* ============================================================
+     MAP view
+     Placeholders: {shown} {total} {n} {t} — replaced with .replace()
+     ============================================================ */
+  "map.filters": { en: "Map filters", zu: "Izihlungi zemephu", af: "Kaartfilters" },
+  "map.filters.description": {
+    en: "Filter the demo incidents shown on the map.",
+    zu: "Coca izigameko zedemo eziboniswa emephu.",
+    af: "Filtreer die demo-voorvalle wat op die kaart gewys word.",
+  },
+  "map.search": { en: "Search incidents…", zu: "Sesha izigameko…", af: "Deursoek voorvalle…" },
+  "map.search-aria": {
+    en: "Search incidents on map",
+    zu: "Sesha izigameko emephu",
+    af: "Deursoek voorvalle op kaart",
+  },
+  "map.service": { en: "Service", zu: "Insizakalo", af: "Diens" },
+  "map.status": { en: "Status", zu: "Isimo", af: "Status" },
+  "map.shown": {
+    en: "{shown} of {total} demo incidents shown",
+    zu: "Kubonisiwe izigameko ezingu-{shown} kwezingu-{total} zedemo",
+    af: "{shown} van {total} demo-voorvalle gewys",
+  },
+  "map.select-marker": { en: "Select a marker", zu: "Khetha uphawu", af: "Kies 'n marker" },
+  "map.select-hint": {
+    en: "Markers are colour-coded by trust status. Choose one to see the incident summary here.",
+    zu: "Uphawu lumelwa ngesimo sokuthembeka. Khetha olulodwa ukuze ubone isifinyezo sesigameko lapha.",
+    af: "Markers is kleurgekodeer volgens vertrouensstatus. Kies een om die voorvalopsomming hier te sien.",
+  },
+  "map.open-incident": { en: "Open incident", zu: "Vula isigameko", af: "Maak voorval oop" },
+  "map.open-case": { en: "Open case", zu: "Vula icala", af: "Maak saak oop" },
+  "map.none-title": {
+    en: "No incidents match these filters",
+    zu: "Ayikho isigameko ehambisana nalokhu kucoca",
+    af: "Geen voorvalle pas hierdie filters nie",
+  },
+  "map.none-hint": {
+    en: "Widen the service or status filters.",
+    zu: "Khulisa izihlungi zensizakalo noma zesimo.",
+    af: "Wyd die diens- of statusfilters uit.",
+  },
+  "map.clear-all": {
+    en: "Clear all filters",
+    zu: "Susa zonke izihlungi",
+    af: "Maak alle filters skoon",
+  },
+  "map.show-one": { en: "Show 1 incident", zu: "Bonisa isigameko esi-1", af: "Wys 1 voorval" },
+  "map.show-many": {
+    en: "Show {n} incidents",
+    zu: "Bonisa izingameko ezingu-{n}",
+    af: "Wys {n} voorvalle",
+  },
+  "map.from-briefing": {
+    en: "From your city briefing",
+    zu: "Kusuka kwinfihlakalo yedoloba yakho",
+    af: "Van jou stadsoorsig",
+  },
+  "map.clear": { en: "Clear", zu: "Susa", af: "Maak skoon" },
+  "map.your-reports": { en: "Your reports", zu: "Imibiko yakho", af: "Jou rapporte" },
+  "map.your-report-tag": { en: "Your report", zu: "Umbiko wakho", af: "Jou rapport" },
+  "map.updated": { en: "Updated {t}", zu: "Kubuyekeziwe {t}", af: "Opgedateer {t}" },
+  "map.sources-one": {
+    en: "{n} public source",
+    zu: "Umthombo womphakathi oyedwa",
+    af: "{n} openbare bron",
+  },
+  "map.sources-many": {
+    en: "{n} public sources",
+    zu: "Imithombo yomphakathi engu-{n}",
+    af: "{n} openbare bronne",
+  },
+  "map.you-are-here": { en: "You are here", zu: "Ulapha", af: "Jy is hier" },
+  "map.saved-note": {
+    en: "Your reports are placed near your saved location.",
+    zu: "Imibiko yakho ibekwe eduze nendawo yakho egciniwe.",
+    af: "Jou rapporte is naby jou bergplek geplaas.",
+  },
+  "map.filed": { en: "Filed {t}", zu: "Ifayiliwe {t}", af: "Gelewer {t}" },
+
+  /* ============================================================
+     INCIDENTS view
+     ============================================================ */
+  "inc.title": { en: "Civic incidents", zu: "Izigameko zomphakathi", af: "Burgerlike voorvalle" },
+  "inc.subtitle": {
+    en: "Reported and confirmed service incidents across Gauteng.",
+    zu: "Izigameko zensizakalo ezibikiwe nezinqinisekisiwe kwaGauteng.",
+    af: "Gerapporteerde en bevestigde diensvoorvalle oor Gauteng.",
+  },
+  "inc.stat-confirmed": { en: "Confirmed", zu: "Kuqinisekisiwe", af: "Bevestig" },
+  "inc.stat-confirmed-hint": {
+    en: "Verified against sources",
+    zu: "Kuqinisekisiwe ngemithombo",
+    af: "Teen bronne geverifieer",
+  },
+  "inc.stat-reported": { en: "Reported", zu: "Kubikiwe", af: "Gerapporteer" },
+  "inc.stat-reported-hint": {
+    en: "Awaiting confirmation",
+    zu: "Kulindele ukuqinisekiswa",
+    af: "Wag vir bevestiging",
+  },
+  "inc.stat-urgent": { en: "Urgent", zu: "Okuphuthumayo", af: "Dringend" },
+  "inc.stat-urgent-hint": {
+    en: "Immediate attention",
+    zu: "Dinga ukunakwa ngokushesha",
+    af: "Onmiddellike aandag nodig",
+  },
+  "inc.stat-resolved": { en: "Resolved", zu: "Kuxazululiwe", af: "Opgelos" },
+  "inc.stat-resolved-hint": {
+    en: "Closed in demo dataset",
+    zu: "Kuvaliwe kusethi yedemo",
+    af: "Gesluit in demodatastel",
+  },
+  "inc.search": {
+    en: "Search title, suburb or city…",
+    zu: "Sesha isihloko, idolobhana noma idolobha…",
+    af: "Deursoek titel, voorstad of stad…",
+  },
+  "inc.search-aria": {
+    en: "Search incidents by title, suburb or city",
+    zu: "Sesha izigameko ngesihloko, idolobhana noma idolobha",
+    af: "Deursoek voorvalle volgens titel, voorstad of stad",
+  },
+  "inc.view-card": {
+    en: "Card list view",
+    zu: "Buka ngamakhadi",
+    af: "Kaartlys-aansig",
+  },
+  "inc.view-dense": {
+    en: "Dense list view",
+    zu: "Buka uhlu oluminyene",
+    af: "Digter lysaansig",
+  },
+  "inc.filter-service": { en: "Service", zu: "Insizakalo", af: "Diens" },
+  "inc.filter-status": { en: "Status", zu: "Isimo", af: "Status" },
+  "inc.filter-severity": { en: "Severity", zu: "Isinga", af: "Ernstigheid" },
+  "inc.filter-municipality": {
+    en: "Municipality",
+    zu: "Umasipala",
+    af: "Munisipaliteit",
+  },
+  "inc.filter-all": { en: "All", zu: "Konke", af: "Alles" },
+  "inc.all-municipalities": {
+    en: "All municipalities",
+    zu: "Wonke amamasipala",
+    af: "Alle munisipaliteite",
+  },
+  "inc.municipality-aria": {
+    en: "Filter by municipality",
+    zu: "Coca ngomasipala",
+    af: "Filtreer volgens munisipaliteit",
+  },
+  "inc.clear-filters": {
+    en: "Clear filters",
+    zu: "Susa izihlungi",
+    af: "Maak filters skoon",
+  },
+  "inc.count-one": { en: "1 incident", zu: "Isigameko esi-1", af: "1 voorval" },
+  "inc.count-many": { en: "{n} incidents", zu: "Izingameko ezingu-{n}", af: "{n} voorvalle" },
+  "inc.empty-title": {
+    en: "No incidents match these filters",
+    zu: "Ayikho isigameko ehambisana nalokhu kucoca",
+    af: "Geen voorvalle pas hierdie filters nie",
+  },
+  "inc.empty-description": {
+    en: "Adjust filters to widen the search across the demo dataset.",
+    zu: "Lungisa izihlungi ukuze wandisa usesho kusethi yedemo.",
+    af: "Pas filters aan om die soektog oor die demodatastel te wy.",
+  },
+  "inc.empty-clear": {
+    en: "Clear all filters",
+    zu: "Susa zonke izihlungi",
+    af: "Maak alle filters skoon",
   },
 };
 

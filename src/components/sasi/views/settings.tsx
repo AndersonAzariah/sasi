@@ -14,6 +14,7 @@ import {
   Lock,
   MapPin,
   Minus,
+  Newspaper,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -376,7 +377,7 @@ export default function SettingsView() {
                     )}
                     aria-hidden
                   />
-                  {ntfOnCount} OF 4 CHANNELS ON
+                  {ntfOnCount} OF 5 CHANNELS ON
                 </span>
               </div>
               <div className="mt-4 space-y-3">
@@ -410,13 +411,21 @@ export default function SettingsView() {
                   onCheckedChange={(v) => setNtfPref("service", v)}
                   tag="NEW"
                 />
+                <ToggleRow
+                  icon={Newspaper}
+                  title="Briefing digest"
+                  description="When today's city briefing (or a chat summary) has been written."
+                  checked={ntfPrefs.digest}
+                  onCheckedChange={(v) => setNtfPref("digest", v)}
+                  subNote="The digest heartbeat — the briefing itself still lands on the dashboard, only the alert is quieted."
+                />
               </div>
             </div>
             <p className="flex items-start gap-2 rounded-lg border border-white/8 bg-white/[0.02] p-3.5 text-[12px] leading-relaxed text-zinc-400">
               <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
-              Preferences apply instantly and survive a reload. City-briefing updates stay on —
-              they are the digest heartbeat, not an interruption. SASI batches everything else
-              and only interrupts you for approvals and urgent, confirmed incidents.
+              Preferences apply instantly and survive a reload. SASI batches everything and
+              only interrupts you for approvals and urgent, confirmed incidents — every family
+              above can be quieted without losing the underlying data on the dashboard.
             </p>
           </section>
         )}

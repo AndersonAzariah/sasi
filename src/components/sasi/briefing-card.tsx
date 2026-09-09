@@ -30,6 +30,8 @@ import { SectionLabel } from "./primitives";
    sessionStorage for the browser session and persisted to the
    briefing history (SQLite) so past briefings can be reopened.
    Stale briefings (>6h) are quietly rewritten on mount.
+   Chat-distilled briefings carry a FROM YOUR CHAT origin tag and
+   a "City mode" chip that swaps the daily digest back for free.
    Honest framing: AI-generated, demo data, refs clickable,
    and a "SASI can be wrong" trust line.
    ============================================================ */
@@ -216,6 +218,7 @@ export function CityBriefingCard() {
   const error = useSasiStore((s) => s.briefingError);
   const history = useSasiStore((s) => s.briefingHistory);
   const generateBriefing = useSasiStore((s) => s.generateBriefing);
+  const restoreCityBriefing = useSasiStore((s) => s.restoreCityBriefing);
   const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
   const navigate = useSasiStore((s) => s.navigate);
   const focusOnMap = useSasiStore((s) => s.focusOnMap);
@@ -307,6 +310,19 @@ export function CityBriefingCard() {
               <RiskIcon className="h-3 w-3" aria-hidden />
               {risk.label}
             </span>
+          )}
+          {/* chat-distilled card → one-click swap back to the daily digest */}
+          {briefing?.origin === "chat" && !viewingPast && (
+            <button
+              onClick={() => void restoreCityBriefing()}
+              disabled={busy}
+              className="sasi-chip-city inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-medium disabled:cursor-not-allowed disabled:opacity-50"
+              title="Swap this conversation summary back to the daily city briefing"
+              aria-label="Restore the daily city briefing"
+            >
+              <Newspaper className="h-3 w-3" aria-hidden />
+              City mode
+            </button>
           )}
           <button
             onClick={() => void generateBriefing({ force: true })}

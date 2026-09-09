@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, List, Rows3, Search, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
+import { useT } from "@/lib/sasi/i18n";
 import { GAUTENG_MUNICIPALITIES, INCIDENTS } from "@/lib/sasi/data";
 import type { Incident, TrustStatus } from "@/lib/sasi/types";
 import { SERVICES, locationLabel, timeAgo } from "@/lib/sasi/utils";
@@ -86,6 +87,7 @@ function FilterGroup({ label, children }: { label: string; children: React.React
 export default function IncidentsView() {
   const navigate = useSasiStore((s) => s.navigate);
   const openIncident = useSasiStore((s) => s.openIncident);
+  const t = useT();
 
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -153,20 +155,18 @@ export default function IncidentsView() {
       {/* ---------- header ---------- */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-[20px] font-semibold tracking-tight text-white">Civic incidents</h1>
-          <p className="mt-1 text-[13px] text-zinc-500">
-            Reported and confirmed service incidents across Gauteng.
-          </p>
+          <h1 className="text-[20px] font-semibold tracking-tight text-white">{t("inc.title")}</h1>
+          <p className="mt-1 text-[13px] text-zinc-500">{t("inc.subtitle")}</p>
         </div>
         <DemoBadge label="DEMO DATA" />
       </div>
 
       {/* ---------- stat tiles ---------- */}
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Confirmed" value={counts.confirmed} tone="green" hint="Verified against sources" />
-        <StatTile label="Reported" value={counts.reported} tone="blue" hint="Awaiting confirmation" />
-        <StatTile label="Urgent" value={counts.urgent} tone="red" hint="Immediate attention" />
-        <StatTile label="Resolved" value={counts.resolved} hint="Closed in demo dataset" />
+        <StatTile label={t("inc.stat-confirmed")} value={counts.confirmed} tone="green" hint={t("inc.stat-confirmed-hint")} />
+        <StatTile label={t("inc.stat-reported")} value={counts.reported} tone="blue" hint={t("inc.stat-reported-hint")} />
+        <StatTile label={t("inc.stat-urgent")} value={counts.urgent} tone="red" hint={t("inc.stat-urgent-hint")} />
+        <StatTile label={t("inc.stat-resolved")} value={counts.resolved} hint={t("inc.stat-resolved-hint")} />
       </div>
 
       {/* ---------- toolbar ---------- */}
@@ -179,8 +179,8 @@ export default function IncidentsView() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search title, suburb or city…"
-            aria-label="Search incidents by title, suburb or city"
+            placeholder={t("inc.search")}
+            aria-label={t("inc.search-aria")}
             className="h-10 rounded-lg border-white/10 bg-white/[0.03] pl-9 text-[13px] text-white placeholder:text-zinc-600"
           />
         </div>
@@ -188,13 +188,13 @@ export default function IncidentsView() {
         <div
           className="flex items-center rounded-lg border border-white/10 p-0.5"
           role="group"
-          aria-label="View mode"
+          aria-label={t("inc.view-card") + " / " + t("inc.view-dense")}
         >
           <button
             type="button"
             onClick={() => setMode("list")}
             aria-pressed={mode === "list"}
-            aria-label="Card list view"
+            aria-label={t("inc.view-card")}
             className={cn(
               "flex h-9 w-10 items-center justify-center rounded-md transition-colors",
               mode === "list" ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300"
@@ -206,7 +206,7 @@ export default function IncidentsView() {
             type="button"
             onClick={() => setMode("dense")}
             aria-pressed={mode === "dense"}
-            aria-label="Dense list view"
+            aria-label={t("inc.view-dense")}
             className={cn(
               "flex h-9 w-10 items-center justify-center rounded-md transition-colors",
               mode === "dense" ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300"
@@ -219,9 +219,9 @@ export default function IncidentsView() {
 
       {/* ---------- filters ---------- */}
       <div className="mt-3 space-y-2 rounded-xl border border-white/5 bg-white/[0.015] p-3">
-        <FilterGroup label="Service">
+        <FilterGroup label={t("inc.filter-service")}>
           <FilterChip active={service === "all"} onClick={() => setService("all")}>
-            All
+            {t("inc.filter-all")}
           </FilterChip>
           {SERVICE_KEYS.map((s) => (
             <FilterChip key={s} active={service === s} onClick={() => setService(s)}>
@@ -230,44 +230,60 @@ export default function IncidentsView() {
           ))}
         </FilterGroup>
 
-        <FilterGroup label="Status">
+        <FilterGroup label={t("inc.filter-status")}>
           <FilterChip active={status === "all"} onClick={() => setStatus("all")}>
-            All
+            {t("inc.filter-all")}
           </FilterChip>
           {STATUS_KEYS.map((s) => (
             <FilterChip key={s} active={status === s} onClick={() => setStatus(s)}>
-              {s.charAt(0) + s.slice(1).toLowerCase()}
+              {t(
+                s === "CONFIRMED"
+                  ? "status.confirmed"
+                  : s === "REPORTED"
+                    ? "status.reported"
+                    : s === "URGENT"
+                      ? "status.urgent"
+                      : "status.resolved"
+              )}
             </FilterChip>
           ))}
         </FilterGroup>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-6">
-            <FilterGroup label="Severity">
+            <FilterGroup label={t("inc.filter-severity")}>
               <FilterChip active={severity === "all"} onClick={() => setSeverity("all")}>
-                All
+                {t("inc.filter-all")}
               </FilterChip>
               {SEVERITY_KEYS.map((s) => (
                 <FilterChip key={s} active={severity === s} onClick={() => setSeverity(s)}>
-                  {s.charAt(0) + s.slice(1).toLowerCase()}
+                  {t(
+                    s === "LOW"
+                      ? "sev.low"
+                      : s === "MEDIUM"
+                        ? "sev.medium"
+                        : s === "HIGH"
+                          ? "sev.high"
+                          : "sev.critical"
+                  )}
                 </FilterChip>
               ))}
             </FilterGroup>
 
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
-                Municipality
+                {t("inc.filter-municipality")}
               </span>
               <Select value={municipality} onValueChange={setMunicipality}>
                 <SelectTrigger
                   size="sm"
-                  aria-label="Filter by municipality"
+                  aria-label={t("inc.municipality-aria")}
                   className="h-8 w-[200px] rounded-full border-white/10 bg-transparent text-[11px] text-zinc-300"
                 >
-                  <SelectValue placeholder="All municipalities" />
+                  <SelectValue placeholder={t("inc.all-municipalities")} />
                 </SelectTrigger>
                 <SelectContent className="border-white/10 bg-[#0b0c0e] text-zinc-200">
-                  <SelectItem value="all">All municipalities</SelectItem>
+                  <SelectItem value="all">{t("inc.all-municipalities")}</SelectItem>
                   {GAUTENG_MUNICIPALITIES.map((m) => (
                     <SelectItem key={m} value={m}>
                       {m}
@@ -284,15 +300,16 @@ export default function IncidentsView() {
               onClick={clearFilters}
               className="text-[11.5px] font-medium text-zinc-400 underline underline-offset-4 transition-colors hover:text-white"
             >
-              Clear filters
+              {t("inc.clear-filters")}
             </button>
           )}
         </div>
       </div>
 
-      {/* ---------- count line ---------- */}
+      {/* ---------- count line (mono metadata: demo suffix stays untranslated) ---------- */}
       <p className="mt-3 font-mono text-[11px] tracking-wide text-zinc-600" aria-live="polite">
-        {filtered.length} incident{filtered.length === 1 ? "" : "s"} · {filtered.length} demo
+        {(filtered.length === 1 ? t("inc.count-one") : t("inc.count-many").replace("{n}", String(filtered.length)))}
+        {" "}· {filtered.length} demo
       </p>
 
       {/* ---------- results ---------- */}
@@ -306,9 +323,9 @@ export default function IncidentsView() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Zap}
-            title="No incidents match these filters"
-            description="Adjust filters to widen the search across the demo dataset."
-            action={<GhostButton onClick={clearFilters}>Clear all filters</GhostButton>}
+            title={t("inc.empty-title")}
+            description={t("inc.empty-description")}
+            action={<GhostButton onClick={clearFilters}>{t("inc.empty-clear")}</GhostButton>}
           />
         ) : mode === "list" ? (
           <motion.div layout className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

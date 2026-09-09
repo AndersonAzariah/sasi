@@ -820,3 +820,51 @@
   line-height: 1.55;
   color: #555;
 }
+
+/* ============================================================
+   Round: quiet digest + city-mode restore + user reports on map
+   ============================================================ */
+
+/* "City mode" — swap a chat-distilled briefing back to the daily
+   digest. Quiet gold until hovered, then a warm national-light glow. */
+.sasi-chip-city {
+  border-color: rgba(227, 197, 103, 0.22);
+  background: rgba(227, 197, 103, 0.06);
+  color: #d6c184;
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.sasi-chip-city:hover:not(:disabled) {
+  border-color: rgba(227, 197, 103, 0.45);
+  background: rgba(227, 197, 103, 0.1);
+  color: #f0d98c;
+  box-shadow: 0 0 18px -6px rgba(227, 197, 103, 0.4);
+}
+.sasi-chip-city:focus-visible {
+  outline: 1px solid rgba(227, 197, 103, 0.6);
+  outline-offset: 1px;
+}
+
+/* "You are here" — slow-rotating dashed halo around the saved-location
+   dot; deliberately faint so it never competes with incident markers. */
+.sasi-home-ring {
+  animation: sasi-home-spin 36s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes sasi-home-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-home-ring {
+    animation: none;
+  }
+}

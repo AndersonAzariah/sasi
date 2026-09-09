@@ -138,12 +138,16 @@ interface SasiState {
   briefingError: string | null;
   /** recent briefings, newest first (persisted per session, capped at 8) */
   briefingHistory: CityBriefing[];
+  /** the daily city briefing a chat-distilled one displaced (for free restore) */
+  cityBriefingBackup: CityBriefing | null;
   /** generate (or regenerate) the daily briefing; caches in sessionStorage */
   generateBriefing: (opts?: { force?: boolean }) => Promise<void>;
   /** restore a briefing cached earlier in this browser session (no network) */
   restoreBriefing: () => void;
   /** distil the current Ask SASI conversation into a briefing (chat → digest reverse link) */
   briefingFromChat: () => Promise<void>;
+  /** swap a chat-distilled card back to the daily city briefing it replaced */
+  restoreCityBriefing: () => Promise<void>;
 }
 
 let caseCounter = 124;
@@ -263,14 +267,16 @@ const BRIEFING_TTL_MS = 6 * 60 * 60 * 1000;
 
 /* ------------------------------------------------------------------
    Notification preferences — persisted per browser so the user's
-   quiet/calm configuration survives reloads. Briefing (UPDATE)
-   notifications are the digest heartbeat and are not gated.
+   quiet/calm configuration survives reloads. The briefing (UPDATE)
+   digest is gated too: it is the heartbeat, but the user can quiet it
+   (the Settings note explains what they might miss).
    ------------------------------------------------------------------ */
 const DEFAULT_NTF_PREFS: NtfPrefs = {
   case: true,
   investigation: true,
   action: true,
   service: false,
+  digest: true,
 };
 
 function loadNtfPrefs(): NtfPrefs {
@@ -294,7 +300,7 @@ function persistNtfPrefs(prefs: NtfPrefs) {
   }
 }
 
-/** which Settings toggle gates a live notification kind (UPDATE/SYSTEM heartbeats pass) */
+/** which Settings toggle gates a live notification kind (all five are user-controlled) */
 function prefGatesKind(prefs: NtfPrefs, kind: NotificationKind): boolean {
   switch (kind) {
     case "CASE":
@@ -306,7 +312,7 @@ function prefGatesKind(prefs: NtfPrefs, kind: NotificationKind): boolean {
     case "SYSTEM":
       return prefs.service;
     case "UPDATE":
-      return true; // briefing heartbeat — always on (honest note in Settings)
+      return prefs.digest; // briefing heartbeat — quietable via Settings
   }
 }
 
@@ -477,8 +483,14 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     }
   },
 
-  /* ---- chat → briefing reverse link: distil this conversation ---- */
+  /* ---- chat → briefing reverse link: distil this conversation ----
+     Replaces today's card, but the city briefing it displaces is kept
+     in cityBriefingBackup so "City mode" can restore it for free. */
   briefingFromChat: async () => {
+    const previous = get().briefing;
+    if (previous && previous.origin !== "chat") {
+      set({ cityBriefingBackup: previous });
+    }
     if (get().briefingBusy) return;
     const transcript = get()
       .chatMessages.filter((m) => m.state === "done" && m.content.trim())
@@ -525,7 +537,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       });
       set({ view: "dashboard", param: null, commandOpen: false });
       toast("Briefing distilled from your chat", {
-        description: "It replaces today's card on the dashboard — regenerate any time.",
+        description: "It replaces today's card — City mode on the card restores the daily digest.",
       });
     } catch (err) {
       set({
@@ -543,6 +555,28 @@ export const useSasiStore = create<SasiState>((set, get) => ({
 
   commandOpen: false,
   setCommandOpen: (open) => set({ commandOpen: open }),
+
+  cityBriefingBackup: null,
+  restoreCityBriefing: async () => {
+    const backup = get().cityBriefingBackup;
+    if (backup) {
+      set({ briefing: backup, cityBriefingBackup: null });
+      try {
+        window.sessionStorage.setItem("sasi.briefing", JSON.stringify(backup));
+      } catch {
+        /* storage full/blocked — briefing stays in memory */
+      }
+      toast("City briefing restored", {
+        description: "You're back on the daily digest for your area.",
+      });
+      return;
+    }
+    /* no backup (e.g. reload after distilling) — honest fallback: rewrite */
+    toast("Rewriting your city briefing…", {
+      description: "The daily digest isn't cached on this browser, so SASI is writing a fresh one.",
+    });
+    await get().generateBriefing({ force: true });
+  },
 
   notifications: NOTIFICATIONS,
   markNotificationRead: (id) => {
@@ -578,7 +612,9 @@ export const useSasiStore = create<SasiState>((set, get) => ({
           ? "Investigation findings"
           : key === "action"
             ? "Action approvals"
-            : "Service alerts";
+            : key === "digest"
+              ? "Briefing digest"
+              : "Service alerts";
     toast(`Notification preference saved`, {
       description: `${label} ${value ? "on" : "off"} — SASI stops or resumes those alerts right away.`,
     });
@@ -960,12 +996,17 @@ export const useSasiStore = create<SasiState>((set, get) => ({
   /* ---------- map focus ---------- */
   mapFocusRef: null,
   focusOnMap: (ref) => {
-    const known = INCIDENTS.some(
-      (i) => i.ref.toLowerCase() === ref.toLowerCase() || i.id === ref.toLowerCase()
-    );
+    /* CASE refs resolve against the user's own cases (placed at their saved
+       location); everything else must be a demo incident. */
+    const known =
+      (ref.toUpperCase().startsWith("CASE-") &&
+        get().cases.some((c) => c.ref.toUpperCase() === ref.toUpperCase())) ||
+      INCIDENTS.some(
+        (i) => i.ref.toLowerCase() === ref.toLowerCase() || i.id === ref.toLowerCase()
+      );
     if (!known) {
       toast("Not on the demo map", {
-        description: `${ref} is not one of the demo incidents, so SASI cannot place it on the map.`,
+        description: `${ref} has no place on this stylised demo map, so SASI cannot focus it.`,
       });
       return;
     }
