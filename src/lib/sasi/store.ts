@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type {
   AppNotification,
   ChatMessage,
+  CityBriefing,
   EvidenceItem,
   Finding,
   ProposedAction,
@@ -100,6 +101,15 @@ interface SasiState {
   /* ---- chat → report loop ---- */
   /** pre-fill the report wizard from an assistant suggestion and open it */
   draftReportFromChat: (messageId: string) => void;
+
+  /* ---- AI City briefing (dashboard digest) ---- */
+  briefing: CityBriefing | null;
+  briefingBusy: boolean;
+  briefingError: string | null;
+  /** generate (or regenerate) the daily briefing; caches in sessionStorage */
+  generateBriefing: (opts?: { force?: boolean }) => Promise<void>;
+  /** restore a briefing cached earlier in this browser session (no network) */
+  restoreBriefing: () => void;
 }
 
 let caseCounter = 124;
@@ -148,6 +158,71 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       param: param ?? null,
       commandOpen: false,
     }),
+
+  /* ---------- AI City briefing ---------- */
+  briefing: null,
+  briefingBusy: false,
+  briefingError: null,
+  restoreBriefing: () => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage.getItem("sasi.briefing");
+      if (!raw) return;
+      const cached = JSON.parse(raw) as CityBriefing;
+      /* only restore if it matches the current location (cheap sanity check) */
+      if (cached?.headline && cached?.sections?.length) {
+        set({ briefing: cached });
+      }
+    } catch {
+      /* corrupt cache — ignore, user can regenerate */
+    }
+  },
+  generateBriefing: async (opts) => {
+    if (get().briefingBusy) return;
+    if (!opts?.force) {
+      get().restoreBriefing();
+      if (get().briefing) return; // cached earlier this session — no LLM call
+    }
+    set({ briefingBusy: true, briefingError: null });
+    try {
+      const res = await fetch("/api/sasi/briefing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          location: get().savedLocation,
+          /* the user's live cases ground the briefing (and its refs) */
+          extraCases: get()
+            .cases.slice(0, 8)
+            .map((c) => ({
+              ref: c.ref,
+              title: c.title,
+              status: c.status,
+              service: c.service,
+              city: c.location.city,
+              actionState: c.proposedAction?.state,
+            })),
+        }),
+      });
+      const data = (await res.json()) as { briefing?: CityBriefing; error?: string };
+      if (!res.ok || !data.briefing) {
+        throw new Error(data.error ?? "SASI could not write the briefing right now.");
+      }
+      set({ briefing: data.briefing, briefingBusy: false });
+      try {
+        window.sessionStorage.setItem("sasi.briefing", JSON.stringify(data.briefing));
+      } catch {
+        /* storage full/blocked — briefing stays in memory */
+      }
+    } catch (err) {
+      set({
+        briefingBusy: false,
+        briefingError:
+          err instanceof Error && err.message
+            ? err.message
+            : "SASI could not write the briefing right now.",
+      });
+    }
+  },
 
   commandOpen: false,
   setCommandOpen: (open) => set({ commandOpen: open }),

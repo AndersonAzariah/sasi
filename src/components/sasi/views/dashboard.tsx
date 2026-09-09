@@ -14,6 +14,7 @@ import { SERVICES } from "@/lib/sasi/utils";
 import type { ServiceKey, View } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
 import { ActivityRow, CaseCard, IncidentCard } from "@/components/sasi/domain";
+import { CityBriefingCard } from "@/components/sasi/briefing-card";
 import {
   DemoBadge,
   GhostButton,
@@ -140,6 +141,8 @@ export default function DashboardView() {
       <div className="mt-6 grid grid-cols-12 gap-5">
         {/* LEFT — 8 cols */}
         <div className="col-span-12 space-y-7 lg:col-span-8">
+          <CityBriefingCard />
+
           <section aria-label="Current cases">
             <div className="flex items-center justify-between gap-2">
               <SectionLabel>Current cases</SectionLabel>

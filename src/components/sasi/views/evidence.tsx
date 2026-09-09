@@ -29,6 +29,7 @@ import {
   StatusBadge,
 } from "../primitives";
 import { EvidenceCard, EvidenceThumb } from "../domain";
+import { PhotoAnalysisPanel } from "../photo-analysis";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -399,6 +400,7 @@ export default function EvidenceView() {
                 <motion.div
                   key={item.id}
                   layout
+                  className="min-w-0"
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.985 }}
@@ -502,6 +504,13 @@ export default function EvidenceView() {
                     </div>
                   ))}
                 </dl>
+
+                {/* VLM re-analysis is only honest for bundled demo photos —
+                    the user's own photos are never stored, so there is
+                    nothing to re-read */}
+                {preview.type === "PHOTO" && preview.imageKey && (
+                  <PhotoAnalysisPanel item={preview} />
+                )}
 
                 {preview.caseId && (
                   <div className="flex items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.02] p-3">

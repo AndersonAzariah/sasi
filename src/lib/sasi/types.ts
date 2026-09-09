@@ -332,6 +332,33 @@ export type View =
   | "profile"
   | "admin";
 
+/* ---------- AI City briefing (dashboard digest) ---------- */
+
+export type BriefingRisk = "CALM" | "ELEVATED" | "STRAINED" | "CRITICAL";
+
+export interface BriefingSection {
+  /** short section heading, e.g. "Water" */
+  title: string;
+  /** markdown-lite body (bold + "- " bullets, ≤ 45 words) */
+  body: string;
+  /** civic refs mentioned in this section (CASE-xxxxxx / INC-xxxx) */
+  refs: string[];
+}
+
+export interface CityBriefing {
+  /** one-line headline for the day */
+  headline: string;
+  risk: BriefingRisk;
+  /** 2-4 sections (water, electricity, …) grounded in the user's data */
+  sections: BriefingSection[];
+  /** 1-3 short "worth watching" items */
+  watchlist: string[];
+  /** ISO timestamp of generation */
+  generatedAt: string;
+  /** location the briefing was generated for */
+  locationLabel: string;
+}
+
 export type PublicView = Extract<
   View,
   | "landing"

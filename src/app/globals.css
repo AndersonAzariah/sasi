@@ -522,6 +522,16 @@
   box-shadow: 0 0 0 2px rgba(227, 197, 103, 0.55);
 }
 
+/* Spin for busy icons (regenerate button etc.) */
+.sasi-spin {
+  animation: sasi-spin 0.9s linear infinite;
+}
+@keyframes sasi-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sasi-caret {
     animation: none;
@@ -534,4 +544,130 @@
   .sasi-btn-sheen::after {
     display: none;
   }
+  .sasi-spin {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   PRINT — the case sheet ("Share → Print / save as PDF")
+   The sheet is portalled to <body>, so printing simply hides
+   every other top-level element and shows the paper-white
+   sheet. No visibility leaks, no dark backgrounds on paper.
+   ============================================================ */
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* the app shell, toasts, palettes… everything top-level except the sheet */
+  body > *:not(.sasi-print-sheet) {
+    display: none !important;
+  }
+
+  .sasi-print-sheet {
+    display: block !important;
+    position: static;
+    width: 100%;
+    color: #111;
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+}
+
+/* Paper styles (only ever seen on paper) */
+.sasi-print-sheet {
+  background: #fff;
+  color: #111;
+}
+.sasi-print-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 2.5px solid #111;
+  padding-bottom: 8px;
+}
+.sasi-print-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+}
+.sasi-print-doc {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #555;
+  text-align: right;
+}
+.sasi-print-title {
+  margin-top: 14px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.sasi-print-meta {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.sasi-print-meta th {
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 8.5px;
+  color: #666;
+  padding: 3px 10px 3px 0;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.sasi-print-meta td {
+  padding: 3px 14px 3px 0;
+  color: #111;
+}
+.sasi-print-h2 {
+  margin-top: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 3px;
+}
+.sasi-print-p {
+  margin-top: 6px;
+  color: #222;
+}
+.sasi-print-list {
+  margin-top: 6px;
+  padding-left: 16px;
+  list-style: disc;
+  color: #222;
+}
+.sasi-print-list li {
+  margin-bottom: 5px;
+}
+.sasi-print-list strong {
+  color: #000;
+}
+.sasi-print-footer {
+  margin-top: 20px;
+  border-top: 1px solid #bbb;
+  padding-top: 8px;
+  font-size: 8.5px;
+  line-height: 1.55;
+  color: #555;
 }

@@ -133,7 +133,7 @@ export function IncidentCard({
   return (
     <button
       onClick={onOpen}
-      className="sasi-card sasi-card-interactive group w-full p-4 text-left"
+      className="sasi-card sasi-card-interactive group w-full min-w-0 p-4 text-left"
       aria-label={`Open incident ${incident.ref}: ${incident.title}`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -379,7 +379,7 @@ export function EvidenceCard({
   return (
     <button
       onClick={onOpen}
-      className="sasi-card sasi-card-interactive w-full p-3 text-left"
+      className="sasi-card sasi-card-interactive w-full min-w-0 p-3 text-left"
       aria-label={`Evidence: ${item.title}`}
     >
       <EvidenceThumb item={item} className="aspect-[16/10] w-full" />
