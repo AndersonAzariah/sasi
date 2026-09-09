@@ -1,0 +1,32 @@
+{
+  "name": "SASI — South African Civic Intelligence Platform",
+  "short_name": "SASI",
+  "description": "Independent civic intelligence: understand what is happening, build the evidence, take the next step. Nothing is submitted without your approval.",
+  "id": "/",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "categories": ["government", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/sasi-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/sasi-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/sasi-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

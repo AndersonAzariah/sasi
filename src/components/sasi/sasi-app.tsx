@@ -20,6 +20,7 @@ import TermsView from "./views/terms";
 import LoginView from "./views/login";
 import SignupView from "./views/signup";
 import DashboardView from "./views/dashboard";
+import AskSasiView from "./views/ask-sasi";
 import InvestigateView from "./views/investigate";
 import StartInvestigationView from "./views/start-investigation";
 import ReportView from "./views/report";
@@ -100,6 +101,7 @@ const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   login: LoginView,
   signup: SignupView,
   dashboard: DashboardView,
+  "ask-sasi": AskSasiView,
   investigate: InvestigateView,
   "start-investigation": StartInvestigationView,
   report: ReportView,

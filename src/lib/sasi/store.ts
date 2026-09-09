@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type {
   AppNotification,
+  ChatMessage,
   EvidenceItem,
   Finding,
   ProposedAction,
@@ -78,6 +79,15 @@ interface SasiState {
   /* ---- saved location / preferences ---- */
   savedLocation: { province: string; city: string; suburb: string };
   setSavedLocation: (loc: Partial<SasiState["savedLocation"]>) => void;
+
+  /* ---- Ask SASI (LLM chat) ---- */
+  chatMessages: ChatMessage[];
+  chatBusy: boolean;
+  /** question queued from the palette / other views — consumed by the chat view */
+  pendingAsk: string | null;
+  setPendingAsk: (q: string | null) => void;
+  askSasi: (question: string) => Promise<void>;
+  clearChat: () => void;
 }
 
 let caseCounter = 124;
@@ -276,4 +286,77 @@ export const useSasiStore = create<SasiState>((set, get) => ({
   savedLocation: { province: "Gauteng", city: "Johannesburg", suburb: "Melrose" },
   setSavedLocation: (loc) =>
     set((s) => ({ savedLocation: { ...s.savedLocation, ...loc } })),
+
+  /* ------------------------------------------------------------------
+     Ask SASI — free-text civic assistant backed by /api/sasi/ask.
+     The API carries the conversation server-side; here we only track
+     visible messages + busy state. On failure the user gets an honest
+     error bubble instead of a fabricated answer.
+     ------------------------------------------------------------------ */
+  chatMessages: [],
+  chatBusy: false,
+  pendingAsk: null,
+  setPendingAsk: (q) => set({ pendingAsk: q }),
+  clearChat: () => set({ chatMessages: [], pendingAsk: null }),
+  askSasi: async (question) => {
+    const trimmed = question.trim();
+    if (!trimmed || get().chatBusy) return;
+
+    const userMsg: ChatMessage = {
+      id: `chat-u-${Date.now()}`,
+      role: "user",
+      content: trimmed,
+      at: new Date().toISOString(),
+      state: "done",
+    };
+    const history = [...get().chatMessages, userMsg];
+    const replyId = `chat-a-${Date.now()}`;
+    set({
+      chatMessages: [
+        ...history,
+        { id: replyId, role: "assistant", content: "", at: new Date().toISOString(), state: "sending" },
+      ],
+      chatBusy: true,
+    });
+
+    try {
+      const res = await fetch("/api/sasi/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: history
+            .filter((m) => m.state === "done")
+            .slice(-10)
+            .map((m) => ({ role: m.role, content: m.content })),
+          location: get().savedLocation,
+        }),
+      });
+      const data = (await res.json()) as { reply?: string; refs?: string[]; error?: string };
+      if (!res.ok || !data.reply) throw new Error(data.error ?? "SASI could not answer right now.");
+      set((s) => ({
+        chatMessages: s.chatMessages.map((m) =>
+          m.id === replyId
+            ? { ...m, content: data.reply as string, refs: data.refs, state: "done" }
+            : m
+        ),
+        chatBusy: false,
+      }));
+    } catch (err) {
+      set((s) => ({
+        chatMessages: s.chatMessages.map((m) =>
+          m.id === replyId
+            ? {
+                ...m,
+                content:
+                  err instanceof Error && err.message
+                    ? err.message
+                    : "SASI could not reach the assistant service. Please try again.",
+                state: "error",
+              }
+            : m
+        ),
+        chatBusy: false,
+      }));
+    }
+  },
 }));

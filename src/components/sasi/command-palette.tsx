@@ -19,6 +19,7 @@ import { useSasiStore } from "@/lib/sasi/store";
 import { CASES, EVIDENCE, INCIDENTS } from "@/lib/sasi/data";
 import { SERVICES as SERVICE_META } from "@/lib/sasi/utils";
 import { ServiceIcon } from "./primitives";
+import { Bot } from "lucide-react";
 
 type ResultRow = {
   id: string;
@@ -37,7 +38,13 @@ export function CommandPalette() {
   const openIncident = useSasiStore((s) => s.openIncident);
   const openService = useSasiStore((s) => s.openService);
   const startInvestigationFor = useSasiStore((s) => s.startInvestigationFor);
+  const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
   const [query, setQuery] = useState("");
+
+  const ask = (q: string) => {
+    setPendingAsk(q);
+    navigate("ask-sasi");
+  };
 
   useEffect(() => {
     if (!open) setQuery("");
@@ -61,7 +68,7 @@ export function CommandPalette() {
     // Ask SASI — intelligent prompts
     const askRows: { q: string; hint: string }[] = query.trim()
       ? [
-          { q: `Ask SASI about “${query.trim()}”`, hint: "Start an investigation" },
+          { q: `Ask SASI about “${query.trim()}”`, hint: "Civic assistant" },
           { q: `Report a problem: “${query.trim()}”`, hint: "Open report flow" },
           { q: `Find services for “${query.trim()}”`, hint: "Browse service directory" },
         ]
@@ -88,9 +95,11 @@ export function CommandPalette() {
             navigate("services");
           } else if (r.q.startsWith("Show incidents")) {
             navigate("incidents");
+          } else if (r.q === "Why is my water off?" || r.q === "What should I do next?") {
+            ask(r.q);
           } else {
-            // free-form question → investigate the flagship case as the demo path
-            startInvestigationFor("case-123");
+            // free-form question → the LLM-backed Ask SASI chat
+            ask(query.trim());
           }
         },
       });
@@ -148,6 +157,7 @@ export function CommandPalette() {
     const navItems = [
       { view: "landing" as const, label: "Home / Landing", icon: LayoutDashboard },
       { view: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
+      { view: "ask-sasi" as const, label: "Ask SASI chat", icon: Bot },
       { view: "investigate" as const, label: "Investigation workspace", icon: Sparkles },
       { view: "cases" as const, label: "Cases", icon: FolderLock },
       { view: "incidents" as const, label: "Incidents", icon: Zap },
@@ -169,7 +179,7 @@ export function CommandPalette() {
     });
 
     return out;
-  }, [query, navigate, openCase, openIncident, openService, startInvestigationFor, useSasiStore]);
+  }, [query, navigate, openCase, openIncident, openService, startInvestigationFor, ask, useSasiStore]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -253,6 +263,8 @@ export function CommandPalette() {
                         >
                           {r.group === "Ask SASI" ? (
                             <Sparkles className="h-4 w-4 shrink-0 text-[#e3c567]" aria-hidden />
+                          ) : r.group === "Navigation" && r.label === "Ask SASI chat" ? (
+                            <Bot className="h-4 w-4 shrink-0 text-[#e3c567]" aria-hidden />
                           ) : r.group === "Services" ? (
                             <ServiceIcon
                               service={

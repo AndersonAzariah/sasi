@@ -93,19 +93,34 @@ export default function DashboardView() {
 
       {/* ---------- Command card ---------- */}
       <div className="sasi-command-focus mt-6 rounded-xl">
-        <button
-          onClick={() => setCommandOpen(true)}
-          className="flex h-12 w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
-          aria-label="Ask SASI — open the command palette"
-        >
-          <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-[14px] text-zinc-500">
-            What do you need help with?
-          </span>
-          <kbd className="hidden shrink-0 items-center rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 sm:flex">
+        <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] pl-4 transition-colors hover:border-white/20 hover:bg-white/[0.04]">
+          <button
+            onClick={() => setCommandOpen(true)}
+            className="flex h-full min-w-0 flex-1 items-center gap-3 text-left"
+            aria-label="Ask SASI — open the command palette"
+          >
+            <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+            <span className="min-w-0 flex-1 truncate text-[14px] text-zinc-500">
+              What do you need help with?
+            </span>
+          </button>
+          <div
+            className="h-6 w-px shrink-0 bg-white/8"
+            role="separator"
+            aria-orientation="vertical"
+          />
+          <button
+            onClick={() => navigate("ask-sasi")}
+            className="group flex h-full shrink-0 items-center gap-1.5 pr-2.5 pl-1 text-[12.5px] font-medium text-zinc-400 transition-colors hover:text-[#e3c567]"
+            aria-label="Open the Ask SASI chat"
+          >
+            <Sparkles className="h-3.5 w-3.5 transition-colors group-hover:text-[#e3c567]" aria-hidden />
+            <span className="hidden sm:inline">Ask SASI</span>
+          </button>
+          <kbd className="mr-3 hidden shrink-0 items-center rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 sm:flex">
             ⌘K
           </kbd>
-        </button>
+        </div>
       </div>
 
       {/* ---------- Stat tiles ---------- */}

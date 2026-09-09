@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -363,6 +363,37 @@ export function EmptyState({
   );
 }
 
+/* ============================================================
+   STAT TILE — with mount count-up (respects reduced motion)
+   ============================================================ */
+
+/** Animate 0 → target once on mount. Hydration-safe: first paint = target,
+ *  then the animation catches the eye without a mismatched flash.
+ *  All state updates happen inside rAF callbacks (never in the effect body). */
+function useCountUp(target: number, duration = 650): number {
+  const [value, setValue] = useState(target);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || target === 0) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic; t=1 → exactly target
+      setValue(Math.round(target * eased));
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [target, duration]);
+
+  return value;
+}
+
 export function StatTile({
   label,
   value,
@@ -386,13 +417,32 @@ export function StatTile({
           : tone === "blue"
             ? "text-[#a7d3f9]"
             : "text-white";
+  const animated = useCountUp(typeof value === "number" ? value : 0);
+  const display = typeof value === "number" ? animated : value;
   return (
-    <div className={cn("sasi-card p-4", className)}>
+    <div className={cn("sasi-card group/tile relative overflow-hidden p-4", className)}>
+      {/* tone light that blooms on hover — detail, not paint */}
+      <span
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover/tile:opacity-100",
+          tone === "red" && "bg-[#ef5350]/15",
+          tone === "green" && "bg-[#66bb6a]/15",
+          tone === "gold" && "bg-[#e3c567]/15",
+          tone === "blue" && "bg-[#64b5f6]/15",
+          tone === "default" && "bg-white/[0.07]"
+        )}
+      />
       <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500">
         {label}
       </p>
-      <p className={cn("mt-2 text-[26px] font-semibold leading-none tracking-tight", toneText)}>
-        {value}
+      <p
+        className={cn(
+          "mt-2 text-[26px] font-semibold leading-none tracking-tight tabular-nums",
+          toneText
+        )}
+      >
+        {display}
       </p>
       {hint && <p className="mt-2 text-[11px] text-zinc-600">{hint}</p>}
     </div>

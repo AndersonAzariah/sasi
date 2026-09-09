@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   Activity,
   Bell,
+  Bot,
   ChevronDown,
   CircleUser,
   Command as CommandIcon,
@@ -35,6 +36,7 @@ const NAV_SECTIONS: {
     label: "Overview",
     items: [
       { view: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { view: "ask-sasi", label: "Ask SASI", icon: Bot },
     ],
   },
   {
@@ -238,7 +240,7 @@ function Topbar() {
 
       <div className="ml-auto flex items-center gap-1.5 md:ml-0">
         <button
-          onClick={() => setCommandOpen(true)}
+          onClick={() => navigate("ask-sasi")}
           className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.04] hover:text-white md:hidden"
           aria-label="Ask SASI"
         >
@@ -399,10 +401,12 @@ function MobileNav() {
    ============================================================ */
 
 function FloatingAskButton() {
-  const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
+  const navigate = useSasiStore((s) => s.navigate);
+  const view = useSasiStore((s) => s.view);
+  if (view === "ask-sasi") return null;
   return (
     <button
-      onClick={() => setCommandOpen(true)}
+      onClick={() => navigate("ask-sasi")}
       className="sasi-glow-multi fixed bottom-[72px] right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-white pl-3.5 pr-4 text-[13px] font-semibold text-black transition-transform active:scale-95 lg:hidden"
       aria-label="Ask SASI anything"
     >

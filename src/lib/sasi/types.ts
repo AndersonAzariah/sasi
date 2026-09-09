@@ -266,6 +266,21 @@ export interface AgentEvent {
 
 /* ---------- Navigation ---------- */
 
+/* ---------- Ask SASI (LLM chat) ---------- */
+
+export type ChatRole = "user" | "assistant";
+
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  at: string; // ISO
+  /** UI delivery state — assistant messages stream "done" on arrival */
+  state: "sending" | "done" | "error";
+  /** civic refs detected in the message body (CASE-xxxxxx / INC-xxxx) */
+  refs?: string[];
+}
+
 export type View =
   | "landing"
   | "about"
@@ -278,6 +293,7 @@ export type View =
   | "login"
   | "signup"
   | "dashboard"
+  | "ask-sasi"
   | "investigate"
   | "start-investigation"
   | "report"

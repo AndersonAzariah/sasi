@@ -30,9 +30,13 @@ export const metadata: Metadata = {
     "civic technology",
   ],
   applicationName: "SASI",
+  manifest: "/manifest.json",
   icons: {
-    icon: "/sasi-logo.png",
-    apple: "/sasi-logo.png",
+    icon: [
+      { url: "/sasi-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/sasi-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/sasi-icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {
     title: "SASI — South African Civic Intelligence Platform",
