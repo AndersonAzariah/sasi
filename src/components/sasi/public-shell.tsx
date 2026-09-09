@@ -18,6 +18,7 @@ const NAV: { view: View; label: string }[] = [
 export function PublicShell({ children }: { children: React.ReactNode }) {
   const navigate = useSasiStore((s) => s.navigate);
   const view = useSasiStore((s) => s.view);
+  const authed = useSasiStore((s) => s.authed);
   const [menuOpen, setMenuOpen] = useState(false);
   const isLanding = view === "landing";
 
@@ -53,10 +54,10 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
 
           <div className="ml-auto hidden items-center gap-2 md:flex">
             <button
-              onClick={() => navigate("login")}
+              onClick={() => navigate(authed ? "dashboard" : "login")}
               className="rounded-lg px-3 py-1.5 text-[13px] text-zinc-400 transition hover:text-white"
             >
-              Sign in
+              {authed ? "Go to dashboard" : "Sign in"}
             </button>
             <button
               onClick={() => navigate("report")}
@@ -94,12 +95,12 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {
-                    navigate("login");
+                    navigate(authed ? "dashboard" : "login");
                     setMenuOpen(false);
                   }}
                   className="rounded-lg border border-white/10 py-2.5 text-[13px] text-zinc-300"
                 >
-                  Sign in
+                  {authed ? "Go to dashboard" : "Sign in"}
                 </button>
                 <button
                   onClick={() => {
@@ -194,8 +195,11 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                     </button>
                   </li>
                   <li>
-                    <button onClick={() => navigate("login")} className="transition hover:text-zinc-200">
-                      Sign in
+                    <button
+                      onClick={() => navigate(authed ? "dashboard" : "login")}
+                      className="transition hover:text-zinc-200"
+                    >
+                      {authed ? "Go to dashboard" : "Sign in"}
                     </button>
                   </li>
                 </ul>

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 
 export default function LoginView() {
   const navigate = useSasiStore((s) => s.navigate);
+  const signIn = useSasiStore((s) => s.signIn);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,6 +37,7 @@ export default function LoginView() {
       setTimeout(() => {
         setLoading(false);
         setSuccess(true);
+        signIn(); // keeps Services inside the app shell after this
         timers.current.push(
           setTimeout(() => navigate("dashboard"), 900)
         );

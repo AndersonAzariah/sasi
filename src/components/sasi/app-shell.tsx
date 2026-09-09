@@ -282,7 +282,7 @@ function Topbar() {
               <div
                 role="dialog"
                 aria-label="Notifications"
-                className="sasi-card absolute right-0 top-11 z-50 w-[min(92vw,380px)] overflow-hidden bg-[#0d0e10] shadow-2xl shadow-black/60"
+                className="sasi-card sasi-pop absolute right-0 top-11 z-50 w-[min(92vw,380px)] overflow-hidden bg-[#0d0e10] shadow-2xl shadow-black/60"
               >
                 <div className="flex items-center justify-between border-b border-white/6 px-3 py-2.5">
                   <p className="text-[12.5px] font-semibold text-white">Notifications</p>

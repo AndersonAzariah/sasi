@@ -6,6 +6,7 @@ import {
   Bell,
   Camera,
   Globe,
+  LogOut,
   MapPin,
   ShieldAlert,
   Sparkles,
@@ -39,6 +40,7 @@ export default function ProfileView() {
   const savedLocation = useSasiStore((s) => s.savedLocation);
   const openCase = useSasiStore((s) => s.openCase);
   const navigate = useSasiStore((s) => s.navigate);
+  const signOut = useSasiStore((s) => s.signOut);
 
   const activeInvestigations = useMemo(
     () => cases.filter((c) => ACTIVE_AI_STATES.has(c.aiState)).length,
@@ -148,6 +150,39 @@ export default function ProfileView() {
           <GhostButton onClick={() => navigate("settings")} className="shrink-0">
             Edit in Settings
           </GhostButton>
+        </div>
+      </section>
+
+      {/* ---------- Session ---------- */}
+      <section aria-labelledby="profile-session" className="mt-8 pb-4">
+        <SectionLabel className="mb-3">Session</SectionLabel>
+        <h2 id="profile-session" className="sr-only">
+          Session
+        </h2>
+        <div className="sasi-card flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03]">
+              <LogOut className="h-4 w-4 text-zinc-400" aria-hidden />
+            </span>
+            <div>
+              <p className="text-[13.5px] font-medium text-white">Sign out of SASI</p>
+              <p className="mt-0.5 max-w-md text-[12px] leading-relaxed text-zinc-500">
+                Ends this demo session on this browser. Your cases, evidence and chat
+                history stay saved here and will be waiting when you return.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              signOut();
+              navigate("landing");
+            }}
+            className="group inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#ef5350]/25 bg-[#ef5350]/[0.06] px-3.5 text-[12.5px] font-medium text-[#fda4a0] transition-colors hover:border-[#ef5350]/40 hover:bg-[#ef5350]/[0.1] active:scale-[0.98]"
+            aria-label="Sign out of SASI"
+          >
+            <LogOut className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" aria-hidden />
+            Sign out
+          </button>
         </div>
       </section>
 

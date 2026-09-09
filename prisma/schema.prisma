@@ -59,3 +59,16 @@ model EvidenceRecord {
 
   @@index([sessionId])
 }
+
+/// One AI City briefing snapshot (append-only history, capped client-side).
+/// Full CityBriefing payload as JSON so the client can re-render it exactly.
+model BriefingRecord {
+  id        String   @id @default(cuid())
+  sessionId String
+  risk      String // CALM | ELEVATED | STRAINED | CRITICAL (for quick ops)
+  headline  String
+  payload   String // full CityBriefing JSON
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+}

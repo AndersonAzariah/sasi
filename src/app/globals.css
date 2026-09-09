@@ -532,6 +532,40 @@
   }
 }
 
+/* Popover / panel entrance — quick scale-and-settle (share menus,
+   briefing history, notification drawer) */
+.sasi-pop {
+  transform-origin: top left;
+  animation: sasi-pop-in 0.16s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes sasi-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* "Ask SASI about this" — whisper-quiet until hovered, then gold */
+.sasi-chip-ask {
+  opacity: 0.85;
+  transition:
+    color 0.18s ease,
+    opacity 0.18s ease,
+    background-color 0.18s ease;
+}
+.sasi-chip-ask:hover {
+  opacity: 1;
+  background: rgba(227, 197, 103, 0.08);
+}
+.group\/sec:hover .sasi-chip-ask {
+  color: #d6c184;
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sasi-caret {
     animation: none;
@@ -545,6 +579,9 @@
     display: none;
   }
   .sasi-spin {
+    animation: none;
+  }
+  .sasi-pop {
     animation: none;
   }
 }

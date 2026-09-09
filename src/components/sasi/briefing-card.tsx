@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Bot,
+  ChevronDown,
   Eye,
+  History,
   Leaf,
   RefreshCw,
   Newspaper,
@@ -11,9 +14,9 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
-import type { BriefingRisk } from "@/lib/sasi/types";
+import type { BriefingRisk, BriefingSection, CityBriefing } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
-import { timeAgo } from "@/lib/sasi/utils";
+import { formatDateTime, timeAgo } from "@/lib/sasi/utils";
 import { toast } from "sonner";
 import { RichText } from "./rich-text";
 import { SectionLabel } from "./primitives";
@@ -22,9 +25,11 @@ import { SectionLabel } from "./primitives";
    CityBriefingCard — the dashboard's AI-written daily digest.
    Grounded in the user's demo dataset (cases + incidents +
    saved location) via POST /api/sasi/briefing. Cached in
-   sessionStorage for the browser session; the user can force a
-   regenerate. Honest framing: AI-generated, demo data, refs
-   clickable, and a "SASI can be wrong" trust line.
+   sessionStorage for the browser session and persisted to the
+   briefing history (SQLite) so past briefings can be reopened.
+   Stale briefings (>6h) are quietly rewritten on mount.
+   Honest framing: AI-generated, demo data, refs clickable,
+   and a "SASI can be wrong" trust line.
    ============================================================ */
 
 const RISK_META: Record<
@@ -57,16 +62,139 @@ const RISK_META: Record<
   },
 };
 
+/* ---------- one briefing body, reused for today + past views ---------- */
+
+function BriefingBody({
+  briefing,
+  onRef,
+  onAsk,
+}: {
+  briefing: CityBriefing;
+  onRef: (ref: string) => void;
+  onAsk: (section: BriefingSection) => void;
+}) {
+  return (
+    <>
+      <h3 className="mt-3.5 text-balance text-[15.5px] font-semibold leading-snug text-white">
+        {briefing.headline}
+      </h3>
+
+      <div className="mt-4 space-y-4">
+        {briefing.sections.map((sec) => (
+          <div key={sec.title} className="group/sec relative">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                {sec.title}
+              </p>
+              <button
+                onClick={() => onAsk(sec)}
+                className="sasi-chip-ask -mr-1 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-600 transition-colors hover:text-[#e3c567] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e3c567]/50"
+                aria-label={`Ask SASI about the ${sec.title} section of the briefing`}
+              >
+                <Bot className="h-3 w-3" aria-hidden />
+                Ask SASI about this
+              </button>
+            </div>
+            <RichText
+              content={sec.body}
+              onRef={onRef}
+              className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-zinc-300 [&_p]:text-[13px]"
+            />
+          </div>
+        ))}
+      </div>
+
+      {briefing.watchlist.length > 0 && (
+        <div className="mt-4 rounded-lg border border-white/8 bg-white/[0.02] p-3">
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            <Eye className="h-3 w-3" aria-hidden />
+            Worth watching
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {briefing.watchlist.map((w, i) => (
+              <li key={i} className="flex gap-2 text-[12.5px] leading-relaxed text-zinc-300">
+                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600" aria-hidden />
+                <RichText content={w} onRef={onRef} className="min-w-0 flex-1 [&>div]:space-y-0" />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="mt-4 border-t border-white/5 pt-3 text-[11px] leading-relaxed text-zinc-600">
+        Written by SASI&apos;s AI from your demo data —{" "}
+        <span className="text-zinc-500">{timeAgo(briefing.generatedAt)}</span> · for{" "}
+        {briefing.locationLabel}. SASI can be wrong; nothing here is an official
+        statement and nothing is shared with any authority.
+      </p>
+    </>
+  );
+}
+
+/* ---------- history row ---------- */
+
+function HistoryRow({
+  briefing,
+  onOpen,
+}: {
+  briefing: CityBriefing;
+  onOpen: () => void;
+}) {
+  const meta = RISK_META[briefing.risk] ?? RISK_META.ELEVATED;
+  return (
+    <li>
+      <button
+        onClick={onOpen}
+        className="group/row relative flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-left transition-colors hover:border-white/8 hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/30"
+        aria-label={`Open briefing from ${formatDateTime(briefing.generatedAt)}: ${briefing.headline}`}
+      >
+        <span
+          className={cn("h-1.5 w-1.5 shrink-0 rounded-full", meta.dot)}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12.5px] leading-snug text-zinc-300 transition-colors group-hover/row:text-white">
+            {briefing.headline}
+          </span>
+          <span className="mt-0.5 block font-mono text-[9.5px] tracking-[0.1em] text-zinc-600">
+            {formatDateTime(briefing.generatedAt).toUpperCase()} · {meta.label.toUpperCase()}
+          </span>
+        </span>
+        <ChevronRight small />
+      </button>
+    </li>
+  );
+}
+
+function ChevronRight({ small }: { small?: boolean }) {
+  return (
+    <ChevronDown
+      className={cn(
+        "shrink-0 -rotate-90 text-zinc-700 transition-colors group-hover/row:text-zinc-400",
+        small ? "h-3 w-3" : "h-3.5 w-3.5"
+      )}
+      aria-hidden
+    />
+  );
+}
+
 export function CityBriefingCard() {
   const briefing = useSasiStore((s) => s.briefing);
   const busy = useSasiStore((s) => s.briefingBusy);
   const error = useSasiStore((s) => s.briefingError);
+  const history = useSasiStore((s) => s.briefingHistory);
   const generateBriefing = useSasiStore((s) => s.generateBriefing);
+  const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
+  const navigate = useSasiStore((s) => s.navigate);
   const cases = useSasiStore((s) => s.cases);
   const openCase = useSasiStore((s) => s.openCase);
   const openIncident = useSasiStore((s) => s.openIncident);
 
-  /* restore from session cache, or auto-generate once per session */
+  /* "today" vs a reopened past briefing */
+  const [viewingPast, setViewingPast] = useState<CityBriefing | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  /* restore from session cache, or auto-generate once per session (stale → refresh) */
   useEffect(() => {
     void generateBriefing();
   }, [generateBriefing]);
@@ -84,7 +212,29 @@ export function CityBriefingCard() {
     }
   };
 
-  const risk = briefing ? RISK_META[briefing.risk] : null;
+  /* grounded pre-filled question for the Ask SASI chat */
+  const askAboutSection = (section: BriefingSection) => {
+    const city = viewingPast?.locationLabel ?? briefing?.locationLabel ?? "";
+    const q = `About the "${section.title}" part of my city briefing${
+      city ? ` for ${city}` : ""
+    }: what does this mean for me and what should I do next?`;
+    setPendingAsk(q);
+    navigate("ask-sasi");
+  };
+
+  /* past items exclude what is currently shown as "today" (or being viewed) */
+  const pastItems = useMemo(
+    () =>
+      history.filter(
+        (h) =>
+          h.generatedAt !== briefing?.generatedAt &&
+          h.generatedAt !== viewingPast?.generatedAt
+      ),
+    [history, briefing, viewingPast]
+  );
+
+  const shown = viewingPast ?? briefing;
+  const risk = shown ? RISK_META[shown.risk] : null;
   const RiskIcon = risk?.icon ?? Eye;
 
   return (
@@ -101,7 +251,7 @@ export function CityBriefingCard() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {briefing && risk && (
+          {shown && risk && (
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
@@ -125,7 +275,7 @@ export function CityBriefingCard() {
       </div>
 
       {/* ---------- busy: shimmer skeleton ---------- */}
-      {busy && !briefing && (
+      {busy && !shown && (
         <div className="mt-4 space-y-3" aria-live="polite" aria-label="SASI is writing today's briefing">
           <div className="sasi-skeleton h-5 w-4/5" />
           <div className="sasi-skeleton h-3.5 w-full" />
@@ -158,52 +308,65 @@ export function CityBriefingCard() {
         </div>
       )}
 
-      {/* ---------- briefing body ---------- */}
-      {briefing && !busy && (
-        <>
-          <h3 className="mt-3.5 text-balance text-[15.5px] font-semibold leading-snug text-white">
-            {briefing.headline}
-          </h3>
-
-          <div className="mt-4 space-y-4">
-            {briefing.sections.map((sec) => (
-              <div key={sec.title}>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                  {sec.title}
-                </p>
-                <RichText
-                  content={sec.body}
-                  onRef={handleRef}
-                  className="mt-1.5 space-y-1 text-[13px] leading-relaxed text-zinc-300 [&_p]:text-[13px]"
-                />
-              </div>
-            ))}
-          </div>
-
-          {briefing.watchlist.length > 0 && (
-            <div className="mt-4 rounded-lg border border-white/8 bg-white/[0.02] p-3">
-              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                <Eye className="h-3 w-3" aria-hidden />
-                Worth watching
-              </p>
-              <ul className="mt-2 space-y-1.5">
-                {briefing.watchlist.map((w, i) => (
-                  <li key={i} className="flex gap-2 text-[12.5px] leading-relaxed text-zinc-300">
-                    <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-zinc-600" aria-hidden />
-                    <RichText content={w} onRef={handleRef} className="min-w-0 flex-1 [&>div]:space-y-0" />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <p className="mt-4 border-t border-white/5 pt-3 text-[11px] leading-relaxed text-zinc-600">
-            Written by SASI&apos;s AI from your demo data —{" "}
-            <span className="text-zinc-500">{timeAgo(briefing.generatedAt)}</span> · for{" "}
-            {briefing.locationLabel}. SASI can be wrong; nothing here is an official
-            statement and nothing is shared with any authority.
+      {/* ---------- viewing a past briefing banner ---------- */}
+      {viewingPast && !busy && (
+        <div className="sasi-pop mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e3c567]/20 bg-[#e3c567]/[0.05] px-3 py-2">
+          <p className="flex min-w-0 items-center gap-2 text-[11.5px] text-[#efe0a8]">
+            <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate">
+              Viewing a past briefing · {formatDateTime(viewingPast.generatedAt)}
+            </span>
           </p>
-        </>
+          <button
+            onClick={() => setViewingPast(null)}
+            className="shrink-0 rounded-md border border-white/10 px-2 py-0.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-white/25 hover:text-white"
+          >
+            Back to today
+          </button>
+        </div>
+      )}
+
+      {/* ---------- briefing body (today or reopened) ---------- */}
+      {shown && !busy && (
+        <BriefingBody briefing={shown} onRef={handleRef} onAsk={askAboutSection} />
+      )}
+
+      {/* ---------- past briefings ---------- */}
+      {pastItems.length > 0 && (
+        <div className="mt-4 border-t border-white/5 pt-3">
+          <button
+            onClick={() => setHistoryOpen((o) => !o)}
+            aria-expanded={historyOpen}
+            aria-controls="briefing-history"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-[11px] font-medium text-zinc-500 transition-colors hover:text-zinc-200"
+          >
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 transition-transform duration-200 motion-reduce:transition-none",
+                historyOpen && "rotate-180"
+              )}
+              aria-hidden
+            />
+            Past briefings
+            <span className="rounded-full bg-white/[0.06] px-1.5 py-px font-mono text-[9px] text-zinc-500">
+              {pastItems.length}
+            </span>
+          </button>
+          {historyOpen && (
+            <ul id="briefing-history" className="sasi-pop mt-1.5 space-y-px">
+              {pastItems.map((b) => (
+                <HistoryRow
+                  key={b.generatedAt}
+                  briefing={b}
+                  onOpen={() => {
+                    setViewingPast(b);
+                    setHistoryOpen(false);
+                  }}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );

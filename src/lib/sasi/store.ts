@@ -27,6 +27,11 @@ interface SasiState {
   param: string | null;
   navigate: (view: View, param?: string) => void;
 
+  /* ---- demo session (drives shell continuity: Services stays in-app) ---- */
+  authed: boolean;
+  signIn: () => void;
+  signOut: () => void;
+
   /* ---- global command interface ---- */
   commandOpen: boolean;
   setCommandOpen: (open: boolean) => void;
@@ -106,6 +111,8 @@ interface SasiState {
   briefing: CityBriefing | null;
   briefingBusy: boolean;
   briefingError: string | null;
+  /** recent briefings, newest first (persisted per session, capped at 8) */
+  briefingHistory: CityBriefing[];
   /** generate (or regenerate) the daily briefing; caches in sessionStorage */
   generateBriefing: (opts?: { force?: boolean }) => Promise<void>;
   /** restore a briefing cached earlier in this browser session (no network) */
@@ -137,6 +144,29 @@ async function persistCase(c: SasiCase) {
   }
 }
 
+async function persistBriefing(b: CityBriefing) {
+  try {
+    await fetch("/api/sasi/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "briefing", sessionId: getSessionId(), briefing: b }),
+    });
+  } catch {
+    /* offline / demo — the session cache still covers this visit */
+  }
+}
+
+/** merge a briefing into the history (newest first, deduped, capped) */
+function pushBriefingHistory(history: CityBriefing[], b: CityBriefing): CityBriefing[] {
+  const next = [b, ...history.filter((h) => h.generatedAt !== b.generatedAt)];
+  return next
+    .slice(0, 8)
+    .sort((x, y) => y.generatedAt.localeCompare(x.generatedAt));
+}
+
+/** briefings older than this are considered stale and quietly refreshed */
+const BRIEFING_TTL_MS = 6 * 60 * 60 * 1000;
+
 let locationSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function persistLocation(loc: SasiState["savedLocation"]) {
   if (locationSaveTimer) clearTimeout(locationSaveTimer);
@@ -159,10 +189,33 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       commandOpen: false,
     }),
 
+  /* ---------- demo session ---------- */
+  authed: false,
+  signIn: () => {
+    set({ authed: true });
+    try {
+      window.localStorage.setItem("sasi.authed", "1");
+    } catch {
+      /* storage blocked — session-only sign-in */
+    }
+  },
+  signOut: () => {
+    set({ authed: false });
+    try {
+      window.localStorage.removeItem("sasi.authed");
+    } catch {
+      /* ignore */
+    }
+    toast("Signed out", {
+      description: "Your saved cases stay on this browser for next time.",
+    });
+  },
+
   /* ---------- AI City briefing ---------- */
   briefing: null,
   briefingBusy: false,
   briefingError: null,
+  briefingHistory: [],
   restoreBriefing: () => {
     if (typeof window === "undefined") return;
     try {
@@ -171,7 +224,10 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       const cached = JSON.parse(raw) as CityBriefing;
       /* only restore if it matches the current location (cheap sanity check) */
       if (cached?.headline && cached?.sections?.length) {
-        set({ briefing: cached });
+        set({
+          briefing: cached,
+          briefingHistory: pushBriefingHistory(get().briefingHistory, cached),
+        });
       }
     } catch {
       /* corrupt cache — ignore, user can regenerate */
@@ -180,8 +236,13 @@ export const useSasiStore = create<SasiState>((set, get) => ({
   generateBriefing: async (opts) => {
     if (get().briefingBusy) return;
     if (!opts?.force) {
-      get().restoreBriefing();
-      if (get().briefing) return; // cached earlier this session — no LLM call
+      if (!get().briefing) get().restoreBriefing();
+      const cached = get().briefing;
+      if (cached) {
+        const age = Date.now() - new Date(cached.generatedAt).getTime();
+        if (age < BRIEFING_TTL_MS) return; // fresh enough — no LLM call
+      }
+      /* stale (older than 6h) or missing → fall through and rewrite quietly */
     }
     set({ briefingBusy: true, briefingError: null });
     try {
@@ -207,13 +268,20 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       if (!res.ok || !data.briefing) {
         throw new Error(data.error ?? "SASI could not write the briefing right now.");
       }
-      set({ briefing: data.briefing, briefingBusy: false });
+      const b = data.briefing;
+      set((s) => ({
+        briefing: b,
+        briefingBusy: false,
+        briefingHistory: pushBriefingHistory(s.briefingHistory, b),
+      }));
       try {
-        window.sessionStorage.setItem("sasi.briefing", JSON.stringify(data.briefing));
+        window.sessionStorage.setItem("sasi.briefing", JSON.stringify(b));
       } catch {
         /* storage full/blocked — briefing stays in memory */
       }
+      void persistBriefing(b);
     } catch (err) {
+      /* a stale cached briefing is still better than an error panel — keep it visible */
       set({
         briefingBusy: false,
         briefingError:
@@ -267,6 +335,12 @@ export const useSasiStore = create<SasiState>((set, get) => ({
   hydrate: async () => {
     if (get().hydrated || typeof window === "undefined") return;
     set({ hydrated: true }); // guard against double-invoke before the fetch resolves
+    /* restore the demo session flag so Services stays in the app shell across reloads */
+    try {
+      if (window.localStorage.getItem("sasi.authed") === "1") set({ authed: true });
+    } catch {
+      /* storage blocked — session-only */
+    }
     try {
       const res = await fetch(`/api/sasi/state?sessionId=${encodeURIComponent(getSessionId())}`);
       if (!res.ok) return;
@@ -281,6 +355,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         }[];
         evidence?: EvidenceItem[];
         location?: { province: string; city: string; suburb: string };
+        briefings?: CityBriefing[];
       };
 
       set((s) => {
@@ -302,11 +377,15 @@ export const useSasiStore = create<SasiState>((set, get) => ({
                 refs: m.refs,
               }))
             : s.chatMessages;
+        /* merge restored briefings into history (dedupe by generatedAt, newest first) */
+        let history = s.briefingHistory;
+        for (const b of data.briefings ?? []) history = pushBriefingHistory(history, b);
         return {
           cases: userCases.length ? [...userCases, ...s.cases] : s.cases,
           evidence: userEvidence.length ? [...userEvidence, ...s.evidence] : s.evidence,
           chatMessages: chat,
           savedLocation: data.location ?? s.savedLocation,
+          briefingHistory: history,
         };
       });
     } catch {

@@ -50,6 +50,11 @@ const PUBLIC_VIEWS = new Set<View>([
   "signup",
 ]);
 
+/* Views that are public for visitors but live INSIDE the app shell for a
+   signed-in user — opening Services from the sidebar must not feel like a
+   logout (no shell swap, no "Sign in" header). */
+const APP_ELIGIBLE_PUBLIC = new Set<View>(["services", "service-detail"]);
+
 function SplashScreen() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#050505]">
@@ -139,6 +144,7 @@ function ViewRenderer() {
 
 export function SasiApp() {
   const view = useSasiStore((s) => s.view);
+  const authed = useSasiStore((s) => s.authed);
   const hydrate = useSasiStore((s) => s.hydrate);
   const [mounted, setMounted] = useState(false);
 
@@ -151,7 +157,8 @@ export function SasiApp() {
 
   if (!mounted) return <SplashScreen />;
 
-  const isPublic = PUBLIC_VIEWS.has(view);
+  const isPublic =
+    PUBLIC_VIEWS.has(view) && !(authed && APP_ELIGIBLE_PUBLIC.has(view));
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">

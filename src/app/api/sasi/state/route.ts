@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import type { EvidenceItem, SasiCase } from "@/lib/sasi/types";
+import type { CityBriefing, EvidenceItem, SasiCase } from "@/lib/sasi/types";
 
 /* ============================================================
    /api/sasi/state — the "survive a reload" layer.
 
-   GET    ?sessionId=…            → user cases + chat + saved location
-   POST   { type:"case", … }      → upsert a user-created case payload
-   POST   { type:"location", … }  → persist saved location
-   DELETE ?sessionId=&scope=chat  → clear chat history for the session
+   GET    ?sessionId=…              → user cases + chat + saved location + evidence + briefings
+   POST   { type:"case", … }        → upsert a user-created case payload
+   POST   { type:"location", … }    → persist saved location
+   POST   { type:"evidence", … }    → upsert an evidence item
+   POST   { type:"briefing", … }    → append a City briefing snapshot (history)
+   DELETE ?sessionId=&scope=chat    → clear chat history for the session
    ============================================================ */
 
 export const runtime = "nodejs";
@@ -35,7 +37,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [caseRows, chatRows, profile, evidenceRows] = await Promise.all([
+    const [caseRows, chatRows, profile, evidenceRows, briefingRows] = await Promise.all([
       db.caseRecord.findMany({
         where: { sessionId },
         orderBy: { createdAt: "desc" },
@@ -51,6 +53,11 @@ export async function GET(req: Request) {
         where: { sessionId },
         orderBy: { createdAt: "desc" },
         take: 60,
+      }),
+      db.briefingRecord.findMany({
+        where: { sessionId },
+        orderBy: { createdAt: "desc" },
+        take: 8,
       }),
     ]);
 
@@ -69,6 +76,18 @@ export async function GET(req: Request) {
       try {
         const payload = JSON.parse(row.payload) as EvidenceItem;
         if (payload && payload.id) evidence.push(payload);
+      } catch {
+        /* skip corrupt rows */
+      }
+    }
+
+    const briefings: CityBriefing[] = [];
+    for (const row of briefingRows) {
+      try {
+        const payload = JSON.parse(row.payload) as CityBriefing;
+        if (payload && payload.headline && Array.isArray(payload.sections)) {
+          briefings.push(payload);
+        }
       } catch {
         /* skip corrupt rows */
       }
@@ -95,7 +114,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ cases, chat, evidence, location });
+    return NextResponse.json({ cases, chat, evidence, briefings, location });
   } catch (err) {
     console.error("[/api/sasi/state GET] hydrate failed:", err);
     return NextResponse.json(
@@ -113,6 +132,7 @@ export async function POST(req: Request) {
     case?: SasiCase;
     evidence?: EvidenceItem;
     location?: SavedLocation;
+    briefing?: CityBriefing;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -160,6 +180,26 @@ export async function POST(req: Request) {
         update: { payload: JSON.stringify(ev) },
       });
       return NextResponse.json({ ok: true, id: ev.id });
+    }
+
+    if (body.type === "briefing" && body.briefing) {
+      const b = body.briefing;
+      if (!b.headline || !Array.isArray(b.sections)) {
+        return NextResponse.json(
+          { error: "briefing.headline and briefing.sections required." },
+          { status: 400 }
+        );
+      }
+      /* append-only history — the client caps what it keeps (8) */
+      const row = await db.briefingRecord.create({
+        data: {
+          sessionId,
+          risk: String(b.risk ?? "ELEVATED").slice(0, 12),
+          headline: b.headline.slice(0, 200),
+          payload: JSON.stringify(b),
+        },
+      });
+      return NextResponse.json({ ok: true, id: row.id });
     }
 
     if (body.type === "location" && body.location) {
