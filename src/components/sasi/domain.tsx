@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   ArrowUpRight,
   BadgeCheck,
+  Camera,
   CheckCircle2,
   CircleDashed,
   ExternalLink,
@@ -302,6 +303,31 @@ export function EvidenceThumb({
 }) {
   const [imgOk, setImgOk] = useState(true);
   if (item.type === "PHOTO") {
+    /* user-attached, AI-analysed photos: the image itself never persists —
+       render an honest placeholder instead of a stand-in demo photo */
+    if (item.id.startsWith("EVD-user-")) {
+      return (
+        <div
+          className={cn(
+            "relative flex items-center justify-center overflow-hidden rounded-lg border border-[#e3c567]/15",
+            className
+          )}
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(227,197,103,0.10), rgba(5,5,5,0.9) 55%, rgba(100,181,246,0.08))",
+          }}
+          role="img"
+          aria-label={`User photo analysed by SASI: ${item.title}`}
+        >
+          <div className="flex flex-col items-center gap-1.5">
+            <Camera className="h-5 w-5 text-[#e3c567]/70" aria-hidden />
+            <span className="font-mono text-[8.5px] font-semibold tracking-[0.18em] text-zinc-500">
+              YOUR PHOTO · AI-READ
+            </span>
+          </div>
+        </div>
+      );
+    }
     const ph = EVIDENCE_PLACEHOLDER[item.imageKey ?? "leak-street"];
     return (
       <div
@@ -369,6 +395,11 @@ export function EvidenceCard({
         <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-[0.12em] text-zinc-400">
           {item.type}
         </span>
+        {item.id.startsWith("EVD-user-") && (
+          <span className="rounded border border-[#e3c567]/30 bg-[#e3c567]/[0.08] px-1.5 py-0.5 font-mono text-[9px] font-semibold tracking-[0.12em] text-[#e3c567]">
+            AI-READ
+          </span>
+        )}
         <StatusBadge status={item.verification} size="sm" />
         {showCase && item.caseId && (
           <span className="font-mono text-[10px] text-zinc-600">{item.caseId}</span>

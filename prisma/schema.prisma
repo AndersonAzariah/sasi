@@ -46,3 +46,16 @@ model Profile {
   location  String? // JSON { province, city, suburb }
   updatedAt DateTime @updatedAt
 }
+
+/// One evidence item added by the user (photo note / link / analysed photo).
+/// Full EvidenceItem payload as JSON, deduped client-side by id.
+model EvidenceRecord {
+  id         String   @id @default(cuid())
+  evidenceId String   @unique // client EvidenceItem.id
+  sessionId  String
+  payload    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([sessionId])
+}

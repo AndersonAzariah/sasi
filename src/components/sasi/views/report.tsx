@@ -2,24 +2,27 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  Camera,
   Check,
   CheckCircle2,
   Link2,
   Loader2,
+  RefreshCw,
+  ScanSearch,
   ShieldCheck,
   StickyNote,
-  Upload,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
 import { POPULAR_SERVICES, SERVICE_REPORT_OPTIONS } from "@/lib/sasi/data";
 import { SERVICES, formatDate } from "@/lib/sasi/utils";
-import type { ServiceKey } from "@/lib/sasi/types";
+import type { EvidenceAnalysis, ServiceKey } from "@/lib/sasi/types";
 import {
   DemoBadge,
   GhostButton,
@@ -61,22 +64,29 @@ const LOCATION_CHIPS = [
   "Pretoria",
 ];
 
-type EvidenceChip = { id: string; kind: "note" | "link"; value: string };
+type EvidenceChip = { id: string; kind: "note" | "link" | "photo"; value: string };
 
 function serializeEvidence(items: EvidenceChip[]): string {
   return items
-    .map((i) => `${i.kind === "note" ? "Note" : "Link"}: ${i.value}`)
+    .map((i) =>
+      `${i.kind === "photo" ? "Photo" : i.kind === "link" ? "Link" : "Note"}: ${i.value}`
+    )
     .join(" | ");
 }
 
 function parseEvidenceNote(note: string): EvidenceChip[] {
   if (!note) return [];
   return note.split(" | ").map((part, i) => {
-    const isLink = part.toLowerCase().startsWith("link:");
+    const lower = part.toLowerCase();
+    const kind: EvidenceChip["kind"] = lower.startsWith("link:")
+      ? "link"
+      : lower.startsWith("photo:")
+        ? "photo"
+        : "note";
     return {
       id: `evd-${i}-${Math.random().toString(36).slice(2, 6)}`,
-      kind: isLink ? "link" : "note",
-      value: part.replace(/^(note|link):\s*/i, ""),
+      kind,
+      value: part.replace(/^(note|link|photo):\s*/i, ""),
     };
   });
 }
@@ -87,6 +97,44 @@ function whenLabel(w: string): string {
   if (w === "older") return "More than 2 days ago";
   if (w) return formatDate(w);
   return "—";
+}
+
+/* ---------- photo → analysis support ---------- */
+
+const SEVERITY_STYLE: Record<EvidenceAnalysis["severity"], string> = {
+  LOW: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+  MEDIUM: "border-[#e3c567]/35 bg-[#e3c567]/10 text-[#e3c567]",
+  HIGH: "border-orange-400/35 bg-orange-400/10 text-orange-300",
+  CRITICAL: "border-[#ef5350]/40 bg-[#ef5350]/10 text-[#fda4a0]",
+};
+
+/** Read a File, downscale to ≤1280px and re-encode as compact JPEG. */
+async function fileToScaledDataUrl(
+  file: File,
+  maxDim = 1280,
+  quality = 0.82
+): Promise<string> {
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = () => rej(new Error("SASI could not read that file."));
+    r.readAsDataURL(file);
+  });
+  const img = document.createElement("img");
+  await new Promise<void>((res, rej) => {
+    img.onload = () => res();
+    img.onerror = () => rej(new Error("That file is not a readable image."));
+    img.src = dataUrl;
+  });
+  const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+  if (scale >= 1 && dataUrl.length < 2_600_000) return dataUrl;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", quality);
 }
 
 /* ---------- shared input styles ---------- */
@@ -172,7 +220,14 @@ export default function ReportView() {
   );
   const [noteInput, setNoteInput] = useState("");
   const [linkInput, setLinkInput] = useState("");
-  const [uploadNote, setUploadNote] = useState(false);
+
+  /* ---- photo evidence + SASI vision analysis ---- */
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [photo, setPhoto] = useState<{ dataUrl: string; name: string } | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<EvidenceAnalysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const analysisUsedRef = useRef(false);
 
   const doneRef = useRef(false);
   const problemInputRef = useRef<HTMLInputElement | null>(null);
@@ -235,6 +290,94 @@ export default function ReportView() {
     setEvidenceItems((prev) => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, kind, value }]);
     if (kind === "note") setNoteInput("");
     else setLinkInput("");
+  };
+
+  /* ---- SASI vision: pick → downscale → analyse ---- */
+  const runPhotoAnalysis = async (dataUrl: string) => {
+    setAnalyzing(true);
+    setAnalysis(null);
+    setAnalysisError(null);
+    try {
+      const res = await fetch("/api/sasi/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: dataUrl,
+          context: { service, problem, location },
+        }),
+      });
+      const data = (await res.json()) as { analysis?: EvidenceAnalysis; error?: string };
+      if (!res.ok || !data.analysis) {
+        throw new Error(data.error ?? "SASI could not analyse that photo.");
+      }
+      setAnalysis(data.analysis);
+      analysisUsedRef.current = false;
+    } catch (err) {
+      setAnalysisError(
+        err instanceof Error && err.message
+          ? err.message
+          : "SASI could not analyse that photo just now."
+      );
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handlePhotoFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+      setAnalysisError("SASI can read PNG, JPEG or WebP photos.");
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      setAnalysisError("That photo is very large — try one under about 10 MB.");
+      return;
+    }
+    try {
+      const dataUrl = await fileToScaledDataUrl(file);
+      setPhoto({ dataUrl, name: file.name });
+      setAnalysis(null);
+      setAnalysisError(null);
+      void runPhotoAnalysis(dataUrl);
+    } catch (err) {
+      setAnalysisError(
+        err instanceof Error ? err.message : "SASI could not read that file."
+      );
+    }
+  };
+
+  const useAnalysisAsNote = () => {
+    if (!analysis || analysisUsedRef.current) return;
+    analysisUsedRef.current = true;
+    const caption = analysis.suggested_caption || "Photo evidence";
+    setEvidenceItems((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-photo`,
+        kind: "photo",
+        value: `${caption} · SASI visual analysis (AI-inferred)`,
+      },
+    ]);
+    useSasiStore.getState().addEvidence({
+      id: `EVD-user-${Date.now()}`,
+      type: "PHOTO",
+      title: caption,
+      description: analysis.what_i_see,
+      createdAt: new Date().toISOString(),
+      location: location.trim() || undefined,
+      verification: "UNVERIFIED",
+      isDemo: true,
+    });
+    toast.success("Photo filed as evidence", {
+      description: "It is in your Evidence Vault and on this report — labelled AI-inferred, not proof.",
+    });
+  };
+
+  const clearPhoto = () => {
+    setPhoto(null);
+    setAnalysis(null);
+    setAnalysisError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = () => {
@@ -497,23 +640,202 @@ export default function ReportView() {
           <StepShell>
             <div>
               <SectionLabel className="mb-2">Evidence (optional)</SectionLabel>
-              <button
-                onClick={() => setUploadNote(true)}
-                className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.015] px-4 py-7 text-center transition-colors hover:border-white/25 hover:bg-white/[0.03]"
-                aria-label="Add photo or file evidence"
-              >
-                <Upload className="h-5 w-5 text-zinc-500" aria-hidden />
-                <span className="text-[13px] font-medium text-zinc-300">
-                  Add a photo or file
-                </span>
-                <span className="text-[11.5px] text-zinc-600">
-                  Tap to see what is supported in this demo
-                </span>
-              </button>
-              {uploadNote && (
-                <p className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-zinc-400">
-                  File upload is coming soon. For the demo, add a note or link below.
-                </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => void handlePhotoFile(e.target.files?.[0])}
+              />
+              {!photo ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="group flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.015] px-4 py-7 text-center transition-colors hover:border-[#e3c567]/40 hover:bg-white/[0.03]"
+                  aria-label="Add a photo for SASI to analyse"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-zinc-400 transition group-hover:border-[#e3c567]/30 group-hover:text-[#e3c567]">
+                    <Camera className="h-[18px] w-[18px]" aria-hidden />
+                  </span>
+                  <span className="text-[13px] font-medium text-zinc-200">
+                    Add a photo — SASI will read it
+                  </span>
+                  <span className="text-[11.5px] text-zinc-600">
+                    PNG, JPEG or WebP · analysed on-device and never shared without approval
+                  </span>
+                </button>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-white/10">
+                  <div className="relative">
+                    <img
+                      src={photo.dataUrl}
+                      alt={`Attached evidence: ${photo.name}`}
+                      className="max-h-44 w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearPhoto}
+                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-black/60 text-zinc-300 backdrop-blur transition hover:text-white"
+                      aria-label="Remove photo"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                    <span className="absolute bottom-2 left-2 rounded-md border border-white/15 bg-black/60 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-zinc-300 backdrop-blur">
+                      Attached · demo
+                    </span>
+                  </div>
+
+                  <div className="border-t border-white/8 bg-white/[0.02] p-3.5">
+                    {analyzing && (
+                      <div className="flex items-start gap-3">
+                        <div className="sasi-glow-soft mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e3c567]/25 bg-[#e3c567]/10">
+                          <Loader2
+                            className="h-4 w-4 animate-spin text-[#e3c567]"
+                            aria-hidden
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12.5px] font-medium text-zinc-200">
+                            SASI is reading the photo…
+                          </p>
+                          <div className="mt-2 space-y-1.5">
+                            <div className="sasi-skeleton h-2.5 w-11/12" />
+                            <div className="sasi-skeleton h-2.5 w-3/4" />
+                            <div className="sasi-skeleton h-2.5 w-2/3" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!analyzing && analysisError && (
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#ef5350]/30 bg-[#ef5350]/10 text-[#ef5350]">
+                          <AlertCircle className="h-4 w-4" aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12.5px] text-[#fda4a0]">{analysisError}</p>
+                          <button
+                            type="button"
+                            onClick={() => void runPhotoAnalysis(photo.dataUrl)}
+                            className="mt-1.5 inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.04] px-2.5 text-[11.5px] text-zinc-300 transition hover:border-white/25 hover:text-white"
+                          >
+                            <RefreshCw className="h-3 w-3" aria-hidden />
+                            Try again
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!analyzing && analysis && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ScanSearch
+                            className="h-4 w-4 shrink-0 text-[#e3c567]"
+                            aria-hidden
+                          />
+                          <p className="min-w-0 flex-1 text-[12.5px] font-semibold text-white">
+                            SASI visual analysis
+                          </p>
+                          <span
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wider",
+                              SEVERITY_STYLE[analysis.severity]
+                            )}
+                          >
+                            {analysis.severity}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-300">
+                          {analysis.what_i_see}
+                        </p>
+
+                        {analysis.service_guess && (
+                          <p className="mt-2 text-[11.5px] text-zinc-500">
+                            Reads like:{" "}
+                            <span className="font-medium text-zinc-300">
+                              {analysis.service_guess}
+                            </span>
+                            {analysis.service_guess !== service && (
+                              <button
+                                type="button"
+                                onClick={() => setService(analysis.service_guess)}
+                                className="ml-1.5 text-[11px] font-medium text-[#e3c567] underline decoration-[#e3c567]/40 underline-offset-2 transition hover:decoration-[#e3c567]"
+                              >
+                                change report to {analysis.service_guess}
+                              </button>
+                            )}
+                          </p>
+                        )}
+
+                        {analysis.useful_for.length > 0 && (
+                          <div className="mt-2.5 space-y-1">
+                            {analysis.useful_for.map((u, i) => (
+                              <div key={i} className="flex gap-2">
+                                <span
+                                  className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-[#e3c567]/70"
+                                  aria-hidden
+                                />
+                                <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-zinc-400">
+                                  {u}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {analysis.notable.length > 0 && (
+                          <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-500">
+                            Also noted: {analysis.notable.join(" · ")}
+                          </p>
+                        )}
+
+                        {analysis.quality_tip && (
+                          <p className="mt-2 rounded-lg border border-white/8 bg-white/[0.03] px-2.5 py-2 text-[11px] leading-relaxed text-zinc-500">
+                            <span className="font-medium text-zinc-400">Better photo tip: </span>
+                            {analysis.quality_tip}
+                          </p>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {!analysisUsedRef.current ? (
+                            <button
+                              type="button"
+                              onClick={useAnalysisAsNote}
+                              className="sasi-btn-sheen inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-[12px] font-medium text-black transition hover:bg-zinc-200 active:scale-[0.98]"
+                            >
+                              <Check className="h-3.5 w-3.5" aria-hidden />
+                              Use as evidence note
+                            </button>
+                          ) : (
+                            <span className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#66bb6a]/25 bg-[#66bb6a]/10 px-3 text-[12px] font-medium text-[#8fd694]">
+                              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                              Filed as evidence
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => void runPhotoAnalysis(photo.dataUrl)}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.03] px-2.5 text-[12px] text-zinc-400 transition hover:border-white/25 hover:text-zinc-200"
+                          >
+                            <RefreshCw className="h-3 w-3" aria-hidden />
+                            Re-analyse
+                          </button>
+                        </div>
+
+                        <p className="mt-2.5 flex items-center gap-1.5 text-[10px] text-zinc-600">
+                          <ShieldCheck className="h-3 w-3 shrink-0 text-zinc-600" aria-hidden />
+                          AI-assisted read — not proof and not an official finding. SASI marks it
+                          AI-inferred.
+                        </p>
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
               )}
 
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -580,10 +902,17 @@ export default function ReportView() {
                   {evidenceItems.map((item) => (
                     <span
                       key={item.id}
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] py-1 pl-2.5 pr-1.5 text-[11.5px] text-zinc-300"
+                      className={cn(
+                        "inline-flex max-w-full items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-1.5 text-[11.5px]",
+                        item.kind === "photo"
+                          ? "border-[#e3c567]/30 bg-[#e3c567]/[0.08] text-[#e3c567]"
+                          : "border-white/10 bg-white/[0.04] text-zinc-300"
+                      )}
                     >
                       {item.kind === "note" ? (
                         <StickyNote className="h-3 w-3 shrink-0 text-zinc-500" aria-hidden />
+                      ) : item.kind === "photo" ? (
+                        <Camera className="h-3 w-3 shrink-0 text-[#e3c567]" aria-hidden />
                       ) : (
                         <Link2 className="h-3 w-3 shrink-0 text-zinc-500" aria-hidden />
                       )}

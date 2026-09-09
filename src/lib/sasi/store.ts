@@ -105,6 +105,14 @@ interface SasiState {
 let caseCounter = 124;
 let eventCounter = 100;
 
+/** keep ref generation ahead of any case restored from the persisted store */
+function bumpCaseCounterFrom(c: SasiCase) {
+  const refNum = Number(/^CASE-(\d{6})$/.exec(c.ref)?.[1] ?? 0);
+  const idNum = Number(/^case-new-(\d+)$/.exec(c.id)?.[1] ?? 0);
+  const max = Math.max(refNum, idNum);
+  if (Number.isFinite(max) && max >= caseCounter) caseCounter = max + 1;
+}
+
 /* ---------- persistence helpers (fire-and-forget; the demo never blocks on storage) ---------- */
 
 async function persistCase(c: SasiCase) {
@@ -196,12 +204,17 @@ export const useSasiStore = create<SasiState>((set, get) => ({
           at: string;
           refs?: string[];
         }[];
+        evidence?: EvidenceItem[];
         location?: { province: string; city: string; suburb: string };
       };
 
       set((s) => {
         const userCases = (data.cases ?? []).filter(
           (c) => !s.cases.some((existing) => existing.ref === c.ref)
+        );
+        for (const c of data.cases ?? []) bumpCaseCounterFrom(c);
+        const userEvidence = (data.evidence ?? []).filter(
+          (ev) => !s.evidence.some((existing) => existing.id === ev.id)
         );
         const chat =
           s.chatMessages.length === 0 && (data.chat?.length ?? 0) > 0
@@ -216,6 +229,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
             : s.chatMessages;
         return {
           cases: userCases.length ? [...userCases, ...s.cases] : s.cases,
+          evidence: userEvidence.length ? [...userEvidence, ...s.evidence] : s.evidence,
           chatMessages: chat,
           savedLocation: data.location ?? s.savedLocation,
         };
@@ -322,7 +336,14 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     set((s) => ({
       findings: { ...s.findings, [caseId]: [...(s.findings[caseId] ?? []), finding] },
     })),
-  addEvidence: (item) => set((s) => ({ evidence: [item, ...s.evidence] })),
+  addEvidence: (item) => {
+    set((s) => ({ evidence: [item, ...s.evidence] }));
+    void fetch("/api/sasi/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "evidence", sessionId: getSessionId(), evidence: item }),
+    }).catch(() => undefined);
+  },
   persistCaseById: (caseId) => {
     const c = get().cases.find((x) => x.id === caseId);
     if (c) void persistCase(c);

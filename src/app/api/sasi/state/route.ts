@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import type { SasiCase } from "@/lib/sasi/types";
+import type { EvidenceItem, SasiCase } from "@/lib/sasi/types";
 
 /* ============================================================
    /api/sasi/state — the "survive a reload" layer.
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [caseRows, chatRows, profile] = await Promise.all([
+    const [caseRows, chatRows, profile, evidenceRows] = await Promise.all([
       db.caseRecord.findMany({
         where: { sessionId },
         orderBy: { createdAt: "desc" },
@@ -47,6 +47,11 @@ export async function GET(req: Request) {
         take: 100,
       }),
       db.profile.findUnique({ where: { sessionId } }),
+      db.evidenceRecord.findMany({
+        where: { sessionId },
+        orderBy: { createdAt: "desc" },
+        take: 60,
+      }),
     ]);
 
     const cases: SasiCase[] = [];
@@ -56,6 +61,16 @@ export async function GET(req: Request) {
         if (payload && payload.id && payload.ref) cases.push(payload);
       } catch {
         /* corrupted row — skip, never block hydration */
+      }
+    }
+
+    const evidence: EvidenceItem[] = [];
+    for (const row of evidenceRows) {
+      try {
+        const payload = JSON.parse(row.payload) as EvidenceItem;
+        if (payload && payload.id) evidence.push(payload);
+      } catch {
+        /* skip corrupt rows */
       }
     }
 
@@ -80,7 +95,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ cases, chat, location });
+    return NextResponse.json({ cases, chat, evidence, location });
   } catch (err) {
     console.error("[/api/sasi/state GET] hydrate failed:", err);
     return NextResponse.json(
@@ -96,6 +111,7 @@ export async function POST(req: Request) {
     type?: string;
     sessionId?: string;
     case?: SasiCase;
+    evidence?: EvidenceItem;
     location?: SavedLocation;
   };
   try {
@@ -127,6 +143,23 @@ export async function POST(req: Request) {
         update: { payload: JSON.stringify(c), title: (c.title ?? "Report").slice(0, 200) },
       });
       return NextResponse.json({ ok: true, ref: c.ref });
+    }
+
+    if (body.type === "evidence" && body.evidence) {
+      const ev = body.evidence;
+      if (!ev.id) {
+        return NextResponse.json({ error: "evidence.id required." }, { status: 400 });
+      }
+      await db.evidenceRecord.upsert({
+        where: { evidenceId: ev.id },
+        create: {
+          evidenceId: ev.id,
+          sessionId,
+          payload: JSON.stringify(ev),
+        },
+        update: { payload: JSON.stringify(ev) },
+      });
+      return NextResponse.json({ ok: true, id: ev.id });
     }
 
     if (body.type === "location" && body.location) {

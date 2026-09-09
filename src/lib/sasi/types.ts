@@ -270,6 +270,24 @@ export interface AgentEvent {
 
 export type ChatRole = "user" | "assistant";
 
+/* ---------- VLM photo analysis (report wizard / evidence) ---------- */
+
+export interface EvidenceAnalysis {
+  /** factual 1-2 sentence description of the scene */
+  what_i_see: string;
+  /** one of the ServiceKey-ish guesses ("water", "roads", …) */
+  service_guess: string;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  /** what this photo helps document/prove */
+  useful_for: string[];
+  /** short observations: hazards, landmarks, infrastructure */
+  notable: string[];
+  /** caption suitable as an evidence note */
+  suggested_caption: string;
+  /** one tip to improve the photo as evidence */
+  quality_tip: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
