@@ -25,10 +25,10 @@ import { useSasiStore } from "@/lib/sasi/store";
 import { toast } from "sonner";
 import type { ChatMessage } from "@/lib/sasi/types";
 import { RichText } from "../rich-text";
-import { DemoBadge } from "../primitives";
 
 /* ============================================================
-   ASK SASI — free-text civic assistant (LLM-backed, demo data)
+   ASK SASI — free-text civic assistant (LLM-backed, grounded only
+   in what you provide)
    ============================================================ */
 
 const SUGGESTIONS: {
@@ -48,7 +48,7 @@ const SUGGESTIONS: {
   },
   {
     icon: ScrollText,
-    q: "What does my case CASE-000123 status mean?",
+    q: "What is the status of my case?",
     hint: "Your cases · explained",
   },
   {
@@ -279,10 +279,9 @@ export default function AskSasiView() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-[15px] font-semibold text-white">Ask SASI</h1>
-              <DemoBadge />
             </div>
             <p className="truncate text-[11.5px] text-zinc-500">
-              Service assistant · grounded in public information and your demo data
+              Answers are AI-assisted — unverified. Grounded only in what you provide.
             </p>
           </div>
           <button
@@ -478,7 +477,7 @@ export default function AskSasiView() {
             <div className="pointer-events-none absolute -inset-x-3 -top-6 h-6 bg-gradient-to-t from-[#050505] to-transparent" aria-hidden />
             <div
               className={cn(
-                "sasi-pulse flex items-end gap-2 rounded-xl border border-white/10 bg-[#0b0b0c] p-2 pl-3.5 shadow-xl shadow-black/50 transition focus-within:border-white/20",
+                "sasi-search-glow flex items-end gap-2 rounded-xl border border-white/10 bg-[#0b0b0c] p-2 pl-3.5 shadow-xl shadow-black/50 transition focus-within:border-white/20",
                 chatBusy && "opacity-90"
               )}
             >

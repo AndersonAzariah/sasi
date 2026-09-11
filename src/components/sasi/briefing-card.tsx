@@ -25,15 +25,18 @@ import { SectionLabel } from "./primitives";
 
 /* ============================================================
    CityBriefingCard — the dashboard's AI-written daily digest.
-   Grounded in the user's demo dataset (cases + incidents +
-   saved location) via POST /api/sasi/briefing. Cached in
-   sessionStorage for the browser session and persisted to the
-   briefing history (SQLite) so past briefings can be reopened.
-   Stale briefings (>6h) are quietly rewritten on mount.
-   Chat-distilled briefings carry a FROM YOUR CHAT origin tag and
-   a "City mode" chip that swaps the daily digest back for free.
-   Honest framing: AI-generated, demo data, refs clickable,
-   and a "SASI can be wrong" trust line.
+   Grounded ONLY in the resident's own material (their cases via
+   POST /api/sasi/briefing; chat-distilled cards from their own
+   conversation). No dataset exists behind it: with no user
+   material the card shows an honest "nothing to brief yet"
+   state instead of inventing content. Cached in sessionStorage
+   for the browser session and persisted to the briefing history
+   (SQLite) so past briefings can be reopened. Stale briefings
+   (>6h) are quietly rewritten on mount. Chat-distilled briefings
+   carry a FROM YOUR CHAT origin tag and a "City mode" chip that
+   swaps the daily digest back for free. Honest framing:
+   AI-generated, user-grounded, refs clickable, and a "SASI can
+   be wrong" trust line.
    ============================================================ */
 
 const RISK_META: Record<
@@ -169,10 +172,11 @@ function BriefingBody({
       )}
 
       <p className="mt-4 border-t border-white/5 pt-3 text-[11px] leading-relaxed text-zinc-600">
-        Written by SASI&apos;s AI from your demo data —{" "}
+        Written by SASI&apos;s AI only from your own reports, cases and
+        conversations —{" "}
         <span className="text-zinc-500">{timeAgo(briefing.generatedAt)}</span> · for{" "}
-        {briefing.locationLabel}. SASI can be wrong; nothing here is an official
-        statement and nothing is shared with any authority.
+        {briefing.locationLabel || "your area"}. SASI can be wrong; nothing here
+        is an official statement and nothing is shared with any authority.
       </p>
     </>
   );
@@ -229,6 +233,7 @@ export function CityBriefingCard() {
   const briefing = useSasiStore((s) => s.briefing);
   const busy = useSasiStore((s) => s.briefingBusy);
   const error = useSasiStore((s) => s.briefingError);
+  const empty = useSasiStore((s) => s.briefingEmpty);
   const history = useSasiStore((s) => s.briefingHistory);
   const generateBriefing = useSasiStore((s) => s.generateBriefing);
   const restoreCityBriefing = useSasiStore((s) => s.restoreCityBriefing);
@@ -253,7 +258,7 @@ export function CityBriefingCard() {
     if (ref.startsWith("CASE-")) {
       if (cases.some((c) => c.ref === ref)) openCase(ref);
       else
-        toast("Reference not in this demo record", {
+        toast("Reference not in your records", {
           description: `The briefing cited ${ref}, which SASI cannot open here. Treated as a note.`,
         });
     } else {
@@ -308,7 +313,7 @@ export function CityBriefingCard() {
             </span>
           ) : (
             <span className="font-mono text-[9.5px] tracking-[0.14em] text-zinc-700">
-              DAILY · DEMO
+              DAILY · YOUR DATA
             </span>
           )}
         </div>
@@ -373,6 +378,27 @@ export function CityBriefingCard() {
           <p className="pt-1 font-mono text-[10px] tracking-[0.14em] text-zinc-600">
             SASI IS WRITING TODAY&apos;S BRIEFING…
           </p>
+        </div>
+      )}
+
+      {/* ---------- honest empty state: nothing to brief from yet ---------- */}
+      {empty && !busy && !shown && (
+        <div className="mt-4 rounded-lg border border-white/8 bg-white/[0.02] p-4">
+          <p className="flex items-center gap-2 text-[13px] font-medium text-zinc-300">
+            <Newspaper className="h-4 w-4 text-zinc-500" aria-hidden />
+            Nothing to brief yet
+          </p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-500">
+            Your briefing is written only from your own reports, cases and
+            conversations — SASI doesn&apos;t invent city-wide news. Report an
+            issue and today&apos;s card will be about it.
+          </p>
+          <button
+            onClick={() => navigate("report")}
+            className="mt-2.5 text-[12px] font-medium text-[#e3c567] transition-colors hover:text-[#f0d98c]"
+          >
+            Report an issue
+          </button>
         </div>
       )}
 

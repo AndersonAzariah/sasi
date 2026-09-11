@@ -1,361 +1,223 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  ArrowUpRight,
-  ChevronRight,
-  Search,
-  ShieldAlert,
-  Sparkles,
-} from "lucide-react";
+import { Bell, ChevronRight, Inbox, NotebookPen, Sparkles } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { useT } from "@/lib/sasi/i18n";
-import { ACTIVITY, DEMO_NOW, DEMO_USER, INCIDENTS } from "@/lib/sasi/data";
-import { SERVICES } from "@/lib/sasi/utils";
-import type { ServiceKey, View } from "@/lib/sasi/types";
+import { DEMO_USER } from "@/lib/sasi/data";
+import { timeAgo } from "@/lib/sasi/utils";
+import type { SasiCase } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
-import { ActivityRow, CaseCard, IncidentCard } from "@/components/sasi/domain";
+import { NotificationRow } from "@/components/sasi/domain";
 import { CityBriefingCard } from "@/components/sasi/briefing-card";
 import {
-  DemoBadge,
-  GhostButton,
-  PrimaryButton,
+  CaseStatusBadge,
   SectionLabel,
   ServiceIcon,
   SERVICE_TINT,
-  SasiPulse,
-  StatTile,
 } from "@/components/sasi/primitives";
 
-const SHORTCUTS: ServiceKey[] = ["water", "electricity", "roads", "waste"];
+/* ============================================================
+   DASHBOARD — a calm home that only ever shows what the user
+   actually created. No demo dataset, no stat tiles, no sample
+   incidents: greeting + two actions, then at most three quiet
+   sections gated on real data (cases / briefing / unread
+   notifications). Everything else is one honest empty state.
+   ============================================================ */
 
-const TIPS: { key: "dash.tip.report" | "dash.tip.investigate" | "dash.tip.incidents"; view: View }[] = [
-  { key: "dash.tip.report", view: "report" },
-  { key: "dash.tip.investigate", view: "start-investigation" },
-  { key: "dash.tip.incidents", view: "incidents" },
-];
+type GreetingKey = "dash.greeting.morning" | "dash.greeting.afternoon" | "dash.greeting.evening";
 
-function greetingKeyForDemo(): "dash.greeting.morning" | "dash.greeting.afternoon" | "dash.greeting.evening" {
-  const h = new Date(DEMO_NOW).getHours();
+/* greeting follows the user's real clock — not a demo timestamp */
+function greetingKeyForNow(): GreetingKey {
+  const h = new Date().getHours();
   if (h < 12) return "dash.greeting.morning";
   if (h < 17) return "dash.greeting.afternoon";
   return "dash.greeting.evening";
 }
 
+/* one honest status line, derived ONLY from the user's own cases */
+function statusLine(cases: SasiCase[]): string {
+  if (cases.length === 0) return "Nothing on your plate yet.";
+  const active = cases.filter((c) => c.status !== "RESOLVED" && c.status !== "CLOSED");
+  const waiting = cases.filter((c) => c.status === "ACTION_REQUIRED").length;
+  if (active.length === 0) return "All caught up — no open reports.";
+  const base =
+    active.length === 1 ? "1 report is open" : `${active.length} reports are open`;
+  if (waiting === 0) return `${base}.`;
+  return waiting === 1
+    ? `${base}, 1 is waiting for your approval.`
+    : `${base}, ${waiting} are waiting for your approval.`;
+}
+
+/* ---------- quiet case row (no cards, no demo chrome) ---------- */
+
+function CaseRow({ c, onOpen }: { c: SasiCase; onOpen: () => void }) {
+  return (
+    <button
+      onClick={onOpen}
+      className="group flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.03]"
+      aria-label={`Open case ${c.ref}: ${c.title}`}
+    >
+      <span
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03]",
+          SERVICE_TINT[c.service]
+        )}
+      >
+        <ServiceIcon service={c.service} className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13.5px] font-medium text-zinc-100">
+          {c.title}
+        </span>
+        <span className="mt-0.5 block truncate font-mono text-[10px] tracking-wider text-zinc-600">
+          {c.ref} · updated {timeAgo(c.updatedAt)}
+        </span>
+      </span>
+      <CaseStatusBadge status={c.status} />
+      <ChevronRight
+        className="h-3.5 w-3.5 shrink-0 text-zinc-700 transition-colors group-hover:text-zinc-400"
+        aria-hidden
+      />
+    </button>
+  );
+}
+
+/* ---------- the one premium empty state ---------- */
+
+function NothingHereYet({ onReport }: { onReport: () => void }) {
+  return (
+    <section
+      aria-label="Nothing here yet"
+      className="sasi-card mt-10 flex flex-col items-center px-6 py-14 text-center"
+    >
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03]">
+        <Inbox className="h-5 w-5 text-zinc-400" aria-hidden />
+      </div>
+      <p className="sasi-serif mt-5 text-[16.5px] text-white">Nothing here yet</p>
+      <p className="mt-2 max-w-sm text-[13px] leading-relaxed text-zinc-500">
+        Your reports, briefings and answers appear here once you create them —
+        nothing is pre-filled.
+      </p>
+      <button
+        onClick={onReport}
+        className="sasi-btn-glass mt-6 flex h-10 items-center gap-2 rounded-xl px-4 text-[13px] font-medium text-zinc-100"
+      >
+        <NotebookPen className="h-3.5 w-3.5" aria-hidden />
+        Report an issue
+      </button>
+    </section>
+  );
+}
+
 export default function DashboardView() {
   const navigate = useSasiStore((s) => s.navigate);
-  const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
   const openCase = useSasiStore((s) => s.openCase);
-  const openIncident = useSasiStore((s) => s.openIncident);
-  const openService = useSasiStore((s) => s.openService);
+  const markNotificationRead = useSasiStore((s) => s.markNotificationRead);
   const cases = useSasiStore((s) => s.cases);
-  const savedLocation = useSasiStore((s) => s.savedLocation);
+  const briefing = useSasiStore((s) => s.briefing);
+  const notifications = useSasiStore((s) => s.notifications);
   const t = useT();
 
   const sortedCases = useMemo(
     () => [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [cases]
   );
+  const unread = useMemo(() => notifications.filter((n) => !n.read), [notifications]);
 
-  const activeCount = cases.filter(
-    (c) => c.status !== "RESOLVED" && c.status !== "CLOSED"
-  ).length;
-  const investigatingCount = cases.filter(
-    (c) => c.aiState !== "IDLE" && c.aiState !== "COMPLETE"
-  ).length;
-  const actionCount = cases.filter((c) => c.status === "ACTION_REQUIRED").length;
-
-  const flagship = cases.find((c) => c.id === "case-123");
-  const flagshipAction = flagship?.proposedAction;
-  const actionPending = flagshipAction?.state === "PROPOSED";
-  const actionRunning =
-    flagshipAction?.state === "APPROVED" || flagshipAction?.state === "IN_PROGRESS";
-  const actionDone = flagshipAction?.state === "COMPLETED";
+  const hasData = cases.length > 0 || briefing !== null || unread.length > 0;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* ---------- Header ---------- */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-semibold tracking-tight text-white">
-              {t(greetingKeyForDemo())}, {DEMO_USER.firstName}.
-            </h1>
-            <DemoBadge />
-          </div>
-          <p className="mt-1 text-[13px] text-zinc-500">
-            {t("dash.picture.for")} {savedLocation.city},{" "}
-            {savedLocation.province}.
-          </p>
-        </div>
-        <GhostButton onClick={() => navigate("start-investigation")}>
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          {t("dash.start-investigation")}
-        </GhostButton>
-      </div>
-
-      {/* ---------- Command card ---------- */}
-      <div className="sasi-command-focus mt-6 rounded-xl">
-        <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] pl-4 transition-colors hover:border-white/20 hover:bg-white/[0.04]">
+    <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:py-14">
+      {/* ---------- greeting + the two primary actions ---------- */}
+      <header>
+        <h1 className="sasi-serif text-[24px] tracking-tight text-white sm:text-[27px]">
+          {t(greetingKeyForNow())}, {DEMO_USER.firstName}.
+        </h1>
+        <p className="mt-1.5 text-[13.5px] text-zinc-500">{statusLine(cases)}</p>
+        <div className="mt-6 flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => setCommandOpen(true)}
-            className="flex h-full min-w-0 flex-1 items-center gap-3 text-left"
-            aria-label="Ask SASI — open the command palette"
+            onClick={() => navigate("report")}
+            className="sasi-btn-white-glass flex h-11 items-center gap-2 rounded-xl px-5 text-[13.5px] font-semibold"
           >
-            <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-            <span className="min-w-0 flex-1 truncate text-[14px] text-zinc-500">
-              {t("dash.command.placeholder")}
-            </span>
+            <NotebookPen className="h-4 w-4" aria-hidden />
+            Report an issue
           </button>
-          <div
-            className="h-6 w-px shrink-0 bg-white/8"
-            role="separator"
-            aria-orientation="vertical"
-          />
           <button
             onClick={() => navigate("ask-sasi")}
-            className="group flex h-full shrink-0 items-center gap-1.5 pr-2.5 pl-1 text-[12.5px] font-medium text-zinc-400 transition-colors hover:text-[#e3c567]"
-            aria-label="Open the Ask SASI chat"
+            className="sasi-btn-glass flex h-11 items-center gap-2 rounded-xl px-5 text-[13.5px] font-medium text-zinc-100"
           >
-            <Sparkles className="h-3.5 w-3.5 transition-colors group-hover:text-[#e3c567]" aria-hidden />
-            <span className="hidden sm:inline">Ask SASI</span>
+            <Sparkles className="h-4 w-4 text-[#e3c567]" aria-hidden />
+            Ask SASI
           </button>
-          <kbd className="mr-3 hidden shrink-0 items-center rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 sm:flex">
-            ⌘K
-          </kbd>
         </div>
-      </div>
+      </header>
 
-      {/* ---------- Stat tiles ---------- */}
-      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label={t("dash.stat.active-cases")} value={activeCount} tone="default" />
-        <StatTile label={t("dash.stat.investigating")} value={investigatingCount} tone="blue" />
-        <StatTile label={t("dash.stat.action-required")} value={actionCount} tone="gold" />
-        <StatTile
-          label={t("dash.stat.nearby-incidents")}
-          value={INCIDENTS.length}
-          hint={t("dash.hint.demo-dataset")}
-          tone="red"
-        />
-      </div>
+      {hasData ? (
+        <div className="mt-10 space-y-8">
+          {/* pinned briefing — only when one actually exists */}
+          {briefing && <CityBriefingCard />}
 
-      {/* ---------- Main grid ---------- */}
-      <div className="mt-6 grid grid-cols-12 gap-5">
-        {/* LEFT — 8 cols */}
-        <div className="col-span-12 space-y-7 lg:col-span-8">
-          <CityBriefingCard />
-
-          <section aria-label={t("dash.current-cases")}>
-            <div className="flex items-center justify-between gap-2">
-              <SectionLabel>{t("dash.current-cases")}</SectionLabel>
-              <span className="font-mono text-[10px] tracking-wider text-zinc-600">
-                {cases.length} {t("dash.on-record")}
-              </span>
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {sortedCases.map((c) => (
-                <CaseCard key={c.id} c={c} onOpen={() => openCase(c.ref)} />
-              ))}
-            </div>
-            <button
-              onClick={() => navigate("cases")}
-              className="mt-3.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-zinc-500 transition-colors hover:text-white"
-            >
-              {t("dash.view-all-cases")}
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          </section>
-
-          <section aria-label={t("dash.nearby")}>
-            <div className="flex items-center gap-2.5">
-              <SectionLabel>{t("dash.nearby")}</SectionLabel>
-              <span className="font-mono text-[9.5px] tracking-[0.14em] text-zinc-700">
-                DEMO DATASET
-              </span>
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {INCIDENTS.slice(0, 2).map((inc) => (
-                <IncidentCard
-                  key={inc.id}
-                  incident={inc}
-                  onOpen={() => openIncident(inc.id)}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section aria-label={t("dash.service-intelligence")}>
-            <div className="flex items-center justify-between gap-2">
-              <SectionLabel>{t("dash.service-intelligence")}</SectionLabel>
-              <DemoBadge />
-            </div>
-            <div className="sasi-card mt-3 divide-y divide-white/[0.04] p-2">
-              {ACTIVITY.slice(0, 3).map((ev) => (
-                <ActivityRow key={ev.id} event={ev} />
-              ))}
-            </div>
-          </section>
-        </div>
-
-        {/* RIGHT — 4 cols (stacks after main content on mobile) */}
-        <div className="col-span-12 space-y-4 lg:col-span-4">
-          {/* NEXT STEPS */}
-          <SasiPulse color="gold" className="sasi-card p-4">
-            <SectionLabel>{t("dash.next-steps")}</SectionLabel>
-            {actionPending ? (
-              <>
-                <div className="mt-3 flex items-center gap-2">
-                  <ShieldAlert
-                    className="h-4 w-4 text-[#e3c567]"
-                    aria-hidden
-                  />
-                  <p className="text-[13px] font-semibold text-white">
-                    {t("dash.approval-needed")}
-                  </p>
-                </div>
-                <p className="mt-2 text-[13.5px] font-medium leading-snug text-zinc-100">
-                  {flagshipAction?.title}
-                </p>
-                <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
-                  SASI prepared this action for {flagship?.ref}. Nothing is
-                  submitted until you approve it.
-                </p>
-                <PrimaryButton
-                  className="mt-3.5 h-8 w-full"
-                  onClick={() => navigate("case-detail", "case-123")}
-                >
-                  {t("dash.review")}
-                </PrimaryButton>
-              </>
-            ) : actionRunning ? (
-              <>
-                <div className="mt-3 flex items-center gap-2">
-                  <span
-                    className="sasi-breathe h-2 w-2 rounded-full bg-[#64b5f6]"
-                    aria-hidden
-                  />
-                  <p className="text-[13px] font-semibold text-white">
-                    {t("dash.action-in-progress")}
-                  </p>
-                </div>
-                <p className="mt-2 text-[13.5px] font-medium leading-snug text-zinc-100">
-                  {flagshipAction?.title}
-                </p>
-                <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
-                  You approved this action. SASI is executing it and will
-                  verify the outcome.
-                </p>
-                <GhostButton
-                  className="mt-3.5 h-8 w-full"
-                  onClick={() => navigate("case-detail", "case-123")}
-                >
-                  {t("dash.review")}
-                </GhostButton>
-              </>
-            ) : actionDone ? (
-              <>
-                <div className="mt-3 flex items-center gap-2">
-                  <span
-                    className="h-2 w-2 rounded-full bg-[#66bb6a]"
-                    aria-hidden
-                  />
-                  <p className="text-[13px] font-semibold text-white">
-                    {t("dash.action-completed")}
-                  </p>
-                </div>
-                <p className="mt-2 text-[13.5px] font-medium leading-snug text-zinc-100">
-                  {flagshipAction?.title}
-                </p>
-                <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
-                  SASI executed the approved action and recorded the
-                  verification outcome.
-                </p>
-                <GhostButton
-                  className="mt-3.5 h-8 w-full"
-                  onClick={() => navigate("case-detail", "case-123")}
-                >
-                  {t("dash.review")}
-                </GhostButton>
-              </>
-            ) : (
-              <>
-                <p className="mt-3 text-[12.5px] leading-relaxed text-zinc-500">
-                  {t("dash.no-action-waiting")}
-                </p>
-                <ul className="mt-2 space-y-0.5">
-                  {TIPS.map((tip) => (
-                    <li key={tip.key}>
-                      <button
-                        onClick={() => navigate(tip.view)}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left text-[12.5px] text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
-                      >
-                        {t(tip.key)}
-                        <ArrowUpRight
-                          className="h-3.5 w-3.5 text-zinc-600"
-                          aria-hidden
-                        />
-                      </button>
-                    </li>
+          {/* recent cases — the user's own service intelligence */}
+          {cases.length > 0 && (
+            <section aria-label={t("dash.service-intelligence")}>
+              <div className="flex items-center justify-between gap-2">
+                <SectionLabel>{t("dash.service-intelligence")}</SectionLabel>
+                <span className="font-mono text-[10px] tracking-wider text-zinc-600">
+                  {cases.length} {t("dash.on-record")}
+                </span>
+              </div>
+              <div className="sasi-card mt-3 overflow-hidden">
+                <div className="sasi-scroll max-h-96 divide-y divide-white/[0.04] overflow-y-auto">
+                  {sortedCases.slice(0, 8).map((c) => (
+                    <CaseRow key={c.id} c={c} onOpen={() => openCase(c.ref)} />
                   ))}
-                </ul>
-              </>
-            )}
-          </SasiPulse>
+                </div>
+                <button
+                  onClick={() => navigate("cases")}
+                  className="block w-full border-t border-white/[0.05] py-2.5 text-center text-[12px] text-zinc-500 transition-colors hover:text-white"
+                >
+                  {t("dash.view-all-cases")}
+                </button>
+              </div>
+            </section>
+          )}
 
-          {/* SERVICE SHORTCUTS */}
-          <section aria-label={t("dash.service-shortcuts")} className="sasi-card p-2">
-            <div className="px-2 pb-1.5 pt-2">
-              <SectionLabel>{t("dash.service-shortcuts")}</SectionLabel>
-            </div>
-            <ul>
-              {SHORTCUTS.map((key) => (
-                <li key={key}>
-                  <button
-                    onClick={() => openService(key)}
-                    aria-label={`Open ${SERVICES[key].label} service`}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/[0.03]"
-                  >
-                    <span
-                      className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03]",
-                        SERVICE_TINT[key]
-                      )}
-                    >
-                      <ServiceIcon service={key} className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-zinc-200">
-                      {SERVICES[key].label}
-                    </span>
-                    <ArrowUpRight
-                      className="h-3.5 w-3.5 shrink-0 text-zinc-700"
-                      aria-hidden
+          {/* recent notifications — only when something is actually unread */}
+          {unread.length > 0 && (
+            <section aria-label={t("shell.notifications")}>
+              <div className="flex items-center justify-between gap-2">
+                <SectionLabel>{t("shell.notifications")}</SectionLabel>
+                <span className="font-mono text-[10px] tracking-wider text-zinc-600">
+                  {unread.length} UNREAD
+                </span>
+              </div>
+              <div className="sasi-card mt-3 overflow-hidden">
+                <div className="sasi-scroll max-h-80 divide-y divide-white/[0.04] overflow-y-auto">
+                  {unread.slice(0, 6).map((n) => (
+                    <NotificationRow
+                      key={n.id}
+                      n={n}
+                      onOpen={() => {
+                        markNotificationRead(n.id);
+                        navigate("notifications");
+                      }}
                     />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* RECENT ACTIVITY */}
-          <section aria-label={t("dash.recent-activity")} className="sasi-card p-2">
-            <div className="px-2 pb-1.5 pt-2">
-              <SectionLabel>{t("dash.recent-activity")}</SectionLabel>
-            </div>
-            <div className="divide-y divide-white/[0.04]">
-              {ACTIVITY.slice(0, 4).map((ev) => (
-                <ActivityRow key={ev.id} event={ev} />
-              ))}
-            </div>
-            <button
-              onClick={() => navigate("activity")}
-              className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg px-2 py-2 text-[12px] text-zinc-500 transition-colors hover:bg-white/[0.03] hover:text-white"
-            >
-              {t("dash.view-all-activity")}
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          </section>
+                  ))}
+                </div>
+                <button
+                  onClick={() => navigate("notifications")}
+                  className="block w-full border-t border-white/[0.05] py-2.5 text-center text-[12px] text-zinc-500 transition-colors hover:text-white"
+                >
+                  {t("shell.view-all-notifications")}
+                </button>
+              </div>
+            </section>
+          )}
         </div>
-      </div>
+      ) : (
+        <NothingHereYet onReport={() => navigate("report")} />
+      )}
     </div>
   );
 }

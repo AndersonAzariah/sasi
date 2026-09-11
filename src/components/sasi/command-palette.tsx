@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
 import { usePwaStore } from "@/lib/sasi/pwa-store";
 import { applyPwaUpdate, promptPwaInstall } from "./pwa";
-import { CASES, EVIDENCE, INCIDENTS } from "@/lib/sasi/data";
+import { EVIDENCE, INCIDENTS } from "@/lib/sasi/data";
 import { LANGUAGES, translate } from "@/lib/sasi/i18n";
 import { SERVICES as SERVICE_META } from "@/lib/sasi/utils";
 import { ServiceIcon } from "./primitives";
@@ -40,7 +40,6 @@ export function CommandPalette() {
   const openCase = useSasiStore((s) => s.openCase);
   const openIncident = useSasiStore((s) => s.openIncident);
   const openService = useSasiStore((s) => s.openService);
-  const startInvestigationFor = useSasiStore((s) => s.startInvestigationFor);
   const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
   const [query, setQuery] = useState("");
 
@@ -78,7 +77,7 @@ export function CommandPalette() {
       : [
           { q: "Why is my water off?", hint: "Ask SASI" },
           { q: "Report a water problem", hint: "Report flow" },
-          { q: "Investigate my water outage", hint: "Start investigation" },
+          { q: "How does an SASI investigation work?", hint: "Ask SASI" },
           { q: "What should I do next?", hint: "Ask SASI" },
           { q: "Show incidents near me", hint: "Incident explorer" },
         ];
@@ -92,13 +91,15 @@ export function CommandPalette() {
         perform: () => {
           if (r.hint === "Report flow" || r.q.startsWith("Report a problem")) {
             navigate("report");
-          } else if (r.hint === "Start investigation" || r.q.startsWith("Investigate")) {
-            startInvestigationFor("case-123");
           } else if (r.hint === "Browse service directory" || r.q.startsWith("Find services")) {
             navigate("services");
           } else if (r.q.startsWith("Show incidents")) {
             navigate("incidents");
-          } else if (r.q === "Why is my water off?" || r.q === "What should I do next?") {
+          } else if (
+            r.q === "Why is my water off?" ||
+            r.q === "What should I do next?" ||
+            r.q === "How does an SASI investigation work?"
+          ) {
             ask(r.q);
           } else {
             // free-form question → the LLM-backed Ask SASI chat
@@ -249,7 +250,7 @@ export function CommandPalette() {
     });
 
     return out;
-  }, [query, navigate, openCase, openIncident, openService, startInvestigationFor, ask, useSasiStore]);
+  }, [query, navigate, openCase, openIncident, openService, ask, useSasiStore]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -296,7 +297,7 @@ export function CommandPalette() {
           >
             <div className="sasi-pulse sasi-pulse-multi overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0c] shadow-2xl shadow-black/70">
               <Command label="SASI command palette" loop>
-                <div className="flex items-center gap-3 border-b border-white/6 px-4">
+                <div className="sasi-search-glow flex items-center gap-3 rounded-t-xl border-b border-white/6 px-4">
                   <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
                   <Command.Input
                     autoFocus
@@ -364,7 +365,7 @@ export function CommandPalette() {
                 <div className="flex items-center justify-between border-t border-white/6 px-4 py-2 text-[10.5px] text-zinc-600">
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="h-3 w-3 text-[#e3c567]" />
-                    SASI command center — demo environment
+                    SASI command center — nothing is sent without your approval
                   </span>
                   <span className="hidden items-center gap-2 sm:flex">
                     <kbd className="rounded border border-white/10 px-1 font-mono text-[9px]">↑↓</kbd>

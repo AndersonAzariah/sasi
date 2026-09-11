@@ -621,9 +621,9 @@ const DICT: Dict = {
   },
   "inc.stat-resolved": { en: "Resolved", zu: "Kuxazululiwe", af: "Opgelos" },
   "inc.stat-resolved-hint": {
-    en: "Closed in demo dataset",
-    zu: "Kuvaliwe kusethi yedemo",
-    af: "Gesluit in demodatastel",
+    en: "Resolved and closed",
+    zu: "Kuxazululwe nabuvaliwe",
+    af: "Opgelos en gesluit",
   },
   "inc.search": {
     en: "Search title, suburb or city…",
@@ -672,14 +672,14 @@ const DICT: Dict = {
   "inc.count-one": { en: "1 incident", zu: "Isigameko esi-1", af: "1 voorval" },
   "inc.count-many": { en: "{n} incidents", zu: "Izingameko ezingu-{n}", af: "{n} voorvalle" },
   "inc.empty-title": {
-    en: "No incidents match these filters",
-    zu: "Ayikho isigameko ehambisana nalokhu kucoca",
-    af: "Geen voorvalle pas hierdie filters nie",
+    en: "No incidents to show",
+    zu: "Ayikho isigameko okukhombwayo",
+    af: "Geen voorvalle om te wys nie",
   },
   "inc.empty-description": {
-    en: "Adjust filters to widen the search across the demo dataset.",
-    zu: "Lungisa izihlungi ukuze wandisa usesho kusethi yedemo.",
-    af: "Pas filters aan om die soektog oor die demodatastel te wy.",
+    en: "Incidents appear here only once they are reported through SASI — nothing is pre-filled.",
+    zu: "Izigameko zivela lapha kuphela uma zibikiwe nge-SASI — akukho okugcwalisekile kusengaphambili.",
+    af: "Voorvalle verskyn hier eers sodra dit deur SASI gerapporteer word — niks is vooraf ingevul nie.",
   },
   "inc.empty-clear": {
     en: "Clear all filters",

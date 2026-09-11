@@ -1,26 +1,30 @@
 import { NextResponse } from "next/server";
 import ZAI from "z-ai-web-dev-sdk";
-import { CASES, INCIDENTS } from "@/lib/sasi/data";
 import { SERVICES } from "@/lib/sasi/utils";
 import type { BriefingRisk, BriefingSection, CityBriefing } from "@/lib/sasi/types";
 
 /* ============================================================
    POST /api/sasi/briefing
-   AI "City briefing" — a short daily digest written by the LLM
-   from the user's demo dataset (their cases + tracked incidents
-   + saved location). Backend-only — the z-ai SDK is never
-   imported from client code.
+   AI "City briefing" — a short digest written by the LLM from
+   the RESIDENT'S OWN MATERIAL ONLY: the cases they created via
+   the report flow (passed in as extraCases) or, in chat mode,
+   the transcript of their own Ask SASI conversation. There is
+   no pre-existing dataset to ground against — if the request
+   carries no user material, the route returns an honest
+   "nothing to brief yet" response instead of inventing one.
 
-   Returns STRICT JSON:
-     { headline, risk, sections: [{title, body, refs[]}],
-       watchlist: [] }
+   Backend-only — the z-ai SDK is never imported from client code.
+
+   Returns STRICT JSON on success:
+     { briefing: { headline, risk, sections: [{title, body, refs[]}],
+       watchlist: [], generatedAt, locationLabel } }
+   Honest no-material response (HTTP 200, contract-stable for the
+   client store which treats a missing briefing as non-fatal):
+     { ok: false, empty: true, briefing: null, error: "…" }
    Two modes:
-   - default (city): digest grounded in the user's demo dataset
+   - default (city): digest grounded in the resident's own cases
    - origin:"chat": distils the Ask SASI transcript passed by the
      client into the same briefing shape (chat → dashboard loop)
-   The client renders it with honest "AI-generated · demo data"
-   framing and clickable refs. Non-streaming on purpose: the
-   payload is small and the UI shows a shimmer skeleton.
    ============================================================ */
 
 export const runtime = "nodejs";
@@ -28,7 +32,7 @@ export const dynamic = "force-dynamic";
 
 interface BriefingBody {
   location?: { province?: string; city?: string; suburb?: string };
-  /** the user's own cases from the live client store — grounded into the prompt */
+  /** the user's own cases from the live client store — the ONLY grounding */
   extraCases?: {
     ref: string;
     title: string;
@@ -37,7 +41,7 @@ interface BriefingBody {
     city?: string;
     actionState?: string;
   }[];
-  /** when "chat", `transcript` is the source material instead of the city dataset */
+  /** when "chat", `transcript` is the source material instead of the cases */
   origin?: "city" | "chat";
   /** Ask SASI conversation (done messages, ≤ 12) to distil into a briefing */
   transcript?: { role: "user" | "assistant"; content: string }[];
@@ -47,92 +51,84 @@ const REF_RE = /(CASE-\d{6}|INC-\d{4})/g;
 
 const RISKS: BriefingRisk[] = ["CALM", "ELEVATED", "STRAINED", "CRITICAL"];
 
+/** the honest no-material response — success-shaped HTTP 200 with an
+    explicit empty flag so the client can render its empty state */
+function noMaterialResponse(origin: "city" | "chat") {
+  const why =
+    origin === "chat"
+      ? "There isn't enough conversation to distil yet. Ask SASI something first, then try again."
+      : "There's nothing to brief yet — your briefing is written from your own reports and cases. Report an issue or start an investigation, and SASI will brief you on it.";
+  return NextResponse.json(
+    { ok: false, empty: true, briefing: null, error: why },
+    { status: 200 }
+  );
+}
+
+/** compact, honest context: ONLY the resident's own cases, exactly as
+    the client reports them — no dataset is merged in */
 function compactContext(
   location: BriefingBody["location"],
   extraCases: BriefingBody["extraCases"]
-): string {
-  /* merge the user's live cases over the static dataset (dedupe by ref) */
-  const merged: { ref: string; status: string; service: string; title: string; city: string; action?: string }[] = [];
+): { context: string; allowedRefs: Set<string> } {
   const seen = new Set<string>();
-  for (const c of extraCases ?? []) {
-    if (seen.has(c.ref)) continue;
-    seen.add(c.ref);
-    merged.push({
-      ref: c.ref,
-      status: c.status,
-      service: c.service,
-      title: c.title,
-      city: c.city ?? location?.city ?? "Johannesburg",
-      action: c.actionState,
-    });
-  }
-  for (const c of CASES) {
-    if (seen.has(c.ref)) continue;
-    seen.add(c.ref);
-    merged.push({
-      ref: c.ref,
-      status: c.status,
-      service: c.service,
-      title: c.title,
-      city: c.location.city,
-      action: c.proposedAction?.state,
-    });
-  }
-
-  const cases = merged
+  const allowedRefs = new Set<string>();
+  const cases = (extraCases ?? [])
+    .filter((c) => {
+      if (seen.has(c.ref) || !c.ref) return false;
+      seen.add(c.ref);
+      allowedRefs.add(c.ref.toUpperCase());
+      return true;
+    })
     .slice(0, 12)
     .map(
       (c) =>
-        `- ${c.ref} [${c.status}] (${c.service}) "${c.title}" — ${c.city}${
-          c.action ? ` · action: ${c.action}` : ""
-        }`
+        `- ${c.ref} [${c.status}] (${c.service}) "${c.title}" — ${
+          c.city || location?.city || "location not set"
+        }${c.actionState ? ` · action: ${c.actionState}` : ""}`
     )
     .join("\n");
-  const incidents = INCIDENTS.slice(0, 8)
-    .map(
-      (i) =>
-        `- ${i.ref} [${i.status}] (${i.service}) "${i.title}" — ${
-          i.location.suburb ?? i.location.city
-        }, severity ${i.severity}`
-    )
-    .join("\n");
+
   const services = Object.entries(SERVICES)
     .map(([key, s]) => `${key}: ${s.label}`)
     .join("; ");
 
-  return [
-    `User location: ${location?.suburb ?? "Melrose"}, ${location?.city ?? "Johannesburg"}, ${location?.province ?? "Gauteng"}, South Africa.`,
+  const context = [
+    `Resident location: ${
+      [location?.suburb, location?.city, location?.province]
+        .filter(Boolean)
+        .join(", ") || "not set"
+    }, South Africa.`,
     "",
-    "The user's SASI cases (demo data):",
+    `The resident's own SASI cases (the ONLY material you may use — exactly ${allowedRefs.size} case(s), listed verbatim):`,
     cases,
     "",
-    "Incidents SASI is tracking nearby (demo data):",
-    incidents,
-    "",
-    `Service directory keys: ${services}.`,
+    `Service directory keys (for naming services only, not facts): ${services}.`,
   ].join("\n");
+
+  return { context, allowedRefs };
 }
 
-const SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. Write a short "City briefing" digest for one resident, grounded ONLY in the demo dataset below.
+const SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. Write a short "City briefing" digest for one resident, grounded ONLY in that resident's own material below — the cases they reported through SASI and the state those cases are in. SASI has no other data source: there is no city feed, no sensor data, no third-party reports. If the material doesn't say it, SASI doesn't say it.
 
 Reply with STRICT JSON only (no markdown fences, no prose):
 {
-  "headline": "one sharp sentence (≤ 110 chars) summarising today's civic picture for the resident",
+  "headline": "one sharp sentence (≤ 110 chars) summarising the state of the resident's own cases",
   "risk": "CALM|ELEVATED|STRAINED|CRITICAL",
   "sections": [
-    { "title": "Service name (e.g. Water)", "body": "2-3 short lines. Use '- ' bullets and **bold** key phrases. Mention specific refs where relevant.", "refs": ["CASE-000123"] }
+    { "title": "Service name (e.g. Water)", "body": "2-3 short lines. Use '- ' bullets and **bold** key phrases. Mention specific refs where relevant.", "refs": ["CASE-000001"] }
   ],
-  "watchlist": ["1-3 short forward-looking items (≤ 90 chars each) the resident should keep an eye on"]
+  "watchlist": ["1-3 short forward-looking items (≤ 90 chars each) drawn ONLY from the resident's own case states"]
 }
 
 RULES
-- 2-4 sections, ordered by relevance to THIS resident (their own cases first).
-- GROUNDING IS ABSOLUTE: every factual statement must be traceable to a line in the dataset (a case status, a case title, an incident title/severity, a proposed-action state). Do NOT invent amounts, account numbers, dates, schedules, announcements or statistics. If the dataset only says "[INVESTIGATING] (water) \\"No water since yesterday evening\\"", say exactly that and no more.
-- Only reference refs (CASE-xxxxxx / INC-xxxx) that appear in the dataset lines.
-- South African civic voice: plain, practical, calm. Mention load-shedding / water-shedding only if supported by the data.
-- risk: CALM = nothing needs attention; ELEVATED = the resident has open work; STRAINED = multiple active problems or an approval waiting; CRITICAL = reserve for genuine danger.
-- watchlist items must be concrete and derived from the dataset (e.g. "Approval on CASE-000123 is waiting for you", not "stay informed").
-- The briefing is independent and unarmed: SASI never claims to have contacted any authority.`;
+- 1-4 sections, ordered by relevance to THIS resident.
+- GROUNDING IS ABSOLUTE: every factual statement must be traceable to a line in the material (a case status, a case title, a proposed-action state). Do NOT invent amounts, account numbers, dates, schedules, announcements, statistics, other residents' problems, other cases, or city-wide conditions. If the material only says "[INVESTIGATING] (water) \\"No water since yesterday evening\\"", say exactly that and no more.
+- The material lists EVERY case that exists — there are no other cases. NEVER mention or cite any case ref that is not in the material, not even a plausible-looking one.
+- Never present a city-wide picture: you only know what this resident told SASI.
+- Only reference refs (CASE-xxxxxx) that appear in the material lines. Never cite INC- refs: they do not exist in the material.
+- South African civic voice: plain, practical, calm. Never claim SASI contacted any authority.
+- risk: CALM = the resident has nothing open; ELEVATED = the resident has open work; STRAINED = multiple active problems or an approval waiting; CRITICAL = reserve for genuine danger described in the material.
+- watchlist items must be concrete and derived from the material (e.g. "Approval on CASE-000001 is waiting for you", not "stay informed").`;
 
 /* ---------- chat-digest mode: the conversation is the source material ---------- */
 
@@ -145,28 +141,57 @@ function transcriptBlock(
     .join("\n\n");
 }
 
-const CHAT_SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. The resident just had an assistance conversation with SASI's chat. Distil THAT CONVERSATION into a short "City briefing" card so the resident can pin a summary of it on their dashboard.
+const CHAT_SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. The resident just had an assistance conversation with SASI's chat. Distil THAT CONVERSATION into a short "City briefing" card so the resident can pin a summary of it on their dashboard. The transcript is the ONLY source material — there is no dataset behind SASI.
 
 Reply with STRICT JSON only (no markdown fences, no prose):
 {
   "headline": "one sharp sentence (≤ 110 chars) capturing what the conversation established for the resident",
   "risk": "CALM|ELEVATED|STRAINED|CRITICAL",
   "sections": [
-    { "title": "Topic (e.g. Water)", "body": "2-3 short lines. Use '- ' bullets and **bold** key phrases. Mention specific refs where relevant.", "refs": ["CASE-000123"] }
+    { "title": "Topic (e.g. Water)", "body": "2-3 short lines. Use '- ' bullets and **bold** key phrases. Mention specific refs where relevant.", "refs": ["CASE-000001"] }
   ],
   "watchlist": ["1-3 short forward-looking items (≤ 90 chars each) drawn from the conversation's advice"]
 }
 
 RULES
-- GROUNDING IS ABSOLUTE: every statement must come from the conversation transcript (or the supporting dataset below). Do NOT invent schedules, amounts, dates or announcements.
-- Only reference refs (CASE-xxxxxx / INC-xxxx) that actually appear in the transcript or dataset.
+- GROUNDING IS ABSOLUTE: every statement must come from the conversation transcript. Do NOT invent schedules, amounts, dates, announcements, or city-wide conditions.
+- Only reference refs (CASE-xxxxxx) that actually appear in the transcript.
 - If the chat was about one issue, write 1-2 focused sections — do not pad to four.
-- South African civic voice: plain, practical, calm.
-- The briefing is independent and unarmed: SASI never claims to have contacted any authority.
+- South African civic voice: plain, practical, calm. SASI never claims to have contacted any authority.
 - If the conversation was vague, say what is known and what the resident still needs to confirm — honestly.
 
 CONVERSATION TRANSCRIPT:
 ${context}`;
+
+/** refs mentioned anywhere in a text blob */
+function refsIn(text: string): string[] {
+  return Array.from(new Set(text.match(REF_RE) ?? []).values());
+}
+
+/** HARD GROUNDING VALIDATION — drop anything citing a ref the resident
+    does not actually have. The model must never be trusted blindly:
+    a fabricated CASE-xxxxxx in a briefing is a fabricated result. */
+function enforceGrounding(
+  briefing: CityBriefing,
+  allowedRefs: Set<string>
+): CityBriefing | null {
+  const known = (ref: string) => allowedRefs.has(ref.toUpperCase());
+
+  if (refsIn(briefing.headline).some((r) => !known(r))) return null;
+
+  const sections = briefing.sections.filter((sec) => {
+    const cited = [...sec.refs, ...refsIn(sec.body)];
+    /* a section is only kept if every ref it cites is real */
+    return cited.every(known);
+  });
+  if (sections.length === 0) return null;
+
+  const watchlist = briefing.watchlist.filter(
+    (w) => refsIn(w).every(known)
+  );
+
+  return { ...briefing, sections, watchlist };
+}
 
 function extractBriefing(
   raw: string,
@@ -238,22 +263,36 @@ export async function POST(req: Request) {
   }
 
   const loc = body.location ?? {};
-  const locationLabel = [
-    loc.suburb ?? "Melrose",
-    loc.city ?? "Johannesburg",
-    loc.province ?? "Gauteng",
-  ]
+  const locationLabel = [loc.suburb, loc.city, loc.province]
     .filter(Boolean)
     .join(", ");
 
   try {
     const zai = await ZAI.create();
 
-    /* chat-digest mode: distil the conversation instead of the city dataset */
+    /* HONESTY GATE — no user material, no briefing. The route never
+       invents a digest from a dataset, because no dataset exists. */
+    const residentCases = (body.extraCases ?? []).filter((c) => c.ref);
     const isChat =
       body.origin === "chat" &&
       Array.isArray(body.transcript) &&
       body.transcript.length >= 2;
+
+    const allowedRefs = new Set<string>(
+      isChat
+        ? (body.transcript ?? []).flatMap((m) => refsIn(m.content))
+        : residentCases.map((c) => c.ref)
+    );
+
+    if (isChat) {
+      const chars = (body.transcript ?? []).reduce(
+        (n, m) => n + (m.content?.trim().length ?? 0),
+        0
+      );
+      if (chars < 40) return noMaterialResponse("chat");
+    } else if (residentCases.length === 0) {
+      return noMaterialResponse("city");
+    }
 
     const completion = (await zai.chat.completions.create({
       messages: [
@@ -261,23 +300,32 @@ export async function POST(req: Request) {
           role: "assistant",
           content: isChat
             ? CHAT_SYSTEM_PROMPT(transcriptBlock(body.transcript ?? []))
-            : SYSTEM_PROMPT(compactContext(loc, body.extraCases)),
+            : SYSTEM_PROMPT(compactContext(loc, residentCases).context),
         },
         {
           role: "user",
           content: isChat
-            ? `USER LOCATION: ${locationLabel}\n\nDistil the conversation above into the briefing JSON now. Reply with the JSON object only.`
-            : `USER LOCATION: ${locationLabel}\n\nWrite today's briefing now. Reply with the JSON object only.`,
+            ? `RESIDENT LOCATION: ${locationLabel || "not set"}\n\nDistil the conversation above into the briefing JSON now. Reply with the JSON object only.`
+            : `RESIDENT LOCATION: ${locationLabel || "not set"}\n\nWrite the resident's briefing from their own cases now. Reply with the JSON object only.`,
         },
       ],
       thinking: { type: "disabled" },
     })) as { choices?: { message?: { content?: string } }[] };
 
     const raw = completion.choices?.[0]?.message?.content ?? "";
-    const briefing = extractBriefing(raw, locationLabel);
-    if (!briefing) {
+    const extracted = extractBriefing(raw, locationLabel);
+    if (!extracted) {
       return NextResponse.json(
         { error: "SASI drafted the briefing but could not structure it. Please try again." },
+        { status: 502 }
+      );
+    }
+    /* drop anything citing refs the resident does not have — fabrication
+       is rejected, never shown */
+    const briefing = enforceGrounding(extracted, allowedRefs);
+    if (!briefing) {
+      return NextResponse.json(
+        { error: "SASI's draft cited material you don't have, so it was discarded. Please try again." },
         { status: 502 }
       );
     }

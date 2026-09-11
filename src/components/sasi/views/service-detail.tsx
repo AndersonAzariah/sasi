@@ -23,7 +23,6 @@ import { INCIDENTS } from "@/lib/sasi/data";
 import { SERVICES } from "@/lib/sasi/utils";
 import type { ServiceKey } from "@/lib/sasi/types";
 import {
-  DemoBadge,
   EmptyState,
   GhostButton,
   SectionLabel,
@@ -159,7 +158,9 @@ export default function ServiceDetailView() {
                 {meta.label} services
               </h1>
               {serviceIncidents.length > 0 && (
-                <DemoBadge label={`DEMO · ${serviceIncidents.length} INCIDENT${serviceIncidents.length === 1 ? "" : "S"} TRACKED`} />
+                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-600">
+                  {serviceIncidents.length} {serviceIncidents.length === 1 ? "incident" : "incidents"} tracked
+                </span>
               )}
             </div>
             <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-zinc-400">{meta.blurb}</p>
@@ -176,7 +177,7 @@ export default function ServiceDetailView() {
         transition={{ duration: 0.45, ease: "easeOut" }}
         aria-labelledby="common-tasks-heading"
       >
-        <SectionLabel className="mb-3">Common tasks</SectionLabel>
+        <SectionLabel className="sasi-eyebrow mb-3">Common tasks</SectionLabel>
         <h2 id="common-tasks-heading" className="sr-only">
           Common tasks for {meta.label.toLowerCase()} services
         </h2>
@@ -213,7 +214,7 @@ export default function ServiceDetailView() {
       >
         {isWater ? (
           <>
-            <SectionLabel className="mb-3">Service information</SectionLabel>
+            <SectionLabel className="sasi-eyebrow mb-3">Service information</SectionLabel>
             <h2 id="civic-info-heading" className="sr-only">
               Current water incidents
             </h2>
@@ -221,7 +222,7 @@ export default function ServiceDetailView() {
               <StatTile
                 label="Active incidents"
                 value={activeIncidents.length}
-                hint="Demo incidents not yet marked resolved"
+                hint="Incidents not yet marked resolved"
                 tone={activeIncidents.length > 0 ? "blue" : "default"}
               />
               <StatTile
@@ -232,29 +233,36 @@ export default function ServiceDetailView() {
               />
             </div>
             <div className="mt-4">
-              <div className="mb-3 flex items-center gap-2">
-                <p className="text-[12.5px] font-medium text-zinc-300">Current incidents</p>
-                <DemoBadge />
-              </div>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                {featuredIncidents.map((incident) => (
-                  <IncidentCard key={incident.id} incident={incident} onOpen={() => openIncident(incident.ref)} />
-                ))}
-              </div>
+              <p className="mb-3 text-[12.5px] font-medium text-zinc-300">Current incidents</p>
+              {featuredIncidents.length === 0 ? (
+                <div className="sasi-card px-6 py-10 text-center">
+                  <p className="text-[13.5px] font-medium text-white">No water incidents tracked right now</p>
+                  <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-zinc-500">
+                    SASI tracks only what it can verify — nothing is invented. Your own
+                    water cases appear below.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  {featuredIncidents.map((incident) => (
+                    <IncidentCard key={incident.id} incident={incident} onOpen={() => openIncident(incident.ref)} />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : (
           <>
-            <SectionLabel className="mb-3">Incidents</SectionLabel>
+            <SectionLabel className="sasi-eyebrow mb-3">Incidents</SectionLabel>
             <h2 id="civic-info-heading" className="sr-only">
               Current {meta.label.toLowerCase()} incidents
             </h2>
             {serviceIncidents.length === 0 ? (
               <div className="sasi-card px-6 py-10 text-center">
-                <p className="text-[13.5px] font-medium text-white">No {meta.label.toLowerCase()} incidents in the demo dataset yet.</p>
+                <p className="text-[13.5px] font-medium text-white">No {meta.label.toLowerCase()} incidents tracked yet.</p>
                 <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-zinc-500">
-                  The demo dataset focuses on water, electricity, roads and waste. Anything you
-                  report in this service will appear here.
+                  Incidents appear here only once they are tracked — SASI never invents
+                  data. Your own {meta.label.toLowerCase()} cases appear below.
                 </p>
               </div>
             ) : (
@@ -278,7 +286,7 @@ export default function ServiceDetailView() {
           transition={{ duration: 0.45, ease: "easeOut" }}
           aria-labelledby="evidence-helps-heading"
         >
-          <SectionLabel className="mb-3">Evidence that helps</SectionLabel>
+          <SectionLabel className="sasi-eyebrow mb-3">Evidence that helps</SectionLabel>
           <h2 id="evidence-helps-heading" className="sr-only">
             Evidence that helps water investigations
           </h2>
@@ -323,7 +331,7 @@ export default function ServiceDetailView() {
         transition={{ duration: 0.45, ease: "easeOut" }}
         aria-labelledby="your-cases-heading"
       >
-        <SectionLabel className="mb-3">Your cases</SectionLabel>
+        <SectionLabel className="sasi-eyebrow mb-3">Your cases</SectionLabel>
         <h2 id="your-cases-heading" className="sr-only">
           Your {meta.label.toLowerCase()} cases
         </h2>
@@ -352,15 +360,16 @@ export default function ServiceDetailView() {
       </motion.section>
 
       {/* ---------- Official pathways ---------- */}
+      <div className="sasi-line mt-12" aria-hidden />
       <motion.section
-        className="mt-10 pb-4"
+        className="mt-8 pb-4"
         initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-40px" }}
         transition={{ duration: 0.45, ease: "easeOut" }}
         aria-labelledby="official-pathways-heading"
       >
-        <SectionLabel className="mb-3">Official pathways</SectionLabel>
+        <SectionLabel className="sasi-eyebrow mb-3">Official pathways</SectionLabel>
         <h2 id="official-pathways-heading" className="sr-only">
           Official pathways
         </h2>

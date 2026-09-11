@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, FolderLock, Plus } from "lucide-react";
+import { ChevronDown, FolderLock, Inbox, Plus } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { useT } from "@/lib/sasi/i18n";
 import { GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
@@ -10,7 +10,6 @@ import type { Priority } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
 import { CaseCard } from "@/components/sasi/domain";
 import {
-  DemoBadge,
   EmptyState,
   GhostButton,
   ListSkeleton,
@@ -176,7 +175,6 @@ export default function CasesView() {
             <h1 className="text-xl font-semibold tracking-tight text-white">
               {t("cases.title")}
             </h1>
-            <DemoBadge />
           </div>
           <p className="mt-1 text-[13px] text-zinc-500">
             {t("cases.subtitle")}
@@ -252,6 +250,24 @@ export default function CasesView() {
       {/* ---------- Grid ---------- */}
       {loading ? (
         <ListSkeleton rows={4} className="mt-5" />
+      ) : cases.length === 0 ? (
+        <div className="sasi-card mt-5 flex flex-col items-center px-6 py-12 text-center">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03]">
+            <Inbox className="h-5 w-5 text-zinc-400" aria-hidden />
+          </div>
+          <h2 className="sasi-serif text-[16px] text-white">No cases yet</h2>
+          <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-zinc-500">
+            Your cases appear here only once you report an issue — SASI never
+            invents data.
+          </p>
+          <GhostButton
+            className="sasi-btn-glass mt-5"
+            onClick={() => navigate("report")}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            {t("cases.report-issue")}
+          </GhostButton>
+        </div>
       ) : filtered.length === 0 ? (
         <EmptyState
           className="mt-5"

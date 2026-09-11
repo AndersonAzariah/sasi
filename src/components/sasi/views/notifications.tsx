@@ -16,7 +16,7 @@ import { INCIDENTS } from "@/lib/sasi/data";
 import type { NotificationKind } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
 import { NotificationRow } from "@/components/sasi/domain";
-import { DemoBadge, EmptyState, GhostButton } from "@/components/sasi/primitives";
+import { EmptyState, GhostButton } from "@/components/sasi/primitives";
 import { timeAgo } from "@/lib/sasi/utils";
 
 type NtfFilter = "ALL" | "CASE" | "INVESTIGATION" | "ACTION" | "UPDATE";
@@ -118,7 +118,6 @@ export default function NotificationsView() {
             <h1 className="text-xl font-semibold tracking-tight text-white">
               {t("ntf.title")}
             </h1>
-            <DemoBadge />
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",

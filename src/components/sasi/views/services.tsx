@@ -83,7 +83,7 @@ export default function ServicesView() {
         {/* Search */}
         <div
           className={cn(
-            "sasi-command-focus mt-6 flex h-12 w-full max-w-2xl items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 transition-colors focus-within:border-white/20"
+            "sasi-command-focus sasi-search-glow mt-6 flex h-12 w-full max-w-2xl items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 transition-colors focus-within:border-white/20"
           )}
         >
           <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
@@ -108,7 +108,7 @@ export default function ServicesView() {
 
         {/* Popular chips */}
         <nav aria-label="Popular services" className="mt-5">
-          <SectionLabel className="mb-2">Popular</SectionLabel>
+          <SectionLabel className="sasi-eyebrow mb-2">Popular</SectionLabel>
           <div className="flex flex-wrap gap-2">
             {POPULAR_SERVICES.map((key) => (
               <button
@@ -184,10 +184,10 @@ export default function ServicesView() {
                     <p className="mt-3 border-t border-white/5 pt-2.5 text-[11px] text-zinc-600">
                       {count > 0 ? (
                         <span>
-                          {count} demo {count === 1 ? "incident" : "incidents"} tracked
+                          {count} {count === 1 ? "incident" : "incidents"} tracked
                         </span>
                       ) : (
-                        <span>No demo incidents tracked</span>
+                        <span>Nothing tracked yet</span>
                       )}
                     </p>
                   </button>
@@ -199,8 +199,9 @@ export default function ServicesView() {
       </motion.section>
 
       {/* ---------- Recommended ---------- */}
+      <div className="sasi-line mt-12" aria-hidden />
       <motion.section
-        className="mt-10"
+        className="mt-8"
         initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-40px" }}

@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   Activity,
   Bell,
@@ -11,6 +17,8 @@ import {
   FolderLock,
   LayoutDashboard,
   Map,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Settings,
   ShieldCheck,
@@ -68,7 +76,32 @@ const NAV_SECTIONS: {
 const SERVICES_SHORTCUT = { view: "services" as View, label: "nav.services", icon: ShieldCheck };
 
 /* ============================================================
-   SIDEBAR
+   SIDEBAR COLLAPSE — persists per browser ("get work done"
+   muscle memory: once tucked away, it stays tucked away)
+   ============================================================ */
+
+const SIDEBAR_COLLAPSED_KEY = "sasi-sidebar-collapsed";
+
+function readSidebarCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeSidebarCollapsed(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* private mode — the choice simply won't persist */
+  }
+}
+
+/* ============================================================
+   SIDEBAR LINK — expands to a labelled row, collapses to a
+   centered 44px icon with a native floating label on hover
    ============================================================ */
 
 function SidebarLink({
@@ -77,20 +110,25 @@ function SidebarLink({
   icon: Icon,
   active,
   badge,
+  collapsed = false,
 }: {
   view: View;
   label: string;
   icon: typeof Search;
   active: boolean;
   badge?: number;
+  collapsed?: boolean;
 }) {
   const navigate = useSasiStore((s) => s.navigate);
   return (
     <button
       onClick={() => navigate(view)}
       aria-current={active ? "page" : undefined}
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
       className={cn(
-        "group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] transition-colors",
+        "group relative flex w-full items-center rounded-lg text-[13px] transition-colors",
+        collapsed ? "mx-auto h-11 w-11 justify-center" : "gap-2.5 px-2.5 py-[7px]",
         active
           ? "bg-white/[0.05] text-white"
           : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-200"
@@ -111,37 +149,94 @@ function SidebarLink({
         )}
         aria-hidden
       />
-      <span className="flex-1 text-left">{label}</span>
-      {badge ? (
+      {!collapsed && <span className="flex-1 text-left">{label}</span>}
+      {!collapsed && badge ? (
         <span className="rounded-full bg-white/8 px-1.5 py-px font-mono text-[9.5px] text-zinc-300">
           {badge}
         </span>
+      ) : null}
+      {collapsed && badge ? (
+        <span
+          className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#e3c567]"
+          aria-label={`${badge} unread`}
+        />
       ) : null}
     </button>
   );
 }
 
-function Sidebar() {
+function Sidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const view = useSasiStore((s) => s.view);
   const notifications = useSasiStore((s) => s.notifications);
   const navigate = useSasiStore((s) => s.navigate);
   const t = useT();
   const unread = notifications.filter((n) => !n.read).length;
+  const initials = `${DEMO_USER.firstName[0]}${DEMO_USER.name.split(" ")[1]?.[0] ?? ""}`;
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[228px] flex-col border-r border-white/6 bg-[#080808] lg:flex">
-      <div className="flex h-14 items-center px-4">
-        <button onClick={() => navigate("landing")} aria-label="SASI home">
-          <SasiLogo size={26} />
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-white/6 bg-[#080808] lg:flex",
+        "transition-[width] duration-300 ease-in-out motion-reduce:transition-none",
+        collapsed ? "w-[60px]" : "w-[228px]"
+      )}
+    >
+      {/* header — brand when open, collapse toggle always reachable */}
+      <div
+        className={cn(
+          "flex h-14 shrink-0 items-center",
+          collapsed ? "justify-center" : "justify-between px-4"
+        )}
+      >
+        {!collapsed && (
+          <button
+            onClick={() => navigate("landing")}
+            aria-label="SASI home"
+            className="rounded-md"
+          >
+            <SasiLogo size={26} />
+          </button>
+        )}
+        <button
+          onClick={onToggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className={cn(
+            "flex items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-white",
+            collapsed ? "h-11 w-11" : "h-9 w-9"
+          )}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-[18px] w-[18px]" aria-hidden />
+          ) : (
+            <PanelLeftClose className="h-[17px] w-[17px]" aria-hidden />
+          )}
         </button>
       </div>
 
-      <nav className="sasi-scroll flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Primary">
+      <nav
+        className={cn(
+          "sasi-scroll flex-1 overflow-y-auto pb-4",
+          collapsed ? "space-y-4 px-2" : "space-y-5 px-3"
+        )}
+        aria-label="Primary"
+      >
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
-            <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
-              {t(section.label)}
-            </p>
+            {collapsed ? (
+              <div className="mx-auto mb-2 h-px w-6 bg-white/8" aria-hidden />
+            ) : (
+              <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
+                {t(section.label)}
+              </p>
+            )}
             <div className="space-y-px">
               {section.items.map((item) => (
                 <SidebarLink
@@ -150,57 +245,69 @@ function Sidebar() {
                   label={t(item.label)}
                   active={view === item.view}
                   badge={item.view === "notifications" ? unread : undefined}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
           </div>
         ))}
         <div>
-          <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
-            {t("nav.services")}
-          </p>
+          {collapsed ? (
+            <div className="mx-auto mb-2 h-px w-6 bg-white/8" aria-hidden />
+          ) : (
+            <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
+              {t("nav.services")}
+            </p>
+          )}
           <SidebarLink
             {...SERVICES_SHORTCUT}
             label={t(SERVICES_SHORTCUT.label)}
             active={view === "services" || view === "service-detail"}
+            collapsed={collapsed}
           />
         </div>
       </nav>
 
-      <div className="border-t border-white/6 p-3">
+      <div className={cn("shrink-0 border-t border-white/6", collapsed ? "p-2" : "p-3")}>
         <button
           onClick={() => navigate("profile")}
+          aria-label={collapsed ? `Profile — ${DEMO_USER.name}` : undefined}
+          title={collapsed ? DEMO_USER.name : undefined}
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors",
+            "flex w-full items-center rounded-lg text-left transition-colors",
+            collapsed ? "h-11 justify-center" : "gap-2.5 px-2 py-2",
             view === "profile" ? "bg-white/[0.05]" : "hover:bg-white/[0.03]"
           )}
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[10.5px] font-semibold text-zinc-300">
-            {DEMO_USER.firstName[0]}
-            {DEMO_USER.name.split(" ")[1]?.[0]}
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[10.5px] font-semibold text-zinc-300">
+            {initials}
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[12.5px] font-medium text-zinc-200">
-              {DEMO_USER.name}
+          {!collapsed && (
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12.5px] font-medium text-zinc-200">
+                {DEMO_USER.name}
+              </span>
+              <span className="block truncate text-[10.5px] text-zinc-600">
+                {DEMO_USER.location.city}
+              </span>
             </span>
-            <span className="block truncate text-[10.5px] text-zinc-600">
-              {DEMO_USER.location.city} · Demo account
-            </span>
-          </span>
-          <CircleUser className="h-4 w-4 text-zinc-700" aria-hidden />
+          )}
+          {!collapsed && <CircleUser className="h-4 w-4 text-zinc-700" aria-hidden />}
         </button>
         <button
           onClick={() => navigate("admin")}
+          aria-label={collapsed ? t("nav.admin") : undefined}
+          title={collapsed ? t("nav.admin") : undefined}
           className={cn(
-            "mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[11.5px] transition-colors",
-            view === "admin" ? "text-zinc-200" : "text-zinc-600 hover:text-zinc-400"
+            "flex w-full items-center rounded-lg transition-colors",
+            collapsed
+              ? "mt-1 h-11 justify-center text-zinc-600 hover:text-zinc-400"
+              : "mt-1 gap-2 px-2 py-1.5 text-[11.5px]",
+            !collapsed && (view === "admin" ? "text-zinc-200" : "text-zinc-600 hover:text-zinc-400")
           )}
         >
-          <Settings className="h-3.5 w-3.5" aria-hidden />
-          {t("nav.admin")}
-          <span className="ml-auto rounded border border-white/8 px-1 py-px font-mono text-[8.5px] tracking-widest text-zinc-600">
-            DEMO
-          </span>
+          <Settings className={cn("shrink-0", collapsed ? "h-4 w-4" : "h-3.5 w-3.5")} aria-hidden />
+          {!collapsed && t("nav.admin")}
         </button>
       </div>
     </aside>
@@ -211,7 +318,7 @@ function Sidebar() {
    TOPBAR
    ============================================================ */
 
-function Topbar() {
+function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   const navigate = useSasiStore((s) => s.navigate);
   const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
   const savedLocation = useSasiStore((s) => s.savedLocation);
@@ -227,6 +334,17 @@ function Topbar() {
       <button className="lg:hidden" onClick={() => navigate("landing")} aria-label="SASI home">
         <SasiLogo size={24} withWordmark={false} />
       </button>
+
+      {/* desktop logo — only while the sidebar rail is collapsed */}
+      {sidebarCollapsed && (
+        <button
+          className="hidden lg:block"
+          onClick={() => navigate("landing")}
+          aria-label="SASI home"
+        >
+          <SasiLogo size={24} withWordmark={false} />
+        </button>
+      )}
 
       {/* command trigger (desktop renders fake input, mobile icon) */}
       <button
@@ -429,11 +547,20 @@ function FloatingAskButton() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   useSyncExternalStore(
     () => () => {},
     () => true,
     () => false
   );
+
+  useEffect(() => {
+    writeSidebarCollapsed(sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((c) => !c);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -448,9 +575,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[#050505]">
-      <Sidebar />
-      <div className="lg:pl-[228px]">
-        <Topbar />
+      <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+      <div
+        className={cn(
+          "transition-[padding] duration-300 ease-in-out motion-reduce:transition-none",
+          sidebarCollapsed ? "lg:pl-[60px]" : "lg:pl-[228px]"
+        )}
+      >
+        <Topbar sidebarCollapsed={sidebarCollapsed} />
         <main className="min-h-[calc(100vh-3.5rem)] pb-24 lg:pb-8">{children}</main>
       </div>
       <MobileNav />
@@ -458,6 +590,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-/* keep import used */
-void Map;

@@ -24,8 +24,12 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isLanding = view === "landing";
 
+  /* Auth views render BARE — split screen fills the viewport, no nav, no footer */
+  const isAuthView = view === "login" || view === "signup";
+
   return (
     <div className="flex min-h-screen flex-col bg-[#050505]">
+      {isAuthView ? null : (
       <header
         className={cn(
           "sticky top-0 z-40 border-b border-white/6 backdrop-blur-md",
@@ -118,9 +122,11 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </header>
+      )}
 
       <main className="flex-1">{children}</main>
 
+      {isAuthView ? null : (
       <footer className="mt-auto border-t border-white/6 bg-[#060606]">
         <div className="sasi-hairline-rainbow" aria-hidden />
         <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
@@ -219,6 +225,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+      )}
     </div>
   );
 }

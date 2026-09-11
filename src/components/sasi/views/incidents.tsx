@@ -11,7 +11,6 @@ import type { Incident, TrustStatus } from "@/lib/sasi/types";
 import { SERVICES, locationLabel, timeAgo } from "@/lib/sasi/utils";
 import {
   CardSkeleton,
-  DemoBadge,
   EmptyState,
   GhostButton,
   PriorityBadge,
@@ -158,7 +157,6 @@ export default function IncidentsView() {
           <h1 className="text-[20px] font-semibold tracking-tight text-white">{t("inc.title")}</h1>
           <p className="mt-1 text-[13px] text-zinc-500">{t("inc.subtitle")}</p>
         </div>
-        <DemoBadge label="DEMO DATA" />
       </div>
 
       {/* ---------- stat tiles ---------- */}
@@ -306,10 +304,9 @@ export default function IncidentsView() {
         </div>
       </div>
 
-      {/* ---------- count line (mono metadata: demo suffix stays untranslated) ---------- */}
+      {/* ---------- count line ---------- */}
       <p className="mt-3 font-mono text-[11px] tracking-wide text-zinc-600" aria-live="polite">
         {(filtered.length === 1 ? t("inc.count-one") : t("inc.count-many").replace("{n}", String(filtered.length)))}
-        {" "}· {filtered.length} demo
       </p>
 
       {/* ---------- results ---------- */}
@@ -381,7 +378,6 @@ export default function IncidentsView() {
                     <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
                       <StatusBadge status={incident.status} size="sm" />
                       <PriorityBadge priority={incident.severity} />
-                      <DemoBadge label="DEMO" />
                     </span>
                     <span className="hidden shrink-0 text-[11px] text-zinc-600 md:block">
                       {timeAgo(incident.updatedAt)}

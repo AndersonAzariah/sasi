@@ -58,7 +58,7 @@ interface SasiState {
   /* ---- settings deep-link: which section is active (palette/shortcuts write it) ---- */
   settingsSection: string;
 
-  /* ---- notifications (demo seed + live events) ---- */
+  /* ---- notifications (live events on the user's own data only) ---- */
   notifications: AppNotification[];
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -159,6 +159,10 @@ interface SasiState {
   briefing: CityBriefing | null;
   briefingBusy: boolean;
   briefingError: string | null;
+  /** true when there is no user material to brief from yet — an honest
+      empty state (not an error): the briefing is written only from the
+      resident's own reports/cases, and none exist so far. */
+  briefingEmpty: boolean;
   /** recent briefings, newest first (persisted per session, capped at 8) */
   briefingHistory: CityBriefing[];
   /** the daily city briefing a chat-distilled one displaced (for free restore) */
@@ -173,8 +177,8 @@ interface SasiState {
   restoreCityBriefing: () => Promise<void>;
 }
 
-let caseCounter = 124;
-let eventCounter = 100;
+let caseCounter = 1;
+let eventCounter = 1;
 
 /** keep ref generation ahead of any case restored from the persisted store */
 function bumpCaseCounterFrom(c: SasiCase) {
@@ -444,33 +448,6 @@ const ALL_VIEWS: readonly View[] = [
   "admin",
 ];
 
-/* ------------------------------------------------------------------
-   Service alerts — when hydrating, surface URGENT/CONFIRMED demo
-   incidents near the saved location as ONE quiet digest notification.
-   A localStorage seen-set keeps it a once-per-new-incident event
-   instead of nagging on every reload. Gated by ntfPrefs.service.
-   ------------------------------------------------------------------ */
-function getServiceAlertSeen(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem("sasi.svcSeen");
-    return raw ? (JSON.parse(raw) as string[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function rememberServiceAlertSeen(ids: string[]) {
-  if (typeof window === "undefined" || ids.length === 0) return;
-  try {
-    const seen = new Set(getServiceAlertSeen());
-    for (const id of ids) seen.add(id);
-    window.localStorage.setItem("sasi.svcSeen", JSON.stringify(Array.from(seen)));
-  } catch {
-    /* storage blocked — alerts may repeat next session (harmless) */
-  }
-}
-
 let locationSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function persistLocation(loc: SasiState["savedLocation"]) {
   void snapshotLocation(loc);
@@ -520,6 +497,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
   briefing: null,
   briefingBusy: false,
   briefingError: null,
+  briefingEmpty: false,
   briefingHistory: [],
   restoreBriefing: () => {
     if (typeof window === "undefined") return;
@@ -549,7 +527,14 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       }
       /* stale (older than 6h) or missing → fall through and rewrite quietly */
     }
-    set({ briefingBusy: true, briefingError: null });
+    /* The daily briefing is grounded ONLY in the resident's own material
+       (their reports/cases). With none yet there is nothing to brief —
+       show the honest empty state instead of asking the AI to invent one. */
+    if (get().cases.length === 0) {
+      set({ briefingBusy: false, briefingError: null, briefingEmpty: true });
+      return;
+    }
+    set({ briefingBusy: true, briefingError: null, briefingEmpty: false });
     try {
       const res = await fetch("/api/sasi/briefing", {
         method: "POST",
@@ -569,7 +554,16 @@ export const useSasiStore = create<SasiState>((set, get) => ({
             })),
         }),
       });
-      const data = (await res.json()) as { briefing?: CityBriefing; error?: string };
+      const data = (await res.json()) as {
+        briefing?: CityBriefing | null;
+        error?: string;
+        empty?: boolean;
+      };
+      /* honest no-material response from the route (contract-stable) */
+      if (data.empty) {
+        set({ briefingBusy: false, briefingError: null, briefingEmpty: true });
+        return;
+      }
       if (!res.ok || !data.briefing) {
         throw new Error(data.error ?? "SASI could not write the briefing right now.");
       }
@@ -577,6 +571,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       set((s) => ({
         briefing: b,
         briefingBusy: false,
+        briefingEmpty: false,
         briefingHistory: pushBriefingHistory(s.briefingHistory, b),
       }));
       try {
@@ -650,6 +645,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       set((s) => ({
         briefing: b,
         briefingBusy: false,
+        briefingEmpty: false,
         briefingHistory: pushBriefingHistory(s.briefingHistory, b),
       }));
       try {
@@ -752,35 +748,9 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       description: `${label} ${value ? "on" : "off"} — SASI stops or resumes those alerts right away.`,
     });
 
-    /* Service alerts ON → surface whatever urgent/confirmed incidents are
-       pending right now, so the toggle gives instant, honest feedback
-       instead of waiting for a future incident that may never come. */
-    if (key === "service" && value) {
-      const loc = get().savedLocation;
-      const city = loc.city.toLowerCase();
-      const pending = INCIDENTS.filter(
-        (i) =>
-          !getServiceAlertSeen().includes(i.id) &&
-          (i.status === "URGENT" || i.status === "CONFIRMED") &&
-          i.location.city.toLowerCase() === city
-      );
-      if (pending.length > 0) {
-        rememberServiceAlertSeen(pending.map((i) => i.id));
-        /* push directly (prefs are already updated in state, so the gate
-           would pass — but call pushNotification for the single code path) */
-        get().pushNotification({
-          id: `ntf-live-svc-${pending[0].id}-${Date.now()}`,
-          kind: "SYSTEM",
-          title: `Service alert · ${pending.length} confirmed incident${pending.length === 1 ? "" : "s"} near ${loc.city}`,
-          body:
-            pending
-              .slice(0, 2)
-              .map((i) => `${i.ref} — ${i.title}`)
-              .join(" · ") +
-            (pending.length > 2 ? ` · +${pending.length - 2} more` : ""),
-        });
-      }
-    }
+    /* No demo service alerts: notifications are raised only by real
+       events on the resident's own data (reports, investigations,
+       approvals, briefings). Nothing is generated from a dataset. */
   },
 
   pushNotification: (partial) => {
@@ -814,11 +784,13 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     });
   },
 
+  /* the user's data — starts EMPTY; hydrate merges only what the
+     resident actually created (server copy + on-device snapshot) */
   cases: CASES,
   findings: FINDINGS,
   evidence: EVIDENCE,
-  activeCaseId: "case-123",
-  activeIncidentId: "inc-41",
+  activeCaseId: null,
+  activeIncidentId: null,
   activeService: "water",
 
   openCase: (ref) => {
@@ -826,6 +798,16 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     set({ activeCaseId: c?.id ?? null, view: "case-detail", param: ref, commandOpen: false });
   },
   openIncident: (ref) => {
+    /* fail SOFT: incidents are user-generated now, so an unknown or
+       absent ref (e.g. a stale INC-… citation) lands on the honest
+       incidents list instead of a broken detail view */
+    const known = INCIDENTS.some(
+      (i) => i.id === ref || i.ref.toLowerCase() === ref.toLowerCase()
+    );
+    if (!known) {
+      set({ activeIncidentId: null, view: "incidents", param: null, commandOpen: false });
+      return;
+    }
     set({ activeIncidentId: ref, view: "incident-detail", param: ref, commandOpen: false });
   },
   openService: (key) => {
@@ -926,31 +908,9 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       }
     }
 
-    /* service alerts: one quiet digest of NEW urgent/confirmed incidents
-       near the saved location — only when the user has them enabled.
-       Uses the static demo dataset, so it works offline too. */
-    {
-      const loc = get().savedLocation;
-      const city = loc.city.toLowerCase();
-      const newOnes = INCIDENTS.filter(
-        (i) =>
-          !getServiceAlertSeen().includes(i.id) &&
-          (i.status === "URGENT" || i.status === "CONFIRMED") &&
-          i.location.city.toLowerCase() === city
-      );
-      if (newOnes.length > 0) {
-        rememberServiceAlertSeen(newOnes.map((i) => i.id));
-        get().pushNotification({
-          id: `ntf-live-svc-${newOnes[0].id}-${Date.now()}`,
-          kind: "SYSTEM",
-          title: `Service alert · ${newOnes.length} confirmed incident${newOnes.length === 1 ? "" : "s"} near ${loc.city}`,
-          body: newOnes
-            .slice(0, 2)
-            .map((i) => `${i.ref} — ${i.title}`)
-            .join(" · ") + (newOnes.length > 2 ? ` · +${newOnes.length - 2} more` : ""),
-        });
-      }
-    }
+    /* No demo service alerts on hydrate: notifications exist only for
+       real events on the resident's own data. Incidents are no longer
+       simulated, so there is nothing to digest at startup. */
 
     /* an offline restore is worth one honest, quiet announcement */
     if (get().restoredOffline) {
@@ -1008,7 +968,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     const draft = get().reportDraft ?? {
       service: "water",
       problem: "Issue reported via SASI",
-      location: "Johannesburg, Gauteng",
+      location: "",
       when: "today",
       impact: "",
       evidenceNote: "",
@@ -1024,9 +984,9 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       description: draft.impact || draft.problem,
       service: (draft.service as SasiCase["service"]) || "water",
       location: {
-        province: "Gauteng",
-        municipality: "City of Johannesburg",
-        city: draft.location.split(",")[0]?.trim() || "Johannesburg",
+        province: get().savedLocation.province,
+        municipality: "",
+        city: draft.location.split(",")[0]?.trim() || get().savedLocation.city,
         suburb: draft.location,
       },
       status: "OPEN",
@@ -1200,8 +1160,8 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         (i) => i.ref.toLowerCase() === ref.toLowerCase() || i.id === ref.toLowerCase()
       );
     if (!known) {
-      toast("Not on the demo map", {
-        description: `${ref} has no place on this stylised demo map, so SASI cannot focus it.`,
+      toast("Nothing to show on the map", {
+        description: `${ref} isn't one of your mappable reports, so SASI cannot focus it.`,
       });
       return;
     }

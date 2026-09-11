@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -40,7 +39,6 @@ import {
 import {
   AIStateChip,
   CaseStatusBadge,
-  DemoBadge,
   PriorityBadge,
   SasiPulse,
   ServiceIcon,
@@ -105,7 +103,6 @@ export function CaseCard({
         {c.status !== "RESOLVED" && c.status !== "CLOSED" && (
           <AIStateChip state={c.aiState} />
         )}
-        <DemoBadge label="DEMO" />
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-2.5 text-[11px] text-zinc-600">
@@ -166,7 +163,6 @@ export function IncidentCard({
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <StatusBadge status={incident.status} />
         <PriorityBadge priority={incident.severity} />
-        <DemoBadge label="DEMO" />
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-2.5 text-[11px] text-zinc-600">
@@ -288,13 +284,6 @@ export function FindingCard({ finding }: { finding: Finding }) {
    EVIDENCE CARD
    ============================================================ */
 
-const EVIDENCE_PLACEHOLDER: Record<string, { from: string; to: string }> = {
-  "dry-tap": { from: "#1a2530", to: "#0d1117" },
-  "leak-street": { from: "#1c1f26", to: "#0d0f13" },
-  "burst-pipe": { from: "#241d1a", to: "#100d0c" },
-  reservoir: { from: "#16211d", to: "#0c100e" },
-};
-
 export function EvidenceThumb({
   item,
   className,
@@ -302,10 +291,9 @@ export function EvidenceThumb({
   item: EvidenceItem;
   className?: string;
 }) {
-  const [imgOk, setImgOk] = useState(true);
   if (item.type === "PHOTO") {
     /* user-attached, AI-analysed photos: the image itself never persists —
-       render an honest placeholder instead of a stand-in demo photo */
+       render an honest placeholder instead of a stand-in photo */
     if (item.id.startsWith("EVD-user-")) {
       return (
         <div
@@ -329,28 +317,19 @@ export function EvidenceThumb({
         </div>
       );
     }
-    const ph = EVIDENCE_PLACEHOLDER[item.imageKey ?? "leak-street"];
+    /* any other photo reference: no bundled imagery exists to stand in —
+       render a quiet neutral placeholder (honest, never fabricated) */
     return (
       <div
-        className={cn("relative overflow-hidden rounded-lg border border-white/8", className)}
-        style={{ background: `linear-gradient(135deg, ${ph.from}, ${ph.to})` }}
-      >
-        {imgOk ? (
-          <img
-            src={`/demo/${item.imageKey ?? "leak-street"}.jpg`}
-            alt={item.title}
-            className="h-full w-full object-cover opacity-90"
-            onError={() => setImgOk(false)}
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <ImageIcon className="h-5 w-5 text-zinc-600" aria-hidden />
-          </div>
+        className={cn(
+          "relative flex items-center justify-center overflow-hidden rounded-lg border border-white/8",
+          className
         )}
-        <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-px font-mono text-[8px] font-semibold tracking-widest text-[#e3c567]">
-          DEMO
-        </span>
+        style={{ background: "linear-gradient(135deg, #1a2028, #0d1117)" }}
+        role="img"
+        aria-label={`Photo evidence: ${item.title}`}
+      >
+        <ImageIcon className="h-5 w-5 text-zinc-600" aria-hidden />
       </div>
     );
   }
@@ -520,7 +499,6 @@ export function ActionApprovalCard({
       <div className="flex items-center gap-2">
         <ShieldAlert className="h-4 w-4 text-[#e3c567]" aria-hidden />
         <p className="text-[13px] font-semibold text-white">Approval required</p>
-        <DemoBadge label="DEMO" className="ml-auto" />
       </div>
       <p className="mt-2.5 text-[14px] font-medium leading-snug text-zinc-100">
         {action.title}

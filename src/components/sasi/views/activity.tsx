@@ -7,7 +7,7 @@ import type { ActivityEvent, ActivityKind } from "@/lib/sasi/types";
 import { useT, type TKey } from "@/lib/sasi/i18n";
 import { cn } from "@/lib/utils";
 import { ActivityRow } from "@/components/sasi/domain";
-import { DemoBadge, EmptyState, SectionLabel } from "@/components/sasi/primitives";
+import { EmptyState, SectionLabel } from "@/components/sasi/primitives";
 
 const NOW_MS = new Date(DEMO_NOW).getTime();
 const DAY_MS = 86_400_000;
@@ -21,7 +21,7 @@ const BUCKET_LABEL: Record<DayBucket, TKey> = {
   earlier: "act.bucket.earlier",
 };
 
-/** UTC-day bucketing against the fixed demo clock — deterministic + hydration-safe. */
+/** UTC-day bucketing — deterministic + hydration-safe. */
 function bucketFor(iso: string): DayBucket {
   const t = new Date(iso).getTime();
   const todayStart = Math.floor(NOW_MS / DAY_MS) * DAY_MS;
@@ -105,9 +105,9 @@ export default function ActivityView() {
           <h1 className="text-xl font-semibold tracking-tight text-white">
             {t("nav.activity")}
           </h1>
-          <DemoBadge />
           <span className="font-mono text-[10.5px] tracking-wider text-zinc-600">
-            {t("act.count").replace("{n}", String(ACTIVITY.length))}
+            {ACTIVITY.length} {ACTIVITY.length === 1 ? "EVENT" : "EVENTS"} · YOUR
+            RECORD
           </span>
         </div>
         <p className="mt-1 text-[13px] text-zinc-500">
@@ -142,7 +142,18 @@ export default function ActivityView() {
       </div>
 
       {/* ---------- Day-grouped rail ---------- */}
-      {isEmpty ? (
+      {ACTIVITY.length === 0 ? (
+        <div className="sasi-card mt-6 flex flex-col items-center px-6 py-12 text-center">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03]">
+            <Inbox className="h-5 w-5 text-zinc-400" aria-hidden />
+          </div>
+          <h2 className="sasi-serif text-[16px] text-white">No activity yet</h2>
+          <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-zinc-500">
+            Everything SASI does on your behalf is recorded here. Activity appears
+            only once you create a case — SASI never invents data.
+          </p>
+        </div>
+      ) : isEmpty ? (
         <EmptyState
           className="mt-6"
           icon={Inbox}
