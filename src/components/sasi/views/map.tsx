@@ -5,6 +5,7 @@ import type * as LeafletTypes from "leaflet";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Crosshair,
+  LocateFixed,
   MapPinned,
   Minus,
   Plus,
@@ -591,6 +592,82 @@ const SASI_MAP_CSS = `
 .sasi-pop-btn svg { width:12px; height:12px; }
 `;
 
+/* ---------- scoped styles: real-device location dot + locate control
+   states (Task 15-c). Injected here on purpose — globals.css is owned
+   by another workstream, so zero conflict by design. ---------- */
+
+const SASI_GEO_CSS = `
+.sasi-leaflet-root .sasi-geo-marker { background:transparent; border:none; }
+.sasi-geo-wrap { position:relative; width:14px; height:14px; }
+.sasi-geo-core {
+  position:absolute; inset:0; border-radius:50%;
+  background:#ffffff;
+  border:2.5px solid #64b5f6;
+  box-shadow:0 0 0 2px rgba(10,11,13,0.55), 0 1px 6px rgba(0,0,0,0.6), 0 0 12px rgba(100,181,246,0.6);
+}
+.sasi-geo-pulse {
+  position:absolute; inset:-3px; border-radius:50%;
+  border:2px solid rgba(100,181,246,0.75);
+  pointer-events:none;
+  animation:sasi-geo-ping 2.1s cubic-bezier(0.23,1,0.32,1) infinite;
+}
+@keyframes sasi-geo-ping {
+  0% { transform:scale(0.85); opacity:0.9; }
+  75% { transform:scale(2.7); opacity:0; }
+  100% { transform:scale(2.7); opacity:0; }
+}
+/* follow-mode highlight — the sasi-search-glow-live "live ring" read,
+   tuned for a 44px round control (two-class specificity beats .sasi-btn-glass) */
+.sasi-geo-btn.sasi-geo-following {
+  border-color:rgba(100,181,246,0.55);
+  color:#a8d4f8;
+  background:linear-gradient(180deg, rgba(100,181,246,0.18), rgba(100,181,246,0.07) 55%, rgba(100,181,246,0.12));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 0 0 1px rgba(100,181,246,0.22),
+    0 0 18px rgba(100,181,246,0.38),
+    0 8px 24px -14px rgba(0,0,0,0.8);
+}
+.sasi-geo-btn.sasi-geo-following:hover {
+  border-color:rgba(100,181,246,0.78);
+  background:linear-gradient(180deg, rgba(100,181,246,0.24), rgba(100,181,246,0.10) 55%, rgba(100,181,246,0.16));
+}
+.sasi-geo-btn.sasi-geo-locating svg { animation:sasi-geo-breathe 1.5s ease-in-out infinite; }
+@keyframes sasi-geo-breathe {
+  0%, 100% { opacity:1; }
+  50% { opacity:0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-geo-pulse { animation:none; opacity:0.45; transform:scale(1.5); }
+  .sasi-geo-btn.sasi-geo-locating svg { animation:none; opacity:0.65; }
+}
+`;
+
+/* ---------- real-device geolocation internals ("Locate me", Task 15-c) ---------- */
+
+type GeoPhase = "idle" | "locating" | "fixed" | "following";
+type GeoErrorKind = "denied" | "unavailable";
+
+interface GeoFix {
+  lat: number;
+  lng: number;
+  accuracy: number;
+}
+
+const GEO_POSITION_OPTS: PositionOptions = {
+  enableHighAccuracy: true,
+  timeout: 15000,
+  maximumAge: 15000,
+};
+
+const GEO_ZOOM = 16;
+/** while following, the camera only re-pans after the device moves this far */
+const GEO_FOLLOW_PAN_M = 30;
+
+function isGeoErrorDenied(err: GeolocationPositionError): boolean {
+  return err.code === err.PERMISSION_DENIED;
+}
+
 /* ---------- filter internals ---------- */
 
 const MAP_SERVICES = ["water", "electricity", "roads", "waste"] as const;
@@ -788,6 +865,15 @@ export default function MapView() {
   const homeMarkerRef = useRef<LeafletTypes.Marker | null>(null);
   const suppressCloseRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
+
+  /* ---- real-device geolocation ("Locate me", Task 15-c) ---- */
+  const [geoPhase, setGeoPhase] = useState<GeoPhase>("idle");
+  const [geoError, setGeoError] = useState<GeoErrorKind | null>(null);
+  const geoFixRef = useRef<GeoFix | null>(null);
+  const geoMarkerRef = useRef<LeafletTypes.Marker | null>(null);
+  const geoCircleRef = useRef<LeafletTypes.Circle | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const geoDisposedRef = useRef(true);
 
   /* ---- the user's own reports — the map's honest core content ---- */
   const userCases = useMemo(
@@ -1192,6 +1278,183 @@ export default function MapView() {
     }
   }, [mapReady, homeLatLng]);
 
+  /* ------------------------------------------------------------
+     Effect F — geolocation lifecycle guard. Geolocation callbacks
+     can outlive this component, so every one of them checks
+     geoDisposedRef (same pattern as Effect A's cancelled flag) —
+     StrictMode's double-mount can never touch a dead map.
+     ------------------------------------------------------------ */
+  useEffect(() => {
+    geoDisposedRef.current = false;
+    return () => {
+      geoDisposedRef.current = true;
+      if (watchIdRef.current !== null && "geolocation" in navigator) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+      watchIdRef.current = null;
+      /* the layers die with the map instance (map.remove()); drop the refs */
+      geoMarkerRef.current = null;
+      geoCircleRef.current = null;
+    };
+  }, []);
+
+  /* ------------------------------------------------------------
+     Effect G — place / sync / remove the real-location pulsing
+     dot + honest accuracy ring. Re-runs on mapReady so a
+     StrictMode remount (fresh map instance) re-anchors the last
+     real fix — it never invents one.
+     ------------------------------------------------------------ */
+  useEffect(() => {
+    const L = LRef.current;
+    const map = mapRef.current;
+    if (!mapReady || !L || !map) return;
+
+    if (geoPhase === "idle") {
+      geoMarkerRef.current?.remove();
+      geoMarkerRef.current = null;
+      geoCircleRef.current?.remove();
+      geoCircleRef.current = null;
+      return;
+    }
+
+    const fix = geoFixRef.current;
+    if (!fix) return;
+
+    if (!geoCircleRef.current) {
+      geoCircleRef.current = L.circle([fix.lat, fix.lng], {
+        radius: Math.max(fix.accuracy, 8),
+        color: "#64b5f6",
+        weight: 1,
+        opacity: 0.35,
+        fillColor: "#64b5f6",
+        fillOpacity: 0.08,
+      }).addTo(map);
+    } else {
+      geoCircleRef.current.setLatLng([fix.lat, fix.lng]);
+      geoCircleRef.current.setRadius(Math.max(fix.accuracy, 8));
+    }
+
+    if (!geoMarkerRef.current) {
+      geoMarkerRef.current = L.marker([fix.lat, fix.lng], {
+        icon: L.divIcon({
+          html:
+            '<div class="sasi-geo-wrap" aria-hidden="true">' +
+            '<span class="sasi-geo-pulse"></span>' +
+            '<span class="sasi-geo-core"></span>' +
+            "</div>",
+          className: "sasi-geo-marker",
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        }),
+        interactive: false,
+        zIndexOffset: 500,
+      }).addTo(map);
+    } else {
+      geoMarkerRef.current.setLatLng([fix.lat, fix.lng]);
+    }
+  }, [mapReady, geoPhase]);
+
+  /* ------------------------------------------------------------
+     Effect H — follow mode: continuous watchPosition. Cleanup
+     ALWAYS clears the watch (toggle-off, error, unmount,
+     StrictMode re-run). Position updates are imperative, in the
+     same style as Effect B's marker diff.
+     ------------------------------------------------------------ */
+  useEffect(() => {
+    if (geoPhase !== "following") return;
+    if (!("geolocation" in navigator)) {
+      setGeoPhase(geoFixRef.current ? "fixed" : "idle");
+      setGeoError("unavailable");
+      return;
+    }
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (geoDisposedRef.current) return;
+        const fix: GeoFix = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        };
+        geoFixRef.current = fix;
+        geoMarkerRef.current?.setLatLng([fix.lat, fix.lng]);
+        geoCircleRef.current?.setLatLng([fix.lat, fix.lng]);
+        geoCircleRef.current?.setRadius(Math.max(fix.accuracy, 8));
+        const map = mapRef.current;
+        if (map && map.getCenter().distanceTo([fix.lat, fix.lng]) > GEO_FOLLOW_PAN_M) {
+          map.panTo([fix.lat, fix.lng], { animate: true, duration: 0.75 });
+        }
+      },
+      (err) => {
+        if (geoDisposedRef.current) return;
+        /* honest stop: the last real fix may stay, but SASI stops claiming to follow */
+        setGeoPhase(geoFixRef.current ? "fixed" : "idle");
+        setGeoError(isGeoErrorDenied(err) ? "denied" : "unavailable");
+      },
+      GEO_POSITION_OPTS
+    );
+    watchIdRef.current = watchId;
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    };
+  }, [geoPhase]);
+
+  /* ---- "Locate me" — one honest device fix, then optional follow ---- */
+  const handleLocate = () => {
+    if (geoPhase === "following") {
+      /* follow OFF: the watch is cleared by Effect H's cleanup and the
+         dot + accuracy ring are removed by Effect G */
+      setGeoPhase("idle");
+      return;
+    }
+    if (geoPhase === "fixed") {
+      /* follow ON: switch to continuous watchPosition from the existing fix */
+      setGeoError(null);
+      setGeoPhase("following");
+      return;
+    }
+    if (geoPhase === "locating") return;
+
+    setGeoError(null);
+    if (!("geolocation" in navigator)) {
+      setGeoError("unavailable");
+      return;
+    }
+    setGeoPhase("locating");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (geoDisposedRef.current) return;
+        const fix: GeoFix = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        };
+        geoFixRef.current = fix; // the only position SASI ever shows — the real one
+        setGeoPhase("fixed");
+        mapRef.current?.flyTo([fix.lat, fix.lng], GEO_ZOOM, { duration: 1.2 });
+      },
+      (err) => {
+        if (geoDisposedRef.current) return;
+        setGeoPhase(geoFixRef.current ? "fixed" : "idle");
+        setGeoError(isGeoErrorDenied(err) ? "denied" : "unavailable");
+      },
+      GEO_POSITION_OPTS
+    );
+  };
+
+  const locateAria =
+    geoPhase === "following"
+      ? "Following my location — click to stop"
+      : geoPhase === "locating"
+        ? "Finding your location"
+        : "Center map on my location";
+  const locateTitle =
+    geoPhase === "following"
+      ? "Following — click to stop"
+      : geoPhase === "fixed"
+        ? "Follow my location"
+        : "Center map on my location";
+
   /* honest legend — only entries that can actually appear */
   const legendServices = useMemo(() => {
     const order: ServiceKey[] = [];
@@ -1252,6 +1515,7 @@ export default function MapView() {
   return (
     <div className="relative -mb-24 h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-[#0a0b0d] lg:-mb-8">
       <style>{SASI_MAP_CSS}</style>
+      <style>{SASI_GEO_CSS}</style>
 
       {/* Leaflet root — tiles below, markers/popup above, all chrome custom */}
       <div
@@ -1379,34 +1643,109 @@ export default function MapView() {
         </div>
       )}
 
-      {/* zoom + recenter — custom glass controls, 44px touch targets,
-          tucked under the mobile filter chip / bottom-right on desktop */}
-      <div className="absolute right-4 top-16 z-20 flex flex-col items-center gap-1.5 lg:bottom-4 lg:right-4 lg:top-auto">
-        <button
-          type="button"
-          onClick={() => mapRef.current?.zoomIn()}
-          aria-label="Zoom in"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/12 bg-black/70 text-zinc-200 backdrop-blur transition-colors hover:border-white/25 hover:text-white"
-        >
-          <Plus className="h-4.5 w-4.5" aria-hidden />
-        </button>
-        <button
-          type="button"
-          onClick={() => mapRef.current?.zoomOut()}
-          aria-label="Zoom out"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/12 bg-black/70 text-zinc-200 backdrop-blur transition-colors hover:border-white/25 hover:text-white"
-        >
-          <Minus className="h-4.5 w-4.5" aria-hidden />
-        </button>
-        <div className="h-px w-6 bg-white/10" aria-hidden />
-        <button
-          type="button"
-          onClick={recenter}
-          aria-label="Recenter on your saved location"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/12 bg-black/70 text-zinc-200 backdrop-blur transition-colors hover:border-white/25 hover:text-white"
-        >
-          <Crosshair className="h-4.5 w-4.5" aria-hidden />
-        </button>
+      {/* map control cluster — glass pill (zoom · saved-location recenter ·
+          real-device "Locate me"), 44px touch targets, tucked under the
+          mobile filter chip / bottom-right on desktop */}
+      <div className="absolute right-4 top-16 z-20 flex flex-col items-end gap-2 lg:bottom-4 lg:right-4 lg:top-auto">
+        {/* follow-mode live tag */}
+        {geoPhase === "following" && (
+          <div
+            role="status"
+            className="flex items-center gap-1.5 rounded-full border border-[#64b5f6]/30 bg-black/70 px-2.5 py-1 backdrop-blur"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-[#64b5f6] sasi-breathe" aria-hidden />
+            <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.14em] text-[#a8d4f8]">
+              Following
+            </span>
+          </div>
+        )}
+
+        {/* honest geolocation notice — SASI never fakes a position */}
+        {geoError && (
+          <div
+            role="status"
+            className="w-60 rounded-xl border border-white/12 bg-black/80 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.45)] backdrop-blur"
+          >
+            <div className="flex items-start gap-2">
+              <span
+                className={cn(
+                  "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                  geoError === "denied" ? "bg-[#ef5350]" : "bg-[#e3c567]"
+                )}
+                aria-hidden
+              />
+              <p className="text-[11px] leading-relaxed text-zinc-300">
+                {geoError === "denied"
+                  ? "Location permission was denied — SASI can't center on you until it's allowed in the browser."
+                  : "Your location is unavailable right now."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setGeoError(null)}
+                aria-label="Dismiss location notice"
+                className="-m-1 ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-500 transition-colors hover:text-white"
+              >
+                <X className="h-3 w-3" aria-hidden />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
+          {/* permanent honesty microcopy for the locate control */}
+          <p
+            className="max-w-[9rem] text-right text-[10px] leading-tight text-zinc-500"
+            style={{ textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}
+          >
+            Location is used only on this device.
+          </p>
+
+          <div
+            role="group"
+            aria-label="Map view controls"
+            className="flex flex-col items-center gap-1 rounded-full border border-white/12 bg-gradient-to-b from-white/[0.06] to-white/[0.02] px-1 py-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md"
+          >
+            <button
+              type="button"
+              onClick={() => mapRef.current?.zoomIn()}
+              aria-label="Zoom in"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
+            >
+              <Plus className="h-4.5 w-4.5" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => mapRef.current?.zoomOut()}
+              aria-label="Zoom out"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
+            >
+              <Minus className="h-4.5 w-4.5" aria-hidden />
+            </button>
+            <div className="h-px w-6 bg-white/10" aria-hidden />
+            <button
+              type="button"
+              onClick={recenter}
+              aria-label="Recenter on your saved location"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
+            >
+              <Crosshair className="h-4.5 w-4.5" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={handleLocate}
+              aria-label={locateAria}
+              aria-pressed={geoPhase === "following"}
+              title={locateTitle}
+              className={cn(
+                "sasi-btn-glass sasi-geo-btn mt-0.5 flex h-11 w-11 items-center justify-center rounded-full text-zinc-100",
+                geoPhase === "following" && "sasi-geo-following",
+                geoPhase === "locating" && "sasi-geo-locating"
+              )}
+            >
+              <LocateFixed className="h-4.5 w-4.5" aria-hidden />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* empty state — the honest overlay when there is nothing to plot */}

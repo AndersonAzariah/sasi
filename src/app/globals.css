@@ -1673,3 +1673,333 @@ html::-webkit-scrollbar-thumb:hover {
     animation: none;
   }
 }
+
+/* ============================================================
+   TASK 15 — UNIVERSAL CIRCULATING BUTTON RINGS
+   Every button carries the national light: a rotating conic
+   outline at rest, brightening + accelerating on hover/focus.
+   ============================================================ */
+
+/* ring hosts need a positioning context */
+.sasi-btn-ring,
+.sasi-btn-glass,
+.sasi-btn-white-glass,
+[data-slot="button"] {
+  position: relative;
+}
+
+/* shared rotating conic ring (::before is free on all hosts) */
+.sasi-btn-ring::before,
+.sasi-btn-glass::before,
+.sasi-btn-white-glass::before,
+[data-slot="button"]::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--sasi-glow-angle),
+    rgba(255, 255, 255, 0.16) 0deg,
+    rgba(229, 57, 53, 0.9) 42deg,
+    rgba(255, 255, 255, 0.12) 96deg,
+    rgba(66, 165, 245, 0.82) 155deg,
+    rgba(255, 255, 255, 0.12) 210deg,
+    rgba(67, 160, 71, 0.78) 262deg,
+    rgba(255, 255, 255, 0.12) 304deg,
+    rgba(212, 175, 55, 0.95) 344deg,
+    rgba(255, 255, 255, 0.16) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.5;
+  animation: sasi-glow-rotate 4.5s linear infinite;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+/* --- per-host tuning (order matters: later rules win) --- */
+[data-slot="button"]::before {
+  inset: -1.5px;
+  padding: 1px;
+  opacity: 0.28;
+  animation-duration: 6.5s;
+}
+.sasi-btn-ring::before {
+  opacity: 0.42;
+  animation-duration: 5.2s;
+}
+.sasi-btn-glass::before {
+  opacity: 0.6;
+}
+.sasi-btn-white-glass::before {
+  opacity: 0.42;
+  animation-duration: 5.2s;
+}
+
+/* --- hover / focus: the light snaps alive --- */
+[data-slot="button"]:hover::before {
+  opacity: 0.9;
+  animation-duration: 3s;
+}
+[data-slot="button"]:focus-visible::before {
+  opacity: 1;
+  animation-duration: 2.6s;
+}
+.sasi-btn-ring:hover::before {
+  opacity: 1;
+  animation-duration: 2.6s;
+}
+.sasi-btn-glass:hover::before,
+.sasi-btn-white-glass:hover::before {
+  opacity: 1;
+  animation-duration: 2.4s;
+  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.35));
+}
+.sasi-btn-white-glass:focus-visible::before,
+.sasi-btn-glass:focus-visible::before {
+  opacity: 1;
+  animation-duration: 2.4s;
+}
+
+/* disabled buttons dim their ring instead of killing it */
+[data-slot="button"][disabled]::before,
+[data-slot="button"][aria-disabled="true"]::before,
+.sasi-btn-glass[disabled]::before,
+.sasi-btn-glass[aria-disabled="true"]::before,
+.sasi-btn-ring[disabled]::before,
+.sasi-btn-white-glass[disabled]::before {
+  opacity: 0.14;
+  animation-play-state: paused;
+}
+
+/* glass buttons: sheen moves from ::after into the background stack
+   so ::before owns the ring — overflow must stay visible */
+.sasi-btn-glass {
+  overflow: visible;
+  background:
+    radial-gradient(
+      120% 60% at 22% 0%,
+      rgba(255, 255, 255, 0.15),
+      rgba(255, 255, 255, 0.02) 55%,
+      transparent 75%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.03) 55%,
+      rgba(255, 255, 255, 0.05)
+    );
+}
+.sasi-btn-glass::after {
+  content: none;
+}
+.sasi-btn-white-glass {
+  overflow: visible;
+  background:
+    radial-gradient(
+      110% 55% at 24% 0%,
+      rgba(255, 255, 255, 0.5),
+      transparent 60%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.84));
+}
+.sasi-btn-white-glass::after {
+  content: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sasi-btn-ring::before,
+  .sasi-btn-glass::before,
+  .sasi-btn-white-glass::before,
+  [data-slot="button"]::before {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
+/* ============================================================
+   TASK 15 — SEARCH BARS 100X
+   Liquid-glass shells, a brighter + faster circulating ring,
+   national halo on focus, live variant turned up.
+   ============================================================ */
+
+.sasi-search-glow,
+.sasi-command-focus {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0.018)
+  );
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 30px -22px rgba(0, 0, 0, 0.9);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background 0.3s ease;
+}
+.sasi-search-glow:hover,
+.sasi-command-focus:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.024)
+  );
+}
+.sasi-search-glow:focus-within,
+.sasi-command-focus:focus-within {
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(229, 57, 53, 0.12),
+    0 0 28px -8px rgba(229, 57, 53, 0.22),
+    0 0 34px -10px rgba(66, 165, 245, 0.3),
+    0 0 38px -12px rgba(212, 175, 55, 0.24);
+}
+
+/* the ring itself: thicker, brighter, faster */
+.sasi-search-glow::before,
+.sasi-command-focus::before {
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--sasi-glow-angle),
+    rgba(255, 255, 255, 0.12) 0deg,
+    rgba(229, 57, 53, 0.95) 36deg,
+    rgba(255, 255, 255, 0.08) 82deg,
+    rgba(66, 165, 245, 0.9) 140deg,
+    rgba(255, 255, 255, 0.08) 194deg,
+    rgba(67, 160, 71, 0.85) 252deg,
+    rgba(255, 255, 255, 0.08) 294deg,
+    rgba(212, 175, 55, 0.98) 334deg,
+    rgba(255, 255, 255, 0.12) 360deg
+  );
+}
+.sasi-search-glow:focus-within::before,
+.sasi-command-focus:focus-within::before {
+  animation-duration: 3.2s;
+  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.4));
+}
+.sasi-search-glow-live::before {
+  opacity: 0.5;
+  animation-duration: 6.5s;
+}
+.sasi-search-glow-live:focus-within::before {
+  opacity: 1;
+  animation-duration: 3.2s;
+}
+
+/* ============================================================
+   TASK 15 — POPUP MENUS 100X (select / popover / command / dropdown)
+   Deeper glass, pop-in motion, national hover bars on items.
+   ============================================================ */
+
+[data-slot="select-content"],
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="command-dialog"] {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    180deg,
+    rgba(18, 18, 21, 0.94),
+    rgba(10, 10, 12, 0.97)
+  );
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 30px 70px -20px rgba(0, 0, 0, 0.92),
+    0 0 60px -24px rgba(66, 165, 245, 0.2);
+  overflow: hidden;
+  animation: sasi-menu-in 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes sasi-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.985);
+  }
+}
+
+/* triggers become liquid glass too */
+[data-slot="select-trigger"] {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.02)
+  );
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* items: rounded, fast, with a national light bar on the active edge */
+[data-slot="select-item"],
+[data-slot="command-item"],
+[data-slot="dropdown-menu-item"] {
+  position: relative;
+  border-radius: 10px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+[data-slot="select-item"]::before,
+[data-slot="command-item"]::before,
+[data-slot="dropdown-menu-item"]::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 22%;
+  bottom: 22%;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ef5350, #64b5f6, #66bb6a, #e3c567);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+[data-slot="select-item"]:hover,
+[data-slot="select-item"][data-highlighted="true"],
+[data-slot="command-item"]:hover,
+[data-slot="command-item"][data-selected="true"],
+[data-slot="command-item"][data-highlighted="true"],
+[data-slot="dropdown-menu-item"]:hover,
+[data-slot="dropdown-menu-item"][data-highlighted="true"] {
+  background: rgba(255, 255, 255, 0.065);
+}
+[data-slot="select-item"]:hover::before,
+[data-slot="select-item"][data-highlighted="true"]::before,
+[data-slot="command-item"]:hover::before,
+[data-slot="command-item"][data-selected="true"]::before,
+[data-slot="command-item"][data-highlighted="true"]::before,
+[data-slot="dropdown-menu-item"]:hover::before,
+[data-slot="dropdown-menu-item"][data-highlighted="true"]::before {
+  opacity: 0.9;
+}
+
+/* command palette input gets the full glass shell read */
+[data-slot="command-dialog-input-wrapper"],
+[data-slot="command-input-wrapper"] {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="select-content"],
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="command-dialog"] {
+    animation: none;
+  }
+}
+/* task15-confirm */

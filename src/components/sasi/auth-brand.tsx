@@ -7,7 +7,7 @@
    Logic-free: pure presentation + navigation only.
    ============================================================ */
 
-import { ArrowLeft, BadgeCheck, Megaphone, SearchCheck } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Megaphone, SearchCheck, ShieldCheck, Lock, Sparkles } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { SasiLogo } from "@/components/sasi/primitives";
 
@@ -66,20 +66,32 @@ export function AuthTopBar() {
 /* ---------- Left brand panel — dots, hero word, principles plate ---------- */
 const PRINCIPLES = [
   {
+    n: "01",
     icon: Megaphone,
+    accent: "#ef5350",
     title: "Report",
     body: "Log a service failure in your own words, with photos.",
   },
   {
+    n: "02",
     icon: SearchCheck,
+    accent: "#64b5f6",
     title: "Investigate",
     body: "SASI assembles a timeline and evidence you control.",
   },
   {
+    n: "03",
     icon: BadgeCheck,
+    accent: "#e3c567",
     title: "Approve",
     body: "Nothing is ever submitted without your sign-off.",
   },
+] as const;
+
+const TRUST_CHIPS = [
+  { icon: ShieldCheck, label: "Local-first" },
+  { icon: Lock, label: "Approval-gated" },
+  { icon: Sparkles, label: "AI-assisted \u2014 unverified" },
 ] as const;
 
 export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
@@ -121,6 +133,14 @@ export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
         style={{ background: ambients.bottom }}
       />
 
+      {/* corner orbit ornament — faint static track + slow national ring */}
+      <div aria-hidden className="sasi-boot-orbit right-[-70px] top-[-70px] h-44 w-44" />
+      <div
+        aria-hidden
+        className="sasi-boot-ring right-[-58px] top-[-58px] h-20 w-20 opacity-50"
+        style={{ animationDuration: "9s" }}
+      />
+
       {/* top — editorial eyebrow */}
       <div className="relative">
         <div className="sasi-eyebrow text-zinc-400">
@@ -136,28 +156,69 @@ export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
       {/* middle — serif statement + liquid glass principles plate */}
       <div className="relative max-w-md">
         <h2 className="sasi-serif text-[38px] font-medium leading-[1.1] tracking-tight text-white xl:text-[44px]">
-          Service intelligence for South&nbsp;Africa.
+          Service intelligence for{" "}
+          <em
+            className="bg-clip-text text-transparent"
+            style={{
+              fontStyle: "italic",
+              backgroundImage:
+                "linear-gradient(100deg, #f28b87, #90caf9 42%, #a5d6a7 68%, #eed582)",
+            }}
+          >
+            South Africa.
+          </em>
         </h2>
         <p className="mt-5 max-w-sm text-[13.5px] leading-relaxed text-zinc-500">
           Independent civic technology. Not a government website.
         </p>
 
-        <div className="sasi-auth-card mt-9 space-y-4 !rounded-3xl p-5">
-          {PRINCIPLES.map(({ icon: Icon, title, body }) => (
-            <div key={title} className="flex items-start gap-3.5">
-              <span className="sasi-principle-tile" aria-hidden>
-                <Icon className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[12.5px] font-semibold tracking-wide text-zinc-100">
-                  {title}
-                </p>
-                <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">
-                  {body}
-                </p>
+        <div className="sasi-auth-card mt-9 !rounded-3xl p-5">
+          <div className="space-y-1">
+            {PRINCIPLES.map(({ n, icon: Icon, accent, title, body }) => (
+              <div
+                key={title}
+                className="group flex items-start gap-3.5 rounded-2xl p-2 transition-colors duration-300 hover:bg-white/[0.04]"
+              >
+                <span className="sasi-serif w-6 shrink-0 pt-1 text-[13px] font-medium text-zinc-600 transition-colors duration-300 group-hover:text-zinc-300">
+                  {n}
+                </span>
+                <span
+                  className="sasi-principle-tile transition-transform duration-300 group-hover:scale-105"
+                  style={{
+                    color: accent,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.14), 0 0 18px -6px ${accent}55`,
+                  }}
+                  aria-hidden
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-semibold tracking-wide text-zinc-100">
+                    {title}
+                  </p>
+                  <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">
+                    {body}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {/* trust chips — honest by design */}
+          <div
+            className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/6 pt-4"
+            aria-label="Design principles"
+          >
+            {TRUST_CHIPS.map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10.5px] font-medium tracking-wide text-zinc-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]"
+              >
+                <Icon className="h-3 w-3 text-zinc-500" aria-hidden />
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
