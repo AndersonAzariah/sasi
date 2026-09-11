@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { formatDateTime, timeAgo } from "@/lib/sasi/utils";
 import { toast } from "sonner";
 import { RichText } from "./rich-text";
-import { SectionLabel } from "./primitives";
+import { SectionLabel, ThinkingDots } from "./primitives";
 
 /* ============================================================
    CityBriefingCard — the dashboard's AI-written daily digest.
@@ -368,13 +368,10 @@ export function CityBriefingCard() {
         </div>
       )}
 
-      {/* ---------- busy: shimmer skeleton ---------- */}
+      {/* ---------- busy: honest national thinking lights (no skeleton bars) ---------- */}
       {busy && !shown && (
-        <div className="mt-4 space-y-3" aria-live="polite" aria-label="SASI is writing today's briefing">
-          <div className="sasi-skeleton h-5 w-4/5" />
-          <div className="sasi-skeleton h-3.5 w-full" />
-          <div className="sasi-skeleton h-3.5 w-11/12" />
-          <div className="sasi-skeleton h-3.5 w-3/5" />
+        <div className="mt-4 space-y-2.5" aria-live="polite" aria-label="SASI is writing today's briefing">
+          <ThinkingDots label="SASI is writing today's briefing" />
           <p className="pt-1 font-mono text-[10px] tracking-[0.14em] text-zinc-600">
             SASI IS WRITING TODAY&apos;S BRIEFING…
           </p>

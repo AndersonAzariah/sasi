@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, List, Rows3, Search, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,6 @@ import { GAUTENG_MUNICIPALITIES, INCIDENTS } from "@/lib/sasi/data";
 import type { Incident, TrustStatus } from "@/lib/sasi/types";
 import { SERVICES, locationLabel, timeAgo } from "@/lib/sasi/utils";
 import {
-  CardSkeleton,
   EmptyState,
   GhostButton,
   PriorityBadge,
@@ -88,18 +87,12 @@ export default function IncidentsView() {
   const openIncident = useSasiStore((s) => s.openIncident);
   const t = useT();
 
-  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [service, setService] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [severity, setSeverity] = useState<string>("all");
   const [municipality, setMunicipality] = useState<string>("all");
   const [mode, setMode] = useState<"list" | "dense">("list");
-
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
 
   const sorted = useMemo(
     () =>
@@ -309,15 +302,9 @@ export default function IncidentsView() {
         {(filtered.length === 1 ? t("inc.count-one") : t("inc.count-many").replace("{n}", String(filtered.length)))}
       </p>
 
-      {/* ---------- results ---------- */}
+      {/* ---------- results — renders instantly, no fake loading ---------- */}
       <div className="mt-2.5">
-        {loading ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <EmptyState
             icon={Zap}
             title={t("inc.empty-title")}

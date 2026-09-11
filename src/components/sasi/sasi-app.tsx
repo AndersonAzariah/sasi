@@ -63,13 +63,41 @@ const APP_ELIGIBLE_PUBLIC = new Set<View>(["services", "service-detail"]);
 
 /* ============================================================
    SPLASH — the boot experience: the mark, big, centered, with
-   the national light circulating around it. Nothing else.
-   Lasts 7 seconds; a tap or any key skips it honestly.
+   the national light circulating around it. Below it the
+   wordmark assembles itself, then four national lights ignite
+   one by one while REAL boot phases complete (session restore,
+   sync, map calibration — wired to hydrate(), not a timer
+   lie). No loading bars: progress is four dots and one honest
+   line. Lasts ~5 seconds; a tap or any key skips it honestly.
    ============================================================ */
 
-const BOOT_MS = 7000;
+const BOOT_MS = 5200;
 
-function SplashScreen({ onSkip }: { onSkip: () => void }) {
+const BOOT_PHASES = [
+  "Restoring your session",
+  "Syncing reports & evidence",
+  "Calibrating the service map",
+  "Ready",
+] as const;
+
+const BOOT_DOT_COLORS = ["#ef5350", "#64b5f6", "#66bb6a", "#e3c567"];
+const BOOT_PHASE_MS = 850;
+
+function SplashScreen({ onSkip, ready }: { onSkip: () => void; ready: boolean }) {
+  const [phase, setPhase] = useState(0);
+
+  /* phases advance on a rhythm, but never claim a stage the app
+     hasn't reached — the last one waits for real hydration */
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setPhase((p) => {
+        const cap = ready ? BOOT_PHASES.length - 1 : BOOT_PHASES.length - 2;
+        return p < cap ? p + 1 : p;
+      });
+    }, BOOT_PHASE_MS);
+    return () => window.clearInterval(id);
+  }, [ready]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "Enter" || e.key === " ") onSkip();
@@ -131,16 +159,90 @@ function SplashScreen({ onSkip }: { onSkip: () => void }) {
         </div>
       </motion.div>
 
-      {/* ------- national-light boot progress ------- */}
+      {/* ------- the wordmark assembles itself under the mark ------- */}
       <motion.div
-        className="mt-14 flex w-52 flex-col items-center gap-3"
+        className="mt-7 flex flex-col items-center"
+        initial="hidden"
+        animate="show"
+        aria-hidden
+      >
+        <div className="flex overflow-hidden">
+          {("SASI" as const).split("").map((ch, i) => (
+            <motion.span
+              key={i}
+              variants={{
+                hidden: { y: 16, opacity: 0, filter: "blur(6px)" },
+                show: { y: 0, opacity: 1, filter: "blur(0px)" },
+              }}
+              transition={{ delay: 0.3 + i * 0.09, duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+              className="sasi-serif pr-[0.42em] text-[26px] leading-none tracking-[0.1em] text-white last:pr-0"
+            >
+              {ch}
+            </motion.span>
+          ))}
+        </div>
+        {/* national rule sweeping out under the wordmark */}
+        <motion.span
+          className="mt-3 h-px w-24 origin-center rounded-full"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, #ef5350 18%, #64b5f6 42%, #66bb6a 62%, #e3c567 82%, transparent)",
+          }}
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          transition={{ delay: 0.75, duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
+        />
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1, duration: 0.6 }}
+          className="mt-3 font-mono text-[9px] font-medium uppercase tracking-[0.34em] text-zinc-600"
+        >
+          South African Service Intelligence
+        </motion.p>
+      </motion.div>
+
+      {/* ------- national-light boot phases: four dots, one honest
+              line — the old sweeping bar is gone ------- */}
+      <motion.div
+        className="mt-12 flex w-56 flex-col items-center gap-3"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.5 }}
       >
-        <div className="sasi-boot-bar w-full" aria-hidden />
+        <div className="flex items-center gap-2.5" aria-hidden>
+          {BOOT_DOT_COLORS.map((c, i) => (
+            <span
+              key={c}
+              className="sasi-boot-dot"
+              data-lit={i <= phase}
+              style={
+                i <= phase
+                  ? { background: c, boxShadow: `0 0 9px ${c}59` }
+                  : undefined
+              }
+            />
+          ))}
+        </div>
+        <div className="h-4" aria-live="polite">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={phase}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.26, ease: "easeOut" }}
+              className="text-center font-mono text-[10.5px] tracking-[0.18em] text-zinc-500"
+            >
+              {BOOT_PHASES[phase].toUpperCase()}
+            </motion.p>
+          </AnimatePresence>
+        </div>
         <p className="text-center text-[11px] tracking-wide text-zinc-600">
-          Tap anywhere to skip
+          Tap anywhere to skip{" "}
+          <kbd className="rounded border border-white/10 bg-white/5 px-1 py-px font-mono text-[9px] text-zinc-500">
+            ESC
+          </kbd>
         </p>
       </motion.div>
 
@@ -217,10 +319,14 @@ export function SasiApp() {
   const updateReady = usePwaStore((s) => s.updateReady);
   const clearUpdateReady = usePwaStore((s) => s.clearUpdateReady);
   const [mounted, setMounted] = useState(false);
+  const [bootReady, setBootReady] = useState(false);
 
   useEffect(() => {
-    // pull persisted chat / cases / location while the splash is up
-    void hydrate();
+    // pull persisted chat / cases / location while the splash is up —
+    // the splash's last boot phase waits for this for real
+    hydrate()
+      .catch(() => undefined)
+      .finally(() => setBootReady(true));
     // restore the Data Saver choice before anything paints
     initDataSaver();
     const t = setTimeout(() => setMounted(true), BOOT_MS);
@@ -269,7 +375,7 @@ export function SasiApp() {
           <SasiGsapRuntime />
         </>
       )}
-      <AnimatePresence>{!mounted && <SplashScreen onSkip={skipBoot} />}</AnimatePresence>
+      <AnimatePresence>{!mounted && <SplashScreen onSkip={skipBoot} ready={bootReady} />}</AnimatePresence>
       <Toaster
         position="bottom-right"
         theme="dark"

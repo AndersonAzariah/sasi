@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronRight,
@@ -100,7 +100,6 @@ export default function EvidenceView() {
   const addEvidence = useSasiStore((s) => s.addEvidence);
   const savedLocation = useSasiStore((s) => s.savedLocation);
 
-  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [type, setType] = useState<string>("ALL");
   const [caseFilter, setCaseFilter] = useState<string>("all");
@@ -115,11 +114,6 @@ export default function EvidenceView() {
   const [addNote, setAddNote] = useState("");
   const [addUrl, setAddUrl] = useState("");
   const [addCaseId, setAddCaseId] = useState<string>("none");
-
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
 
   const caseRefById = useMemo(() => {
     const map = new Map<string, string>();
@@ -363,33 +357,9 @@ export default function EvidenceView() {
         )}
       </div>
 
-      {/* ---------- results ---------- */}
+      {/* ---------- results — renders instantly, no fake loading ---------- */}
       <div className="mt-4">
-        {loading ? (
-          mode === "grid" ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="sasi-card space-y-3 p-3">
-                  <div className="aspect-[16/10] w-full animate-pulse rounded-lg bg-white/5" />
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-white/5" />
-                  <div className="h-2 w-1/2 animate-pulse rounded bg-white/4" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="sasi-card divide-y divide-white/5 overflow-hidden">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-3">
-                  <div className="h-14 w-20 shrink-0 animate-pulse rounded-lg bg-white/5" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 w-1/3 animate-pulse rounded bg-white/5" />
-                    <div className="h-2 w-1/2 animate-pulse rounded bg-white/4" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <EmptyState
             icon={FolderLock}
             title={t("ev.empty.title")}

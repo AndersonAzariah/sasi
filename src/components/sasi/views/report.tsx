@@ -31,6 +31,7 @@ import {
   SectionLabel,
   ServiceIcon,
   SERVICE_TINT,
+  ThinkingDots,
 } from "@/components/sasi/primitives";
 
 /* ============================================================
@@ -722,11 +723,8 @@ export default function ReportView() {
                           <p className="text-[12.5px] font-medium text-zinc-200">
                             {t("rp.evidence.reading")}
                           </p>
-                          <div className="mt-2 space-y-1.5">
-                            <div className="sasi-skeleton h-2.5 w-11/12" />
-                            <div className="sasi-skeleton h-2.5 w-3/4" />
-                            <div className="sasi-skeleton h-2.5 w-2/3" />
-                          </div>
+                          {/* national thinking lights — no skeleton bars */}
+                          <ThinkingDots className="mt-3" label="SASI is reading the photo" />
                         </div>
                       </div>
                     )}

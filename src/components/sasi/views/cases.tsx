@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, FolderLock, Inbox, Plus } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { useT } from "@/lib/sasi/i18n";
@@ -12,7 +12,6 @@ import { CaseCard } from "@/components/sasi/domain";
 import {
   EmptyState,
   GhostButton,
-  ListSkeleton,
   PrimaryButton,
 } from "@/components/sasi/primitives";
 
@@ -79,13 +78,6 @@ export default function CasesView() {
   const [service, setService] = useState<string>("ALL");
   const [location, setLocation] = useState<string>("ALL");
   const [priority, setPriority] = useState<string>("ALL");
-
-  /* brief skeleton on first mount — premium loading feel */
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 300);
-    return () => clearTimeout(t);
-  }, []);
 
   const counts = useMemo(() => {
     const c: Record<StatusTab, number> = {
@@ -247,10 +239,8 @@ export default function CasesView() {
         </p>
       </div>
 
-      {/* ---------- Grid ---------- */}
-      {loading ? (
-        <ListSkeleton rows={4} className="mt-5" />
-      ) : cases.length === 0 ? (
+      {/* ---------- Grid — renders instantly, no fake loading ---------- */}
+      {cases.length === 0 ? (
         <div className="sasi-card mt-5 flex flex-col items-center px-6 py-12 text-center">
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03]">
             <Inbox className="h-5 w-5 text-zinc-400" aria-hidden />

@@ -472,27 +472,55 @@ export function SasiPulse({
 }
 
 /* ============================================================
-   SKELETONS
+   THINKING DOTS — the site-wide replacement for skeleton loading
+   bars (Task 20). Four national lights breathing in sequence
+   while GENUINE async work runs; an optional rotating status
+   line keeps the wait legible without pretending fake content.
    ============================================================ */
 
-export function CardSkeleton({ className }: { className?: string }) {
+const THINKING_DOT_COLORS = ["#ef5350", "#64b5f6", "#66bb6a", "#e3c567"];
+
+export function ThinkingDots({
+  className,
+  label,
+}: {
+  className?: string;
+  /** accessible one-line description of the real work in progress */
+  label?: string;
+}) {
   return (
-    <div className={cn("sasi-card space-y-3 p-4", className)}>
-      <div className="h-3 w-1/3 animate-pulse rounded bg-white/6" />
-      <div className="h-3 w-3/4 animate-pulse rounded bg-white/5" />
-      <div className="h-2 w-1/2 animate-pulse rounded bg-white/4" />
+    <div
+      className={cn("flex items-center gap-1.5", className)}
+      role="status"
+      aria-label={label ?? "SASI is working"}
+    >
+      {THINKING_DOT_COLORS.map((c, i) => (
+        <span
+          key={c}
+          className="sasi-breathe h-1.5 w-1.5 rounded-full"
+          style={{
+            backgroundColor: c,
+            animationDelay: `${i * 0.32}s`,
+          }}
+          aria-hidden
+        />
+      ))}
     </div>
   );
 }
 
-export function ListSkeleton({ rows = 3, className }: { rows?: number; className?: string }) {
-  return (
-    <div className={cn("space-y-3", className)}>
-      {Array.from({ length: rows }).map((_, i) => (
-        <CardSkeleton key={i} />
-      ))}
-    </div>
-  );
+/** Rotating honest microcopy for waits longer than a beat —
+    cycles real-stage phrases, no fake content shapes. */
+export function useRotatingStatus(phrases: readonly string[], ms = 1700): string {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setIdx((i) => (i + 1) % phrases.length),
+      ms
+    );
+    return () => window.clearInterval(id);
+  }, [phrases, ms]);
+  return phrases[idx];
 }
 
 /* ============================================================

@@ -12,6 +12,7 @@ import { useSasiStore } from "@/lib/sasi/store";
 import type { EvidenceAnalysis, EvidenceItem } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { ThinkingDots, useRotatingStatus } from "@/components/sasi/primitives";
 
 /* ============================================================
    PhotoAnalysisPanel — "SASI reads this photo" for evidence
@@ -27,6 +28,13 @@ const SEVERITY_CLS: Record<EvidenceAnalysis["severity"], string> = {
   HIGH: "border-orange-400/35 bg-orange-400/10 text-orange-300",
   CRITICAL: "border-[#ef5350]/40 bg-[#ef5350]/10 text-[#fda4a0]",
 };
+
+/** module-level so the rotating-status interval never resets on re-render */
+const WORK_STAGES = [
+  "FRAMING THE SCENE…",
+  "READING TEXTURES…",
+  "GAUGING SEVERITY…",
+] as const;
 
 /** Downscale an image data-URL to ≤1280px compact JPEG. */
 function scaleDataUrl(src: string, maxDim = 1280, quality = 0.82): Promise<string> {
@@ -54,6 +62,8 @@ export function PhotoAnalysisPanel({ item }: { item: EvidenceItem }) {
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<EvidenceAnalysis | null>(null);
   const filedRef = useRef(false);
+  /* hook at the top level — the working branch below only renders it */
+  const workStage = useRotatingStatus(WORK_STAGES);
 
   const analyse = async () => {
     if (state === "working") return;
@@ -159,11 +169,11 @@ export function PhotoAnalysisPanel({ item }: { item: EvidenceItem }) {
           <span className="sasi-breathe h-2 w-2 rounded-full bg-[#e3c567]" aria-hidden />
           <p className="text-[12.5px] font-medium text-white">SASI is reading the photo…</p>
         </div>
-        <div className="mt-3 space-y-2">
-          <div className="sasi-skeleton h-3.5 w-11/12" />
-          <div className="sasi-skeleton h-3.5 w-4/5" />
-          <div className="sasi-skeleton h-3.5 w-3/5" />
-        </div>
+        {/* honest stage line + national lights — no skeleton bars */}
+        <p className="mt-3 font-mono text-[10px] tracking-[0.16em] text-zinc-500">
+          {workStage.toUpperCase()}
+        </p>
+        <ThinkingDots className="mt-2.5" label="SASI is reading the photo" />
       </div>
     );
   }

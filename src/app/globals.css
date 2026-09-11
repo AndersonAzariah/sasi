@@ -471,7 +471,9 @@ html::-webkit-scrollbar-thumb:hover {
 }
 
 /* ============================================================
-   MICRO-DETAILS — streaming caret, skeletons, button sheen
+   MICRO-DETAILS — streaming caret, button sheen
+   (skeleton loading bars removed in Task 20 — surfaces render
+   instantly; genuine async work is shown with breathing dots)
    ============================================================ */
 
 /* Live-streaming caret for Ask SASI replies (blinking gold block) */
@@ -489,32 +491,6 @@ html::-webkit-scrollbar-thumb:hover {
 @keyframes sasi-caret-blink {
   to {
     visibility: hidden;
-  }
-}
-
-/* Shimmer sweep for loading surfaces */
-.sasi-skeleton {
-  position: relative;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.045);
-  border-radius: 8px;
-}
-.sasi-skeleton::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.07),
-    transparent
-  );
-  animation: sasi-skeleton-sweep 1.6s ease-in-out infinite;
-}
-@keyframes sasi-skeleton-sweep {
-  100% {
-    transform: translateX(100%);
   }
 }
 
@@ -711,10 +687,6 @@ html::-webkit-scrollbar-thumb:hover {
   .sasi-caret {
     animation: none;
     opacity: 0.8;
-  }
-  .sasi-skeleton::after {
-    animation: none;
-    display: none;
   }
   .sasi-btn-sheen::after {
     display: none;
@@ -1535,40 +1507,23 @@ html::-webkit-scrollbar-thumb:hover {
   pointer-events: none;
 }
 
-/* ---------- Boot progress — national light sweep ---------- */
-.sasi-boot-bar {
-  position: relative;
-  overflow: hidden;
-  height: 2px;
+/* ---------- Boot phase dots — four national stages (Task 20,
+   replaces the old sweeping boot BAR: progress is now four
+   national lights that ignite one by one, tied to real boot
+   phases, ending in the honest "Ready.") ---------- */
+.sasi-boot-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  transition:
+    background 0.45s ease,
+    box-shadow 0.45s ease,
+    transform 0.45s cubic-bezier(0.23, 1, 0.32, 1);
 }
-.sasi-boot-bar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 42%;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    #ef5350 22%,
-    #64b5f6 48%,
-    #66bb6a 70%,
-    #e3c567 88%,
-    transparent
-  );
-  animation: sasi-boot-sweep 1.15s ease-in-out infinite;
-}
-@keyframes sasi-boot-sweep {
-  0% {
-    transform: translateX(-110%);
-  }
-  100% {
-    transform: translateX(340%);
-  }
+.sasi-boot-dot[data-lit="true"] {
+  transform: scale(1.25);
 }
 
 /* ---------- Auth glass card — the form's liquid slab ---------- */
@@ -1636,8 +1591,7 @@ html::-webkit-scrollbar-thumb:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sasi-boot-ring,
-  .sasi-boot-bar::after {
+  .sasi-boot-ring {
     animation: none;
   }
 }
@@ -2172,7 +2126,6 @@ strong {
   display: none;
 }
 .sasi-data-saver .sasi-boot-ring,
-.sasi-data-saver .sasi-boot-bar::after,
 .sasi-data-saver .sasi-breathe,
 .sasi-data-saver .sasi-shimmer-text,
 .sasi-data-saver .sasi-glow-multi {

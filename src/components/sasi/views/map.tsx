@@ -2,13 +2,18 @@
 
 import "leaflet/dist/leaflet.css";
 import type * as LeafletTypes from "leaflet";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
   Crosshair,
+  Layers,
   LocateFixed,
+  Map as MapIcon,
   MapPinned,
   Minus,
+  Moon,
   Plus,
+  Satellite,
   Search,
   SlidersHorizontal,
   WifiOff,
@@ -304,6 +309,9 @@ export function GautengMiniMap({
    filter, with automatic OpenStreetMap fallback after repeated
    tile errors, and an honest offline note when no imagery can
    load at all (markers, pins and coordinates keep working).
+   Task 20: three imagery styles — Midnight (dark filtered
+   road), Satellite (true-colour) and Hybrid (satellite +
+   roads) — switchable from the layers popover.
 
    Coordinates: the stylised 0–100 map space (mapX/mapY) is
    projected onto real Gauteng lat/lng with a per-axis linear
@@ -311,6 +319,18 @@ export function GautengMiniMap({
    Pretoria, Centurion, Midrand, Randburg, Sandton,
    Johannesburg, Roodepoort, Soweto, Benoni; residual ≈ 3–5 km,
    honest for a stylised demo canvas).
+
+   Task 20 map system:
+   — PIN CLUSTERING: overlapping pins collapse into numbered
+     glass clusters (greedy pixel-distance grouping, recomputed
+     on zoom); a cluster click flies out to reveal its members.
+     The selected pin and a briefing focus pin always stay solo.
+   — PIN DIRECTORY: a live index of everything plotted, sorted
+     by distance from the saved location; a row click flies to
+     the pin and opens its popup.
+   — LIVE READOUT: centre coordinates + zoom in a mono chip.
+   — KEYBOARD CYCLING: ArrowUp/ArrowDown walks the visible
+     pins while the map has focus.
 
    Content honesty: the map plots the user's OWN reports (store
    cases) plus whatever demo incidents still exist in data.ts.
@@ -339,10 +359,25 @@ const CANVAS_BOUNDS: [[number, number], [number, number]] = [
 
 const FOCUS_ZOOM = 13;
 const HOME_ZOOM = 12;
+/** pins closer than this (screen px) collapse into one numbered cluster */
+const CLUSTER_PX = 44;
 
 /* ---------- tile sources + honest fallback state machine ---------- */
 
-const GOOGLE_TILES = "https://mt{s}.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}";
+type MapStyleKey = "midnight" | "satellite" | "hybrid";
+
+const TILE_URLS: Record<MapStyleKey, string> = {
+  midnight: "https://mt{s}.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}",
+  satellite: "https://mt{s}.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}",
+  hybrid: "https://mt{s}.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}",
+};
+
+const MAP_STYLE_LABEL: Record<MapStyleKey, string> = {
+  midnight: "Midnight",
+  satellite: "Satellite",
+  hybrid: "Hybrid",
+};
+
 const OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
 type TileState = "loading" | "google" | "osm" | "offline";
@@ -424,6 +459,43 @@ function homeInnerHtml(label: string): string {
   );
 }
 
+function clusterInnerHtml(count: number): string {
+  return (
+    '<div class="sasi-cluster" aria-hidden="true">' +
+    `<span class="sasi-cluster-count">${count}</span>` +
+    "</div>"
+  );
+}
+
+/** members of a dead-end cluster (pins too close to ever separate
+    by zooming) — one row per report, click force-solos that pin */
+function clusterListHtml(pins: PlotPin[]): string {
+  const rows = pins
+    .map(
+      (p) =>
+        '<button type="button" class="sasi-pop-row" data-sasi-pin="' + esc(p.id) + '">' +
+        '<span class="sasi-pop-row-dot" style="background:' + p.accent + '" aria-hidden="true"></span>' +
+        '<span class="sasi-pop-row-main"><span class="sasi-pop-row-title">' + esc(p.title) + '</span>' +
+        '<span class="sasi-pop-row-ref">' + esc(p.ref) + (p.kind === "case" ? " · YOURS" : "") + '</span></span>' +
+        '</button>'
+    )
+    .join("");
+  return (
+    '<div class="sasi-pop-card">' +
+    '<p class="sasi-pop-clustertitle">' + pins.length + ' reports at this spot</p>' +
+    rows +
+    "</div>"
+  );
+}
+
+/** priority accent dots inside the popup meta line */
+const PRIORITY_DOT: Record<string, string> = {
+  CRITICAL: "#ef5350",
+  HIGH: "#ef5350",
+  MEDIUM: "#e3c567",
+  LOW: "#a1a1aa",
+};
+
 /* ---------- popup HTML (minimal glass card) ---------- */
 
 function esc(s: string): string {
@@ -445,6 +517,9 @@ function esc(s: string): string {
 
 function popupHtml(pin: PlotPin, yoursTag: string, openLabel: string): string {
   const serviceLabel = SERVICES[pin.service]?.label ?? "Service";
+  const priorityDot = pin.priorityKey
+    ? `<span class="sasi-pop-pdot" style="background:${PRIORITY_DOT[pin.priorityKey] ?? "#a1a1aa"}" aria-hidden="true"></span>`
+    : "";
   return (
     '<div class="sasi-pop-card">' +
     '<div class="sasi-pop-head">' +
@@ -455,7 +530,7 @@ function popupHtml(pin: PlotPin, yoursTag: string, openLabel: string): string {
     "</div>" +
     (pin.kind === "case" ? `<span class="sasi-pop-yours">${esc(yoursTag)}</span>` : "") +
     "</div>" +
-    `<p class="sasi-pop-meta"><span style="color:${pin.accent}">${esc(serviceLabel)}</span> · ${esc(pin.statusLabel)}${pin.detail ? ` · ${esc(pin.detail)}` : ""}${pin.kind === "incident" ? " · DEMO" : ""}</p>` +
+    `<p class="sasi-pop-meta"><span style="color:${pin.accent}">${esc(serviceLabel)}</span> · ${esc(pin.statusLabel)}${pin.detail ? ` · ${priorityDot}${esc(pin.detail)}` : ""}${pin.kind === "incident" ? " · DEMO" : ""}</p>` +
     (pin.loc ? `<p class="sasi-pop-loc">${esc(pin.loc)}</p>` : "") +
     `<button type="button" class="sasi-pop-btn" data-sasi-open="${pin.kind}" data-ref="${esc(pin.kind === "case" ? pin.ref : pin.id)}">${esc(openLabel)}${GLYPH_SVG_OPEN}${OPEN_ARROW_GLYPH}</svg></button>` +
     "</div>"
@@ -467,12 +542,17 @@ function popupHtml(pin: PlotPin, yoursTag: string, openLabel: string): string {
 const SASI_MAP_CSS = `
 .sasi-leaflet-root { background:#0a0b0d; }
 .sasi-leaflet-root .leaflet-container { background:#0a0b0d; font-family:inherit; }
-.sasi-leaflet-root[data-tiles="loading"] .leaflet-tile-pane,
-.sasi-leaflet-root[data-tiles="google"] .leaflet-tile-pane {
+/* imagery style grading — keyed on data-style (Task 20):
+   Midnight = the national dark invert, Satellite/Hybrid = true colour,
+   gently graded toward the dark UI */
+.sasi-leaflet-root[data-style="midnight"] .leaflet-tile-pane {
   filter: invert(0.9) hue-rotate(185deg) saturate(0.42) brightness(0.94) contrast(1.07);
 }
-.sasi-leaflet-root[data-tiles="osm"] .leaflet-tile-pane {
-  filter: invert(0.9) hue-rotate(185deg) saturate(0.3) brightness(0.85) contrast(1.1);
+.sasi-leaflet-root[data-style="satellite"] .leaflet-tile-pane {
+  filter: saturate(0.9) contrast(1.06) brightness(0.88);
+}
+.sasi-leaflet-root[data-style="hybrid"] .leaflet-tile-pane {
+  filter: saturate(0.95) contrast(1.05) brightness(0.9);
 }
 .sasi-leaflet-root .sasi-pin-wrap { background:transparent; border:none; }
 .sasi-leaflet-root .leaflet-marker-icon { outline:none; }
@@ -544,6 +624,58 @@ const SASI_MAP_CSS = `
   border-radius:7px; padding:3px 7px; box-shadow:0 4px 14px rgba(0,0,0,0.45);
 }
 .sasi-leaflet-root .sasi-tip.leaflet-tooltip-top::before { border-top-color:rgba(12,13,15,0.92); }
+/* ---------- pin clusters (Task 20) — numbered glass orbs with a
+   slow dashed orbit ring; click flies out to the members ---------- */
+.sasi-leaflet-root .sasi-cluster-wrap { background:transparent; border:none; }
+.sasi-cluster {
+  position:relative; width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  background:linear-gradient(165deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05) 55%, rgba(0,0,0,0.3));
+  border:1px solid rgba(255,255,255,0.22);
+  box-shadow:0 2px 6px rgba(0,0,0,0.55), 0 8px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.14);
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  transition:transform 0.18s cubic-bezier(0.23,1,0.32,1), border-color 0.18s;
+}
+.sasi-cluster:hover { transform:scale(1.1); border-color:rgba(255,255,255,0.4); }
+.sasi-cluster::before {
+  content:""; position:absolute; inset:-5px; border-radius:50%;
+  border:1px dashed rgba(255,255,255,0.16);
+  animation:sasi-cluster-orbit 16s linear infinite; pointer-events:none;
+}
+@keyframes sasi-cluster-orbit { to { transform:rotate(360deg); } }
+.sasi-cluster-count {
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:12.5px; font-weight:600; color:#fff;
+  text-shadow:0 1px 3px rgba(0,0,0,0.85); pointer-events:none;
+}
+@media (prefers-reduced-motion: reduce) { .sasi-cluster::before { animation:none; opacity:0.5; } }
+/* priority dot inside popup meta (Task 20) */
+.sasi-pop-pdot {
+  display:inline-block; width:5px; height:5px; border-radius:50%;
+  margin-right:3px; vertical-align:1.5px;
+}
+/* dead-end cluster member list (Task 20) */
+.sasi-pop-clustertitle {
+  margin:0 0 6px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:9.5px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:#71717a;
+}
+.sasi-pop-row {
+  display:flex; align-items:center; gap:8px; width:100%;
+  padding:7px 8px; margin:0 -8px; width:calc(100% + 16px);
+  background:transparent; border:none; border-radius:9px;
+  cursor:pointer; text-align:left; font-family:inherit;
+  transition:background 0.15s;
+}
+.sasi-pop-row:hover { background:rgba(255,255,255,0.06); }
+.sasi-pop-row + .sasi-pop-row { margin-top:2px; }
+.sasi-pop-row-dot { flex:0 0 auto; width:7px; height:7px; border-radius:50%; border:1px solid rgba(0,0,0,0.5); }
+.sasi-pop-row-main { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.sasi-pop-row-title { font-size:12px; font-weight:600; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sasi-pop-row-ref {
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:9px; letter-spacing:0.12em; color:#71717a;
+}
 .sasi-leaflet-root .sasi-leaflet-popup .leaflet-popup-content-wrapper {
   background:rgba(11,12,14,0.88);
   -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
@@ -798,8 +930,35 @@ interface PlotPin {
   accent: string;
   latlng: [number, number];
   statusLabel: string;
+  priorityKey: string;
   detail: string;
   loc: string;
+}
+
+/** a numbered glass orb standing in for pins that overlap at the current zoom */
+interface PinCluster {
+  id: string;
+  latlng: [number, number];
+  pins: PlotPin[];
+}
+
+/** great-circle distance in metres — powers the pin directory ordering */
+function haversineM(a: [number, number], b: [number, number]): number {
+  const R = 6371000;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const la = (a[0] * Math.PI) / 180;
+  const lb = (b[0] * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(la) * Math.cos(lb) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** "850 m" / "3.2 km" for the directory rows */
+function fmtDistance(m: number): string {
+  if (m >= 950) return `${(m / 1000).toFixed(1)} km`;
+  return `${Math.round(m / 10) * 10} m`;
 }
 
 function incidentToPin(i: Incident): PlotPin {
@@ -812,6 +971,7 @@ function incidentToPin(i: Incident): PlotPin {
     accent: SERVICE_ACCENT[i.service] ?? "#a1a1aa",
     latlng: svgToLatLng(i.location.mapX ?? 50, i.location.mapY ?? 50),
     statusLabel: TRUST_STATUS_META[i.status]?.label ?? i.status,
+    priorityKey: i.severity,
     detail: PRIORITY_META[i.severity]?.label ?? i.severity,
     loc: [i.location.suburb, i.location.city].filter(Boolean).join(", "),
   };
@@ -828,6 +988,7 @@ function caseToPin(c: SasiCase, fallbackCity: string): PlotPin {
     accent: SERVICE_ACCENT[c.service] ?? USER_GOLD,
     latlng: svgToLatLng(pos.x, pos.y),
     statusLabel: CASE_STATUS_META[c.status]?.label ?? c.status,
+    priorityKey: c.priority,
     detail: PRIORITY_META[c.priority]?.label ?? c.priority,
     loc: [c.location.suburb, c.location.city].filter(Boolean).join(", "),
   };
@@ -854,6 +1015,13 @@ export default function MapView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [tileState, setTileState] = useState<TileState>("loading");
 
+  /* ---- Task 20: imagery style + pin clustering + live readout ---- */
+  const [mapStyle, setMapStyle] = useState<MapStyleKey>("midnight");
+  const [styleOpen, setStyleOpen] = useState(false);
+  const [clusters, setClusters] = useState<PinCluster[]>([]);
+  const [soloPins, setSoloPins] = useState<PlotPin[]>([]);
+  const [viewInfo, setViewInfo] = useState<{ lat: number; lng: number; z: number } | null>(null);
+
   /* ---- Leaflet handles (populated in the one-shot mount effect) ---- */
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletTypes.Map | null>(null);
@@ -861,6 +1029,7 @@ export default function MapView() {
   const tileRef = useRef<LeafletTypes.TileLayer | null>(null);
   const markersRef = useRef<Map<string, LeafletTypes.Marker>>(new Map());
   const markerSelRef = useRef<Map<string, boolean>>(new Map());
+  const clusterMarkersRef = useRef<Map<string, LeafletTypes.Marker>>(new Map());
   const popupRef = useRef<LeafletTypes.Popup | null>(null);
   const homeMarkerRef = useRef<LeafletTypes.Marker | null>(null);
   const suppressCloseRef = useRef(false);
@@ -933,11 +1102,25 @@ export default function MapView() {
   }, [focusCase, focusIncident, savedLocation.city]);
   const focusMissed = mapFocusRef !== null && focusPin === null;
 
+  /* pin directory — everything plotted, nearest to the saved location first */
+  const directoryPins = useMemo(() => {
+    return [...plotPins].sort(
+      (a, b) => haversineM(homeLatLng, a.latlng) - haversineM(homeLatLng, b.latlng)
+    );
+  }, [plotPins, homeLatLng]);
+
   /* keep the latest pins available to the mount effect (initial camera fit) */
   const pinsRef = useRef(plotPins);
   pinsRef.current = plotPins;
   const homeRef = useRef(homeLatLng);
   homeRef.current = homeLatLng;
+  /* latest selection / focus / solo pins for clustering + keyboard cycling */
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  const focusIdRef = useRef<string | null>(focusPin?.id ?? null);
+  focusIdRef.current = focusPin?.id ?? null;
+  const soloPinsRef = useRef<PlotPin[]>(soloPins);
+  soloPinsRef.current = soloPins;
 
   const activeFilterCount = services.size + statuses.size + (query.trim() ? 1 : 0);
 
@@ -957,6 +1140,80 @@ export default function MapView() {
     setSelectedId(null);
     map.flyTo(homeRef.current, HOME_ZOOM, { duration: 0.9 });
   };
+
+  /* ------------------------------------------------------
+     Task 20 — PIN CLUSTERING. Greedy grouping in screen
+     space: pins closer than CLUSTER_PX share one numbered
+     glass orb. The selected pin and a briefing focus pin
+     are always pulled out so they can never hide inside a
+     cluster. Recomputed on zoom (distances change) and
+     whenever the plotted set or selection changes.
+     ------------------------------------------------------ */
+  const recomputeClusters = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const pins = pinsRef.current;
+    if (pins.length === 0) {
+      setClusters([]);
+      setSoloPins([]);
+      return;
+    }
+
+    const forcedSolo = new Set<string>();
+    if (selectedIdRef.current) forcedSolo.add(selectedIdRef.current);
+    if (focusIdRef.current) forcedSolo.add(focusIdRef.current);
+
+    const clusterable = pins.filter((p) => !forcedSolo.has(p.id));
+    const projected = clusterable.map((pin) => ({
+      pin,
+      pt: map.latLngToContainerPoint(pin.latlng as [number, number]),
+    }));
+
+    const groups: { pts: { x: number; y: number }[]; pins: PlotPin[] }[] = [];
+    for (const item of projected) {
+      let best: (typeof groups)[number] | null = null;
+      let bestD = Infinity;
+      for (const g of groups) {
+        let sx = 0;
+        let sy = 0;
+        for (const p of g.pts) {
+          sx += p.x;
+          sy += p.y;
+        }
+        const cx = sx / g.pts.length;
+        const cy = sy / g.pts.length;
+        const d = Math.hypot(cx - item.pt.x, cy - item.pt.y);
+        if (d < bestD) {
+          bestD = d;
+          best = g;
+        }
+      }
+      if (best && bestD <= CLUSTER_PX) {
+        best.pts.push({ x: item.pt.x, y: item.pt.y });
+        best.pins.push(item.pin);
+      } else {
+        groups.push({ pts: [{ x: item.pt.x, y: item.pt.y }], pins: [item.pin] });
+      }
+    }
+
+    const nextClusters: PinCluster[] = [];
+    const nextSolo: PlotPin[] = pins.filter((p) => forcedSolo.has(p.id));
+    for (const g of groups) {
+      if (g.pins.length < 2) {
+        nextSolo.push(g.pins[0]);
+        continue;
+      }
+      const lat = g.pins.reduce((s, p) => s + p.latlng[0], 0) / g.pins.length;
+      const lng = g.pins.reduce((s, p) => s + p.latlng[1], 0) / g.pins.length;
+      nextClusters.push({
+        id: `cl:${g.pins[0].id}:${g.pins.length}`,
+        latlng: [lat, lng],
+        pins: g.pins,
+      });
+    }
+    setClusters(nextClusters);
+    setSoloPins(nextSolo);
+  }, []);
 
   /* store actions are reachable from raw popup HTML via delegated clicks */
   const actionsRef = useRef({ openCase, openIncident });
@@ -980,6 +1237,15 @@ export default function MapView() {
     const counters = { google: 0, osm: 0, swapped: false };
 
     const onDomClick = (e: MouseEvent) => {
+      /* a row inside a dead-end cluster list → select that pin (the
+         recluster logic force-solos the selection and its popup opens) */
+      const pinEl = (e.target as HTMLElement | null)?.closest?.("[data-sasi-pin]");
+      if (pinEl) {
+        const id = pinEl.getAttribute("data-sasi-pin");
+        const pin = pinsRef.current.find((p) => p.id === id);
+        if (pin) setSelectedId(pin.id);
+        return;
+      }
       const el = (e.target as HTMLElement | null)?.closest?.("[data-sasi-open]");
       if (!el) return;
       const kind = el.getAttribute("data-sasi-open");
@@ -995,8 +1261,38 @@ export default function MapView() {
       }
       setSelectedId(null);
     };
+    /* ArrowUp/ArrowDown walks the visible (solo) pins while the map
+       is focused — the container is Leaflet's own keyboard target */
+    const onContainerKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const pins = soloPinsRef.current;
+      if (pins.length === 0 || !map) return;
+      e.preventDefault();
+      const idx = pins.findIndex((p) => p.id === selectedIdRef.current);
+      const next =
+        e.key === "ArrowDown"
+          ? (idx + 1 + pins.length) % pins.length
+          : (idx - 1 + pins.length) % pins.length;
+      const pin = pins[next];
+      setSelectedId(pin.id);
+      map.panTo(pin.latlng, { animate: true, duration: 0.5 });
+    };
+    /* live centre readout — rAF-throttled so flyTo pans don't flood React */
+    let viewRaf = 0;
+    const onViewMove = () => {
+      if (viewRaf || cancelled) return;
+      viewRaf = requestAnimationFrame(() => {
+        viewRaf = 0;
+        if (cancelled || !map) return;
+        const c = map.getCenter();
+        setViewInfo({ lat: c.lat, lng: c.lng, z: map.getZoom() });
+      });
+    };
 
     containerRef.current?.addEventListener("click", onDomClick);
+    containerRef.current?.addEventListener("keydown", onContainerKey);
     window.addEventListener("resize", onWinResize);
 
     void (async () => {
@@ -1039,8 +1335,9 @@ export default function MapView() {
       }
 
       /* tiles — Google first, OSM fallback after repeated errors,
-         honest offline note when nothing loads (watchdog) */
-      const tile = L.tileLayer(GOOGLE_TILES, {
+         honest offline note when nothing loads (watchdog). The
+         imagery STYLE (Task 20) swaps the URL via setUrl later. */
+      const tile = L.tileLayer(TILE_URLS["midnight"], {
         subdomains: "0123",
         minZoom: 7,
         maxZoom: 19,
@@ -1081,11 +1378,18 @@ export default function MapView() {
       }, 9000);
 
       map.on("popupclose", onPopupClose);
+      map.on("move", onViewMove);
+      map.on("zoomend", recomputeClusters);
+      onViewMove(); // seed the readout with the initial camera
       setMapReady(true);
 
       settleRaf = requestAnimationFrame(() => {
         map?.invalidateSize();
-        settleTimer = window.setTimeout(() => map?.invalidateSize(), 280);
+        recomputeClusters();
+        settleTimer = window.setTimeout(() => {
+          map?.invalidateSize();
+          recomputeClusters();
+        }, 280);
       });
     })().catch(() => {
       if (!cancelled) setTileState("offline");
@@ -1096,10 +1400,13 @@ export default function MapView() {
       window.clearTimeout(watchdog);
       window.clearTimeout(settleTimer);
       if (settleRaf) cancelAnimationFrame(settleRaf);
+      if (viewRaf) cancelAnimationFrame(viewRaf);
       window.removeEventListener("resize", onWinResize);
       containerRef.current?.removeEventListener("click", onDomClick);
+      containerRef.current?.removeEventListener("keydown", onContainerKey);
       markersRef.current.clear();
       markerSelRef.current.clear();
+      clusterMarkersRef.current.clear();
       popupRef.current = null;
       homeMarkerRef.current = null;
       tileRef.current = null;
@@ -1108,11 +1415,12 @@ export default function MapView() {
       setMapReady(false);
       map?.remove();
     };
-  }, []);
+  }, [recomputeClusters]);
 
   /* ------------------------------------------------------------
-     Effect B — marker diff (add / move / restyle / remove).
-     Icons depend only on (kind, service, selected) so selection
+     Effect B — marker diff (add / move / restyle / remove) for
+     the SOLO pins (those not absorbed into a cluster). Icons
+     depend only on (kind, service, selected) so selection
      changes restyle just the affected markers.
      ------------------------------------------------------------ */
   useEffect(() => {
@@ -1132,7 +1440,7 @@ export default function MapView() {
         popupAnchor: [0, -20],
       });
 
-    const byId = new Map(plotPins.map((p) => [p.id, p]));
+    const byId = new Map(soloPins.map((p) => [p.id, p]));
 
     for (const [id, marker] of markersRef.current) {
       if (!byId.has(id)) {
@@ -1142,7 +1450,7 @@ export default function MapView() {
       }
     }
 
-    for (const pin of plotPins) {
+    for (const pin of soloPins) {
       const selected = pin.id === selectedId;
       const existing = markersRef.current.get(pin.id);
       if (existing) {
@@ -1174,7 +1482,109 @@ export default function MapView() {
         markerSelRef.current.set(pin.id, selected);
       }
     }
-  }, [mapReady, plotPins, selectedId]);
+  }, [mapReady, soloPins, selectedId]);
+
+  /* ------------------------------------------------------------
+     Effect B2 — recluster whenever the plotted set, selection or
+     a briefing focus target changes (zoom changes flow through
+     the zoomend listener wired in Effect A).
+     ------------------------------------------------------------ */
+  useEffect(() => {
+    if (!mapReady) return;
+    recomputeClusters();
+  }, [mapReady, recomputeClusters, plotPins, selectedId, focusPin]);
+
+  /* ------------------------------------------------------------
+     Effect B3 — cluster marker diff (add / move / remove the
+     numbered glass orbs; a click flies out to the members).
+     ------------------------------------------------------------ */
+  useEffect(() => {
+    const L = LRef.current;
+    const map = mapRef.current;
+    if (!mapReady || !L || !map) return;
+
+    const byId = new Map(clusters.map((c) => [c.id, c]));
+    for (const [id, marker] of clusterMarkersRef.current) {
+      if (!byId.has(id)) {
+        marker.remove();
+        clusterMarkersRef.current.delete(id);
+      }
+    }
+
+    for (const c of clusters) {
+      const existing = clusterMarkersRef.current.get(c.id);
+      if (existing) {
+        existing.setLatLng(c.latlng);
+        continue;
+      }
+      const marker = L.marker(c.latlng, {
+        icon: L.divIcon({
+          html: clusterInnerHtml(c.pins.length),
+          className: "sasi-cluster-wrap",
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
+        }),
+        riseOnHover: true,
+        keyboard: true,
+      });
+      marker.on("click", () => {
+        const bounds = L.latLngBounds(c.pins.map((p) => p.latlng));
+        const fitZoom = map.getBoundsZoom(bounds.pad(0.4));
+        if (fitZoom <= 16) {
+          /* zooming separates the members — fly out and let them breathe */
+          map.flyToBounds(bounds.pad(0.4), { duration: 0.8, maxZoom: 16 });
+          return;
+        }
+        /* dead end: members would never leave the same pixels (jitter
+           collisions) — list them instead; a row click force-solos that pin */
+        const popup =
+          popupRef.current ??
+          (popupRef.current = L.popup({
+            className: "sasi-leaflet-popup",
+            closeButton: true,
+            maxWidth: 278,
+            minWidth: 240,
+            autoPanPadding: [18, 18],
+            offset: [0, -4],
+          }));
+        popup.setContent(clusterListHtml(c.pins));
+        popup.setLatLng(c.latlng);
+        if (!map.hasLayer(popup)) popup.openOn(map);
+      });
+      marker.addTo(map);
+      const el = marker.getElement();
+      if (el) {
+        el.setAttribute("role", "button");
+        el.setAttribute(
+          "aria-label",
+          `Cluster of ${c.pins.length} nearby pins — zoom in to expand`
+        );
+      }
+      clusterMarkersRef.current.set(c.id, marker);
+    }
+  }, [mapReady, clusters]);
+
+  /* ------------------------------------------------------------
+     Effect B4 — imagery style: swap the tile URL, keep the same
+     layer (and its error/fallback listeners) alive.
+     ------------------------------------------------------------ */
+  useEffect(() => {
+    const tile = tileRef.current;
+    if (!mapReady || !tile) return;
+    tile.setUrl(TILE_URLS[mapStyle]);
+  }, [mapReady, mapStyle]);
+
+  /* close the style popover on any outside click */
+  useEffect(() => {
+    if (!styleOpen) return;
+    const close = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest?.("[data-sasi-style-pop]")) return;
+      setStyleOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [styleOpen]);
 
   /* ------------------------------------------------------------
      Effect C — selection popup (one reused glass popup).
@@ -1455,6 +1865,24 @@ export default function MapView() {
         ? "Follow my location"
         : "Center map on my location";
 
+  /* pin directory row click — fly to the pin and open its popup */
+  const focusPinFromList = (pin: PlotPin) => {
+    const map = mapRef.current;
+    if (!map) return;
+    setSelectedId(pin.id);
+    map.flyTo(pin.latlng, FOCUS_ZOOM, { duration: 0.9 });
+  };
+
+  /* live readout formatting: 26.1075° S · 28.0567° E · Z12.5 */
+  const fmtHemi = (v: number, pos: string, neg: string) =>
+    `${Math.abs(v).toFixed(4)}° ${v >= 0 ? pos : neg}`;
+
+  const STYLE_ICON: Record<MapStyleKey, typeof Moon> = {
+    midnight: Moon,
+    satellite: Satellite,
+    hybrid: MapIcon,
+  };
+
   /* honest legend — only entries that can actually appear */
   const legendServices = useMemo(() => {
     const order: ServiceKey[] = [];
@@ -1521,6 +1949,7 @@ export default function MapView() {
       <div
         ref={containerRef}
         data-tiles={tileState}
+        data-style={mapStyle}
         className="sasi-leaflet-root absolute inset-0 z-0"
         role="application"
         aria-label="Service intelligence map of Gauteng with your reports and service incidents"
@@ -1596,7 +2025,8 @@ export default function MapView() {
         </div>
       )}
 
-      {/* desktop — selection hint panel (hidden while a popup is open) */}
+      {/* desktop — live pin directory (replaces the old static hint;
+          hidden while a popup is open so autopan owns the room) */}
       {!universeEmpty && (
         <div
           className={cn(
@@ -1604,24 +2034,60 @@ export default function MapView() {
             selectedId && "lg:hidden"
           )}
         >
-          <div className="sasi-card p-4">
-            <div className="flex flex-col items-center py-4 text-center">
-              <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03]">
-                <Crosshair className="h-4.5 w-4.5 text-zinc-500" aria-hidden />
+          <div className="sasi-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/5 px-3.5 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+                Plotted pins
+              </p>
+              <span className="font-mono text-[10px] tracking-[0.12em] text-zinc-600">
+                {plotPins.length}
               </span>
-              <p className="text-[13px] font-medium text-white">{t("map.select-marker")}</p>
-              <p className="mt-1 max-w-[240px] text-[12px] leading-relaxed text-zinc-500">
-                {t("map.select-hint")}
-              </p>
-              <p className="mt-3 border-t border-white/5 pt-2.5 font-mono text-[10px] tracking-wide text-zinc-600">
-                {t("map.shown")
-                  .replace("{shown}", String(plotPins.length))
-                  .replace("{total}", String(INCIDENTS.length + userCases.length))}
-              </p>
             </div>
+            <div className="sasi-scroll max-h-[42vh] overflow-y-auto p-1.5" role="list">
+              {directoryPins.map((pin) => {
+                return (
+                  <button
+                    key={pin.id}
+                    type="button"
+                    role="listitem"
+                    onClick={() => focusPinFromList(pin)}
+                    className="group flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/[0.05] focus-visible:bg-white/[0.05] focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/30"
+                    aria-label={`${pin.kind === "case" ? "Your report" : "Incident"} ${pin.ref} — ${pin.title}. Fly to pin.`}
+                  >
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition-colors group-hover:border-white/25"
+                      style={{ color: pin.accent }}
+                      aria-hidden
+                    >
+                      <ServiceIcon service={pin.service} className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12px] font-medium text-zinc-200 group-hover:text-white">
+                        {pin.title}
+                      </span>
+                      <span className="block font-mono text-[9.5px] tracking-[0.12em] text-zinc-600">
+                        {pin.ref} · {fmtDistance(haversineM(homeLatLng, pin.latlng))}
+                      </span>
+                    </span>
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: pin.accent }}
+                      aria-hidden
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <p className="border-t border-white/5 px-3.5 py-2 font-mono text-[9px] tracking-[0.12em] text-zinc-700">
+              Nearest to your saved location · ↑↓ cycles pins
+            </p>
           </div>
         </div>
       )}
+
+      {/* live centre readout lives INSIDE the legend strip (Task 20):
+          bottom-left is the map's console line, so telemetry joins it
+          instead of fighting it for bottom-centre space */}
 
       {/* desktop — honest legend + attribution */}
       {!universeEmpty && (
@@ -1637,6 +2103,15 @@ export default function MapView() {
             {hasIncidents && (
               <span className="border-l border-white/8 pl-3 font-mono text-[9px] tracking-[0.14em] text-zinc-700">
                 DEMO DATA
+              </span>
+            )}
+            {viewInfo && (
+              <span
+                className="border-l border-white/8 pl-3 font-mono text-[9px] tabular-nums tracking-[0.12em] text-zinc-500"
+                aria-hidden
+              >
+                {fmtHemi(viewInfo.lat, "N", "S")} · {fmtHemi(viewInfo.lng, "E", "W")} · Z
+                {viewInfo.z.toFixed(1)}
               </span>
             )}
           </div>
@@ -1744,6 +2219,61 @@ export default function MapView() {
             >
               <LocateFixed className="h-4.5 w-4.5" aria-hidden />
             </button>
+            <div className="h-px w-6 bg-white/10" aria-hidden />
+            {/* imagery style — layers button + glass popover (Task 20) */}
+            <div className="relative" data-sasi-style-pop>
+              <button
+                type="button"
+                onClick={() => setStyleOpen((o) => !o)}
+                aria-expanded={styleOpen}
+                aria-haspopup="menu"
+                aria-label={`Map imagery style — currently ${MAP_STYLE_LABEL[mapStyle]}`}
+                title="Map imagery style"
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40",
+                  styleOpen ? "bg-white/10 text-white" : "text-zinc-200"
+                )}
+              >
+                <Layers className="h-4.5 w-4.5" aria-hidden />
+              </button>
+              {styleOpen && (
+                <div
+                  role="menu"
+                  aria-label="Map imagery style"
+                  className="absolute bottom-0 right-[calc(100%+10px)] w-44 rounded-xl border border-white/12 bg-[#0b0c0e]/95 p-1.5 shadow-[0_16px_44px_rgba(0,0,0,0.6)] backdrop-blur-md"
+                >
+                  {(Object.keys(TILE_URLS) as MapStyleKey[]).map((k) => {
+                    const Icon = STYLE_ICON[k];
+                    const active = mapStyle === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={active}
+                        onClick={() => {
+                          setMapStyle(k);
+                          setStyleOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12px] font-medium transition-colors",
+                          active
+                            ? "bg-white/10 text-white"
+                            : "text-zinc-400 hover:bg-white/[0.06] hover:text-white"
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <span className="flex-1">{MAP_STYLE_LABEL[k]}</span>
+                        {active && <Check className="h-3.5 w-3.5 text-[#e3c567]" aria-hidden />}
+                      </button>
+                    );
+                  })}
+                  <p className="border-t border-white/8 px-2.5 pb-1 pt-1.5 font-mono text-[8.5px] tracking-[0.12em] text-zinc-600">
+                    IMAGERY © GOOGLE
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
