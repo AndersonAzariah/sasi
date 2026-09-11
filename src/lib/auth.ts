@@ -1,0 +1,93 @@
+import bcrypt from "bcryptjs";
+import { getServerSession, type NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+
+import { db } from "@/lib/db";
+
+/* ============================================================
+   SASI — authentication (NextAuth v4, credentials + JWT sessions)
+
+   - Passwords are stored ONLY as bcrypt hashes (cost 12).
+   - Sessions are stateless JWTs in an httpOnly cookie; the user's
+     database id rides in the token (sub) and is surfaced on
+     session.user.id for every server-side authorization check.
+   - No OAuth/email providers are configured — signup is the only
+     account-creation path (POST /api/sasi/auth/signup).
+   - The SPA renders its own sign-in surface (/ ?view=login), so
+     NextAuth's built-in pages are never shown.
+   ============================================================ */
+
+/* Module augmentation: every session carries the real database id. */
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+    };
+  }
+  interface User {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  }
+}
+
+export const authOptions: NextAuthOptions = {
+  session: {
+    strategy: "jwt",
+    /* 30 days — a resident's phone should stay signed in like an app. */
+    maxAge: 30 * 24 * 60 * 60,
+  },
+  pages: {
+    /* the SPA owns sign-in UI; NextAuth never renders a page */
+    signIn: "/",
+    error: "/",
+  },
+  providers: [
+    CredentialsProvider({
+      name: "Email and password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email?.trim().toLowerCase() ?? "";
+        const password = credentials?.password ?? "";
+        if (!email || !password || email.length > 254 || password.length > 128) {
+          return null;
+        }
+
+        const user = await db.user.findUnique({ where: { email } });
+
+        /* Constant-work comparison: when the account does not exist we
+           still burn one bcrypt compare against a fixed hash, so
+           response timing does not reveal whether an email is registered. */
+        const DUMMY_HASH = "$2a$12$C6UzMDM.H6dfI/f/IKcEeO7ZDZQj1Vp1p2b3E4fF5gG6hH7iI8jJk";
+        const hash = user?.passwordHash ?? DUMMY_HASH;
+        const valid = await bcrypt.compare(password, hash).catch(() => false);
+
+        if (!user || !valid) return null;
+
+        /* Only safe, non-secret fields ever leave this function. */
+        return { id: user.id, name: user.name, email: user.email };
+      },
+    }),
+  ],
+  callbacks: {
+    jwt({ token, user }) {
+      if (user?.id) token.sub = user.id;
+      return token;
+    },
+    session({ session, token }) {
+      if (token.sub) session.user.id = token.sub;
+      return session;
+    },
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+};
+
+/** Server-side session accessor for API routes. */
+export function getAuthSession() {
+  return getServerSession(authOptions);
+}

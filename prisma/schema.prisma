@@ -22,6 +22,7 @@ model CaseRecord {
   id        String   @id @default(cuid())
   ref       String // CASE-000124 (unique per session)
   sessionId String
+  userId    String? // set when the case belongs to a real authenticated account
   service   String
   title     String
   payload   String // full SasiCase JSON
@@ -30,6 +31,7 @@ model CaseRecord {
 
   @@unique([sessionId, ref])
   @@index([sessionId, createdAt])
+  @@index([userId])
 }
 
 /// One Ask SASI chat message (user or assistant).
@@ -90,4 +92,55 @@ model NotificationRecord {
   createdAt      DateTime @default(now())
 
   @@index([sessionId, createdAt])
+}
+
+/// A real account (phase 3): email + bcrypt password hash, JWT session via
+/// NextAuth. Data rows can carry userId for server-side ownership checks.
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  auditEvents AuditEvent[]
+  submissions SubmissionRecord[]
+}
+
+/// Server-stamped audit trail for real account events. Rows are written
+/// by the SERVER when real events happen — never fabricated client-side.
+model AuditEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  eventType    String // ACCOUNT_CREATED | EVIDENCE_REVIEWED | ...
+  actor        String // SYSTEM | USER | (future agent ids)
+  description  String
+  caseRef      String?
+  resourceType String?
+  resourceId   String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+/// A PREPARATION record for institutional submission. No adapter exists
+/// today, so status is always NOT_CONNECTED and externalReference is
+/// always null — the row proves the request existed, nothing more.
+model SubmissionRecord {
+  id                String   @id @default(cuid())
+  userId            String
+  caseRef           String
+  institutionKey    String
+  institutionName   String?
+  status            String // NOT_CONNECTED (only status possible today)
+  externalReference String?
+  requestPayload    String
+  resultPayload     String
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
 }

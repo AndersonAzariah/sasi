@@ -13,6 +13,7 @@ const NAV: { view: View; label: string }[] = [
   { view: "services", label: "landing.nav.services" },
   { view: "how-it-works", label: "landing.nav.how" },
   { view: "about", label: "landing.nav.about" },
+  { view: "gov", label: "landing.nav.gov" },
   { view: "security", label: "landing.nav.security" },
 ];
 
@@ -32,25 +33,30 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
       {isAuthView ? null : (
       <header
         className={cn(
-          "sticky top-0 z-40 border-b border-white/6 backdrop-blur-md",
-          isLanding ? "bg-transparent" : "bg-[#050505]/85"
+          "sticky top-0 z-40 border-b border-white/[0.06]",
+          "bg-[#050505]/55 backdrop-blur-2xl [backdrop-filter:blur(24px)_saturate(160%)]",
+          "shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_12px_32px_-24px_rgba(0,0,0,0.9)]",
+          isLanding && "bg-transparent shadow-none"
         )}
       >
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-6 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-5 px-4 sm:px-6">
           <button onClick={() => navigate("landing")} aria-label="SASI home">
             <SasiLogo size={28} />
           </button>
 
-          <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Public">
+          <nav
+            className="ml-3 hidden items-center gap-0.5 rounded-full border border-white/[0.06] bg-white/[0.03] p-1 md:flex"
+            aria-label="Public"
+          >
             {NAV.map((item) => (
               <button
                 key={item.view}
                 onClick={() => navigate(item.view)}
                 className={cn(
-                  "rounded-lg px-3 py-1.5 text-[13px] transition-colors",
+                  "rounded-full px-3.5 py-1.5 text-[13px] transition-all duration-200",
                   view === item.view
-                    ? "text-white"
-                    : "text-zinc-500 hover:text-zinc-200"
+                    ? "bg-white/[0.09] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                    : "text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-100"
                 )}
               >
                 {t(item.label)}
@@ -61,13 +67,13 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           <div className="ml-auto hidden items-center gap-2 md:flex">
             <button
               onClick={() => navigate(authed ? "dashboard" : "login")}
-              className="rounded-lg px-3 py-1.5 text-[13px] text-zinc-400 transition hover:text-white"
+              className="rounded-full px-3.5 py-1.5 text-[13px] text-zinc-400 transition hover:bg-white/[0.05] hover:text-white"
             >
               {authed ? t("public.go-to-dashboard") : t("public.sign-in")}
             </button>
             <button
               onClick={() => navigate("report")}
-              className="sasi-btn-sheen rounded-lg bg-white px-3.5 py-1.5 text-[13px] font-medium text-black transition hover:bg-zinc-200 active:scale-[0.98]"
+              className="sasi-btn-white-glass rounded-full bg-white px-4 py-1.5 text-[13px] font-medium text-black transition-all hover:bg-zinc-100 active:scale-[0.98]"
             >
               {t("landing.cta.report")}
             </button>
@@ -104,7 +110,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                     navigate(authed ? "dashboard" : "login");
                     setMenuOpen(false);
                   }}
-                  className="rounded-lg border border-white/10 py-2.5 text-[13px] text-zinc-300"
+                  className="rounded-full border border-white/10 py-2.5 text-[13px] text-zinc-300"
                 >
                   {authed ? t("public.go-to-dashboard") : t("public.sign-in")}
                 </button>
@@ -113,7 +119,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                     navigate("report");
                     setMenuOpen(false);
                   }}
-                  className="rounded-lg bg-white py-2.5 text-[13px] font-medium text-black"
+                  className="rounded-full bg-white py-2.5 text-[13px] font-medium text-black"
                 >
                   Report an issue
                 </button>
@@ -220,7 +226,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
               © 2026 SASI · Independent civic technology platform
             </p>
             <p className="font-mono text-[10px] tracking-[0.14em] text-zinc-700">
-              DEMO ENVIRONMENT — ALL DATA IS DEMONSTRATION DATA
+              HONEST BY DESIGN — NOTHING IS SUBMITTED WITHOUT YOUR APPROVAL
             </p>
           </div>
         </div>

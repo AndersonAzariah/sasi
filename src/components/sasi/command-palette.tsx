@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Bell,
   FolderLock,
+  Landmark,
   LayoutDashboard,
   Map as MapIcon,
   Search,
@@ -169,6 +170,7 @@ export function CommandPalette() {
       { view: "evidence" as const, label: "Evidence vault", icon: FolderLock },
       { view: "activity" as const, label: "Activity", icon: Zap },
       { view: "notifications" as const, label: "Notifications", icon: Bell },
+      { view: "gov" as const, label: "Government", icon: Landmark },
       { view: "settings" as const, label: "Settings", icon: Settings },
     ];
     navItems.forEach((n) => {

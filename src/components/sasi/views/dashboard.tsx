@@ -117,6 +117,7 @@ export default function DashboardView() {
   const cases = useSasiStore((s) => s.cases);
   const briefing = useSasiStore((s) => s.briefing);
   const notifications = useSasiStore((s) => s.notifications);
+  const accountName = useSasiStore((s) => s.accountName);
   const t = useT();
 
   const sortedCases = useMemo(
@@ -132,7 +133,7 @@ export default function DashboardView() {
       {/* ---------- greeting + the two primary actions ---------- */}
       <header>
         <h1 className="sasi-serif text-[24px] tracking-tight text-white sm:text-[27px]">
-          {t(greetingKeyForNow())}, {DEMO_USER.firstName}.
+          {t(greetingKeyForNow())}, {accountName?.trim() ? accountName.trim() : DEMO_USER.firstName}.
         </h1>
         <p className="mt-1.5 text-[13.5px] text-zinc-500">{statusLine(cases)}</p>
         <div className="mt-6 flex flex-wrap items-center gap-2.5">

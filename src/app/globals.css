@@ -301,7 +301,7 @@
 .sasi-card {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 40%), var(--sasi-surface-1);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 0.75rem;
+  border-radius: 1rem;
 }
 .sasi-card-interactive {
   transition:
@@ -344,21 +344,47 @@
   );
 }
 
-/* Subtle grid backdrop for hero / map panels */
+/* Subtle DOT backdrop for hero / map panels (phase-3 look: dots, not grid) */
 .sasi-grid-bg {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 44px 44px;
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.055) 1px,
+    transparent 1.1px
+  );
+  background-size: 22px 22px;
+  background-position: -1px -1px;
 }
 
 /* ============================================================
-   SCROLLBARS
+   SCROLLBARS — transparent until hover, whisper when needed
    ============================================================ */
 
+/* page-level scrollbar: nearly invisible hairline thumb */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.09) transparent;
+}
+html::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+html::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
+}
+
+/* inner scroll areas: fully transparent until the area is hovered */
 .sasi-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: transparent transparent;
 }
 .sasi-scroll::-webkit-scrollbar {
   width: 6px;
@@ -368,11 +394,16 @@
   background: transparent;
 }
 .sasi-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0);
   border-radius: 999px;
+  transition: background 0.35s ease;
 }
-.sasi-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+.sasi-scroll:hover::-webkit-scrollbar-thumb,
+.sasi-scroll:focus-within::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+.sasi-scroll:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
 /* Command bar focus — subtle national light */
@@ -1145,47 +1176,100 @@
   animation-duration: 4.5s;
 }
 
-/* ---------- Glass buttons ---------- */
+/* ---------- Liquid glass buttons ----------
+   Dual-layer refraction: blurred backdrop + specular top highlight +
+   elliptical sheen, with the tri-color national halo on hover. */
 .sasi-btn-glass {
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 24px -14px rgba(0, 0, 0, 0.8);
   transition:
     border-color 0.3s ease,
     background 0.3s ease,
     transform 0.3s ease,
     box-shadow 0.3s ease;
 }
+/* elliptical specular sheen — the "liquid" read */
+.sasi-btn-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    120% 60% at 22% 0%,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.02) 55%,
+    transparent 75%
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
 .sasi-btn-glass:hover {
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.28);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.04));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05) 55%, rgba(255, 255, 255, 0.07));
   transform: translateY(-1px);
-  box-shadow: 0 10px 32px -12px rgba(0, 0, 0, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 32px -12px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 6px 22px -8px rgba(229, 57, 53, 0.16),
+    0 10px 28px -10px rgba(66, 165, 245, 0.14),
+    0 12px 30px -12px rgba(212, 175, 55, 0.14);
+}
+.sasi-btn-glass:active {
+  transform: translateY(0);
 }
 .sasi-btn-white-glass {
   position: relative;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.4);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.86));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.84));
   color: #09090b;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
+    0 10px 30px -14px rgba(0, 0, 0, 0.75);
   transition:
     box-shadow 0.35s ease,
     transform 0.35s ease,
     border-color 0.35s ease;
 }
+.sasi-btn-white-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    110% 55% at 24% 0%,
+    rgba(255, 255, 255, 0.55),
+    transparent 60%
+  );
+  opacity: 0.9;
+  pointer-events: none;
+}
 .sasi-btn-white-glass:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.85);
   box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
     0 0 0 1px rgba(255, 255, 255, 0.18),
     0 6px 22px -6px rgba(229, 57, 53, 0.35),
     0 10px 30px -8px rgba(66, 165, 245, 0.3),
     0 12px 34px -10px rgba(212, 175, 55, 0.28);
+}
+.sasi-btn-white-glass:active {
+  transform: translateY(0);
 }
 
 /* ---------- Editorial serif + eyebrow with hairlines ---------- */
@@ -1332,5 +1416,54 @@
   .sasi-hero-word,
   .sasi-ambient {
     animation: none;
+  }
+}
+
+/* ============================================================
+   GSAP SCROLL LAYER SUPPORT
+   (driven by src/components/sasi/gsap-runtime.tsx)
+   ============================================================ */
+
+/* 2px national-light reading progress across the top of the viewport */
+.sasi-scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 70;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(
+    90deg,
+    #ef5350,
+    #64b5f6 34%,
+    #66bb6a 62%,
+    #e3c567 88%
+  );
+  box-shadow: 0 0 12px -2px rgba(227, 197, 103, 0.45);
+  pointer-events: none;
+}
+
+/* masked word reveals — [data-sasi-words] headlines split by the runtime */
+.sasi-wmask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-bottom: 0.08em; /* keep descenders (g, y, p) unclipped */
+  margin-bottom: -0.08em;
+}
+.sasi-word {
+  display: inline-block;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sasi-scroll-progress {
+    display: none;
+  }
+  .sasi-word {
+    transform: none !important;
+    opacity: 1 !important;
   }
 }

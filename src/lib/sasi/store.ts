@@ -48,6 +48,9 @@ interface SasiState {
 
   /* ---- demo session (drives shell continuity: Services stays in-app) ---- */
   authed: boolean;
+  /** display name from the REAL account (null → the neutral "You") */
+  accountName: string | null;
+  setAccountName: (name: string | null) => void;
   signIn: () => void;
   signOut: () => void;
 
@@ -428,6 +431,7 @@ const ALL_VIEWS: readonly View[] = [
   "security",
   "privacy",
   "terms",
+  "gov",
   "login",
   "signup",
   "dashboard",
@@ -473,6 +477,16 @@ export const useSasiStore = create<SasiState>((set, get) => ({
 
   /* ---------- demo session ---------- */
   authed: false,
+  accountName: null,
+  setAccountName: (name) => {
+    set({ accountName: name && name.trim() ? name.trim() : null });
+    try {
+      if (name && name.trim()) window.localStorage.setItem("sasi.accountName", name.trim());
+      else window.localStorage.removeItem("sasi.accountName");
+    } catch {
+      /* storage blocked — session-only name */
+    }
+  },
   signIn: () => {
     set({ authed: true });
     try {
@@ -835,6 +849,12 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     /* restore the demo session flag so Services stays in the app shell across reloads */
     try {
       if (window.localStorage.getItem("sasi.authed") === "1") set({ authed: true });
+      try {
+        const savedName = window.localStorage.getItem("sasi.accountName");
+        if (savedName) set({ accountName: savedName });
+      } catch {
+        /* ignore */
+      }
       const savedLang = window.localStorage.getItem("sasi.lang");
       if (savedLang === "en" || savedLang === "zu" || savedLang === "af") {
         set({ lang: savedLang });

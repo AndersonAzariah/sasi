@@ -5,12 +5,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
 import { usePwaStore } from "@/lib/sasi/pwa-store";
-import { applyPwaUpdate } from "./pwa";
 import type { View } from "@/lib/sasi/types";
 import { AppShell } from "./app-shell";
 import { PublicShell } from "./public-shell";
 import { CommandPalette } from "./command-palette";
-import { PwaRuntime } from "./pwa";
+import { PwaRuntime, applyPwaUpdate } from "./pwa";
+import { SasiGsapRuntime } from "./gsap-runtime";
 import { SasiLogo } from "./primitives";
 
 import LandingView from "./views/landing";
@@ -21,6 +21,7 @@ import ServiceDetailView from "./views/service-detail";
 import SecurityView from "./views/security";
 import PrivacyView from "./views/privacy";
 import TermsView from "./views/terms";
+import GovView from "./views/gov";
 import LoginView from "./views/login";
 import SignupView from "./views/signup";
 import DashboardView from "./views/dashboard";
@@ -49,6 +50,7 @@ const PUBLIC_VIEWS = new Set<View>([
   "security",
   "privacy",
   "terms",
+  "gov",
   "login",
   "signup",
 ]);
@@ -107,6 +109,7 @@ const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   security: SecurityView,
   privacy: PrivacyView,
   terms: TermsView,
+  gov: GovView,
   login: LoginView,
   signup: SignupView,
   dashboard: DashboardView,
@@ -196,6 +199,7 @@ export function SasiApp() {
       )}
       <CommandPalette />
       <PwaRuntime />
+      <SasiGsapRuntime />
       <Toaster
         position="bottom-right"
         theme="dark"

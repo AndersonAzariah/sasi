@@ -17,6 +17,7 @@ import {
   SasiLogo,
 } from "@/components/sasi/primitives";
 import { Input } from "@/components/ui/input";
+import { signIn as nextAuthSignIn } from "next-auth/react";
 
 /* Shared field shell — circulating national glow ring appears on focus */
 function GlowField({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,7 @@ const NATIONAL_DOT_GRADIENT =
 export default function SignupView() {
   const navigate = useSasiStore((s) => s.navigate);
   const signIn = useSasiStore((s) => s.signIn);
+  const setAccountName = useSasiStore((s) => s.setAccountName);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -43,6 +45,7 @@ export default function SignupView() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -50,20 +53,56 @@ export default function SignupView() {
     return () => pending.forEach(clearTimeout);
   }, []);
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading || success) return;
+    setError(null);
     setLoading(true);
-    timers.current.push(
-      setTimeout(() => {
+
+    /* REAL account creation: POST /api/sasi/auth/signup (zod validation,
+       bcrypt cost 12, rate-limited) — then a real credentials sign-in. */
+    try {
+      const res = await fetch("/api/sasi/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+      });
+      const data: { error?: string; user?: { name?: string } } = await res
+        .json()
+        .catch(() => ({}));
+      if (!res.ok) {
         setLoading(false);
-        setSuccess(true);
-        signIn(); // keeps Services inside the app shell after this
-        timers.current.push(
-          setTimeout(() => navigate("dashboard"), 900)
+        setError(
+          data.error ??
+            "SASI could not create the account right now. Check the details and try again."
         );
-      }, 900)
-    );
+        return;
+      }
+      if (data.user?.name) setAccountName(data.user.name);
+
+      const si = await nextAuthSignIn("credentials", {
+        redirect: false,
+        email: email.trim(),
+        password,
+      });
+      if (si?.error) {
+        /* account exists but sign-in failed — send them to sign in honestly */
+        setLoading(false);
+        setError("Account created, but automatic sign-in failed. Please sign in.");
+        return;
+      }
+    } catch {
+      setLoading(false);
+      setError(
+        "SASI could not reach the signup service just now. Try again shortly."
+      );
+      return;
+    }
+
+    setLoading(false);
+    setSuccess(true);
+    signIn(); // keeps Services inside the app shell after this
+    timers.current.push(setTimeout(() => navigate("dashboard"), 900));
   };
 
   return (
@@ -229,6 +268,15 @@ export default function SignupView() {
               </GlowField>
             </div>
 
+            {error && (
+              <p
+                role="alert"
+                className="rounded-lg border border-[#ef5350]/25 bg-[#ef5350]/[0.06] p-3 text-[12px] leading-relaxed text-[#fda4a0]"
+              >
+                {error}
+              </p>
+            )}
+
             <PrimaryButton
               type="submit"
               disabled={loading || success}
@@ -245,7 +293,7 @@ export default function SignupView() {
                 className="flex items-center gap-2 rounded-lg border border-[#66bb6a]/20 bg-[#66bb6a]/5 p-3 text-[12px] text-[#8ee09a]"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Account created (demo). Taking you to your dashboard…
+                Account created and signed in. Taking you to your dashboard…
               </p>
             )}
           </form>

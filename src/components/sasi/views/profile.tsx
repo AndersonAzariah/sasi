@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { DEMO_USER } from "@/lib/sasi/data";
+import { signOut as nextAuthSignOut } from "next-auth/react";
 import { formatDate, initials } from "@/lib/sasi/utils";
 import {
   DemoBadge,
@@ -174,6 +175,8 @@ export default function ProfileView() {
           </div>
           <button
             onClick={() => {
+              /* clear BOTH the NextAuth JWT cookie session and the UI flag */
+              void nextAuthSignOut({ redirect: false });
               signOut();
               navigate("landing");
             }}

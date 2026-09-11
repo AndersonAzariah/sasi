@@ -67,6 +67,11 @@ const DICT: Dict = {
   "nav.evidence": { en: "Evidence", zu: "Ubufakazi", af: "Bewys" },
   "nav.system": { en: "System", zu: "Isistimu", af: "Stelsel" },
   "nav.services": { en: "Services", zu: "Izinsizakalo", af: "Dienste" },
+  "nav.government": {
+    en: "Government",
+    zu: "Uhulumeni",
+    af: "Regering",
+  },
 
   /* ---------- shell: nav items ---------- */
   "nav.dashboard": { en: "Dashboard", zu: "Idashibodi", af: "Dashbord" },
@@ -181,6 +186,11 @@ const DICT: Dict = {
   },
   "landing.nav.about": { en: "About", zu: "Mayelana", af: "Agor" },
   "landing.nav.security": { en: "Security", zu: "Ukuphepha", af: "Sekuriteit" },
+  "landing.nav.gov": {
+    en: "Government",
+    zu: "Uhulumeni",
+    af: "Regering",
+  },
 
   /* ---------- settings / language ---------- */
   "settings.language.interface": {

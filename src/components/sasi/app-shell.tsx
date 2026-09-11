@@ -15,6 +15,7 @@ import {
   CircleUser,
   Command as CommandIcon,
   FolderLock,
+  Landmark,
   LayoutDashboard,
   Map,
   PanelLeftClose,
@@ -74,6 +75,7 @@ const NAV_SECTIONS: {
 ];
 
 const SERVICES_SHORTCUT = { view: "services" as View, label: "nav.services", icon: ShieldCheck };
+const GOV_SHORTCUT = { view: "gov" as View, label: "nav.government", icon: Landmark };
 
 /* ============================================================
    SIDEBAR COLLAPSE — persists per browser ("get work done"
@@ -263,6 +265,12 @@ function Sidebar({
             {...SERVICES_SHORTCUT}
             label={t(SERVICES_SHORTCUT.label)}
             active={view === "services" || view === "service-detail"}
+            collapsed={collapsed}
+          />
+          <SidebarLink
+            {...GOV_SHORTCUT}
+            label={t(GOV_SHORTCUT.label)}
+            active={view === "gov"}
             collapsed={collapsed}
           />
         </div>

@@ -337,6 +337,7 @@ export type View =
   | "security"
   | "privacy"
   | "terms"
+  | "gov"
   | "login"
   | "signup"
   | "dashboard"
