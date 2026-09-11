@@ -71,7 +71,7 @@ export function CommandPalette() {
     // Ask SASI — intelligent prompts
     const askRows: { q: string; hint: string }[] = query.trim()
       ? [
-          { q: `Ask SASI about “${query.trim()}”`, hint: "Civic assistant" },
+          { q: `Ask SASI about “${query.trim()}”`, hint: "Service assistant" },
           { q: `Report a problem: “${query.trim()}”`, hint: "Open report flow" },
           { q: `Find services for “${query.trim()}”`, hint: "Browse service directory" },
         ]
@@ -88,7 +88,7 @@ export function CommandPalette() {
         group: "Ask SASI",
         label: r.q,
         hint: r.hint,
-        keywords: `ask sasi ai question civic ${r.q}`,
+        keywords: `ask sasi ai question civic service ${r.q}`,
         perform: () => {
           if (r.hint === "Report flow" || r.q.startsWith("Report a problem")) {
             navigate("report");
@@ -164,7 +164,7 @@ export function CommandPalette() {
       { view: "investigate" as const, label: "Investigation workspace", icon: Sparkles },
       { view: "cases" as const, label: "Cases", icon: FolderLock },
       { view: "incidents" as const, label: "Incidents", icon: Zap },
-      { view: "map" as const, label: "Civic map", icon: MapIcon },
+      { view: "map" as const, label: "Service map", icon: MapIcon },
       { view: "evidence" as const, label: "Evidence vault", icon: FolderLock },
       { view: "activity" as const, label: "Activity", icon: Zap },
       { view: "notifications" as const, label: "Notifications", icon: Bell },

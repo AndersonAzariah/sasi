@@ -287,7 +287,7 @@ export function GautengMiniMap({
 }
 
 /* ============================================================
-   MAP VIEW — full-bleed civic intelligence map
+   MAP VIEW — full-bleed service intelligence map
    ============================================================ */
 
 const MAP_SERVICES = ["water", "electricity", "roads", "waste"] as const;
@@ -686,7 +686,7 @@ export default function MapView() {
         preserveAspectRatio="xMidYMid meet"
         className="absolute inset-0 h-full w-full"
         role="img"
-        aria-label="Civic intelligence map of Gauteng with incident markers and your reports"
+        aria-label="Service intelligence map of Gauteng with incident markers and your reports"
       >
         <MemoBase />
         <HomeMarker x={home.x} y={home.y} label={t("map.you-are-here")} />

@@ -128,7 +128,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <div className="max-w-sm">
               <SasiLogo size={30} />
               <p className="mt-4 text-[13px] font-medium text-zinc-300">
-                South African Civic Intelligence Platform
+                South African Service Intelligence
               </p>
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-600">
                 Independent civic technology platform. SASI is not a government

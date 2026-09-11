@@ -90,7 +90,7 @@ function SplashScreen() {
             transition={{ delay: 0.3 }}
             className="mt-1.5 text-center text-[11px] tracking-wide text-zinc-700"
           >
-            Civic intelligence for South Africa
+            Service intelligence for South Africa
           </motion.p>
         </motion.div>
       </div>

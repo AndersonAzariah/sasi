@@ -1,6 +1,6 @@
 /* ============================================================
    SASI — Core domain types
-   Trust-first civic intelligence: every claim carries a status.
+   Trust-first service intelligence: every claim carries a status.
    ============================================================ */
 
 export type TrustStatus =

@@ -184,9 +184,9 @@ export default function DashboardView() {
             </div>
           </section>
 
-          <section aria-label={t("dash.civic-intelligence")}>
+          <section aria-label={t("dash.service-intelligence")}>
             <div className="flex items-center justify-between gap-2">
-              <SectionLabel>{t("dash.civic-intelligence")}</SectionLabel>
+              <SectionLabel>{t("dash.service-intelligence")}</SectionLabel>
               <DemoBadge />
             </div>
             <div className="sasi-card mt-3 divide-y divide-white/[0.04] p-2">

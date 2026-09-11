@@ -144,7 +144,7 @@ function BriefingBody({
                       <button
                         onClick={() => onMap(incRef)}
                         className="sasi-chip-map mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500 transition-colors hover:text-[#64b5f6] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#64b5f6]/50"
-                        aria-label={`Show ${incRef} on the civic map`}
+                        aria-label={`Show ${incRef} on the SASI map`}
                       >
                         <MapPin className="h-3 w-3" aria-hidden />
                         View on map
@@ -154,7 +154,7 @@ function BriefingBody({
                       <button
                         onClick={() => onMap(caseRef)}
                         className="sasi-chip-map-gold mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#e3c567]/50"
-                        aria-label={`Show your report ${caseRef} on the civic map`}
+                        aria-label={`Show your report ${caseRef} on the SASI map`}
                       >
                         <MapPin className="h-3 w-3" aria-hidden />
                         View on map

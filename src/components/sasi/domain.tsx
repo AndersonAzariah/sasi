@@ -684,7 +684,7 @@ export function NotificationRow({
   onOpen?: () => void;
   /** set when the notification carries a mappable ref — adds a quiet gold
       "View on map" affordance (visible on hover/focus-within, always on
-      touch) that focuses the civic map without leaving the list */
+      touch) that focuses the map without leaving the list */
   onViewOnMap?: () => void;
   /** the ref being focused (CASE-… or INC-…) — used for the a11y label */
   mapRef?: string;
@@ -744,7 +744,7 @@ export function NotificationRow({
                 }
               }}
               className="sasi-chip-map-gold inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
-              aria-label={`Show ${mapRef ?? "the referenced item"} on the civic map`}
+              aria-label={`Show ${mapRef ?? "the referenced item"} on the SASI map`}
             >
               <MapPin className="h-3 w-3" aria-hidden />
               View on map

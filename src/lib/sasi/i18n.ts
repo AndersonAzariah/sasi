@@ -134,7 +134,7 @@ const DICT: Dict = {
   },
 
   /* ---------- landing ---------- */
-  "landing.hero.a": { en: "Civic intelligence for", zu: "Ukwazi komphakathi", af: "Burgerlike intelligensie vir" },
+  "landing.hero.a": { en: "Service intelligence for", zu: "Ukwazi ngezinsizakusebenza", af: "Diensintelligensie vir" },
   "landing.hero.b": { en: "South Africa", zu: "eNingizimu Afrika", af: "Suid-Afrika" },
   "landing.hero.sub": {
     en: "Understand what is happening. Build the evidence. Take the next step.",
@@ -287,10 +287,10 @@ const DICT: Dict = {
     af: "Sien alle sake",
   },
   "dash.nearby": { en: "Nearby", zu: "Eduze nami", af: "Naby my" },
-  "dash.civic-intelligence": {
-    en: "Civic intelligence",
-    zu: "Ukwazi komphakathi",
-    af: "Burgerlike intelligensie",
+  "dash.service-intelligence": {
+    en: "Service intelligence",
+    zu: "Ukwazi ngezinsizakusebenza",
+    af: "Diensintelligensie",
   },
   "dash.next-steps": {
     en: "Next steps",
@@ -595,7 +595,7 @@ const DICT: Dict = {
   /* ============================================================
      INCIDENTS view
      ============================================================ */
-  "inc.title": { en: "Civic incidents", zu: "Izigameko zomphakathi", af: "Burgerlike voorvalle" },
+  "inc.title": { en: "Service incidents", zu: "Izigameko zezinsizakusebenza", af: "Diensvoorvalle" },
   "inc.subtitle": {
     en: "Reported and confirmed service incidents across Gauteng.",
     zu: "Izigameko zensizakalo ezibikiwe nezinqinisekisiwe kwaGauteng.",

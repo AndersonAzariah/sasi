@@ -64,7 +64,7 @@ const SUGGESTIONS: {
   {
     icon: MapPin,
     q: "Which municipality handles streetlights in Johannesburg?",
-    hint: "Civic directory",
+    hint: "Service directory",
   },
 ];
 
@@ -282,7 +282,7 @@ export default function AskSasiView() {
               <DemoBadge />
             </div>
             <p className="truncate text-[11.5px] text-zinc-500">
-              Civic assistant · grounded in public information and your demo data
+              Service assistant · grounded in public information and your demo data
             </p>
           </div>
           <button

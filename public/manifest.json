@@ -1,7 +1,7 @@
 {
-  "name": "SASI — South African Civic Intelligence Platform",
+  "name": "SASI — South African Service Intelligence",
   "short_name": "SASI",
-  "description": "Independent civic intelligence: understand what is happening, build the evidence, take the next step. Nothing is submitted without your approval.",
+  "description": "Independent service intelligence: understand what is happening, build the evidence, take the next step. Nothing is submitted without your approval.",
   "id": "/",
   "start_url": "/",
   "display": "standalone",

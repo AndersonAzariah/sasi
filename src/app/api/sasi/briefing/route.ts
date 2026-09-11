@@ -113,7 +113,7 @@ function compactContext(
   ].join("\n");
 }
 
-const SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — the South African Civic Intelligence Platform. Write a short "City briefing" digest for one resident, grounded ONLY in the demo dataset below.
+const SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. Write a short "City briefing" digest for one resident, grounded ONLY in the demo dataset below.
 
 Reply with STRICT JSON only (no markdown fences, no prose):
 {
@@ -145,7 +145,7 @@ function transcriptBlock(
     .join("\n\n");
 }
 
-const CHAT_SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — the South African Civic Intelligence Platform. The resident just had an assistance conversation with SASI's chat. Distil THAT CONVERSATION into a short "City briefing" card so the resident can pin a summary of it on their dashboard.
+const CHAT_SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. The resident just had an assistance conversation with SASI's chat. Distil THAT CONVERSATION into a short "City briefing" card so the resident can pin a summary of it on their dashboard.
 
 Reply with STRICT JSON only (no markdown fences, no prose):
 {

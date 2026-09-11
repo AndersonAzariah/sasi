@@ -32,7 +32,7 @@ interface VisionBody {
 const MAX_BASE64_CHARS = 5_000_000; // ~3.7MB binary
 const ALLOWED_MIME = /^data:(image\/(png|jpe?g|webp));base64,/;
 
-const SYSTEM_PROMPT = `You are SASI's evidence analyst — part of the South African Civic Intelligence Platform. A resident is reporting an everyday civic service problem (water, electricity, roads, waste, healthcare, education, housing, documents, safety, local government) and attached a photo.
+const SYSTEM_PROMPT = `You are SASI's evidence analyst — part of South African Service Intelligence. A resident is reporting an everyday civic service problem (water, electricity, roads, waste, healthcare, education, housing, documents, safety, local government) and attached a photo.
 
 Analyse the photo and reply with STRICT JSON only (no markdown fences, no prose):
 {

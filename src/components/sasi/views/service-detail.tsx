@@ -202,7 +202,7 @@ export default function ServiceDetailView() {
         </ul>
       </motion.section>
 
-      {/* ---------- Civic information (water flagship) / incidents for other services ---------- */}
+      {/* ---------- Service information (water flagship) / incidents for other services ---------- */}
       <motion.section
         className="mt-10"
         initial={{ opacity: 0, y: 12 }}
@@ -213,7 +213,7 @@ export default function ServiceDetailView() {
       >
         {isWater ? (
           <>
-            <SectionLabel className="mb-3">Civic information</SectionLabel>
+            <SectionLabel className="mb-3">Service information</SectionLabel>
             <h2 id="civic-info-heading" className="sr-only">
               Current water incidents
             </h2>

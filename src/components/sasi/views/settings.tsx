@@ -173,7 +173,7 @@ const I18N_COVERAGE: { view: string; cov: [CoverageState, CoverageState, Coverag
   { view: "Report wizard", cov: ["full", "full", "full"] },
   { view: "Cases & case detail", cov: ["full", "full", "full"] },
   { view: "Incidents & incident detail", cov: ["full", "full", "full"] },
-  { view: "Civic map", cov: ["full", "full", "full"] },
+  { view: "Service map", cov: ["full", "full", "full"] },
   { view: "Notifications", cov: ["full", "full", "full"] },
   { view: "Activity feed", cov: ["full", "full", "full"] },
   { view: "Evidence", cov: ["full", "full", "full"] },

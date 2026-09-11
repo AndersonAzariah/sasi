@@ -96,7 +96,7 @@ export default function AboutView() {
           <section aria-labelledby="about-what">
             <SectionHeader title="What SASI is" />
             <p className="mt-3 text-[13.5px] leading-relaxed text-zinc-400">
-              SASI — the South African Civic Intelligence Platform — is an independent civic
+              SASI — South African Service Intelligence — is an independent civic
               technology product. It helps you describe a civic problem, investigates what is
               known about it, organises the evidence, and prepares clear findings — so you can
               decide what to do next with facts instead of frustration.

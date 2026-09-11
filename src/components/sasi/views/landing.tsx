@@ -324,7 +324,7 @@ export default function LandingView() {
         </div>
       </section>
 
-      {/* ================================================== LIVE CIVIC INTELLIGENCE */}
+      {/* ================================================== LIVE SERVICE INTELLIGENCE */}
       <section aria-labelledby="live-heading">
         <div className="mx-auto max-w-6xl px-4 pb-14 sm:px-6 sm:pb-20">
           <motion.div
@@ -336,7 +336,7 @@ export default function LandingView() {
           >
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 id="live-heading" className="text-[15px] font-semibold tracking-tight text-white">
-                Live civic intelligence
+                Live service intelligence
               </h2>
               <DemoBadge label="DEMO DATA" />
               <span className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[11px] text-zinc-400">
@@ -566,7 +566,7 @@ export default function LandingView() {
         </div>
       </section>
 
-      {/* ================================================== LATEST CIVIC INFORMATION */}
+      {/* ================================================== LATEST SERVICE INFORMATION */}
       <section aria-labelledby="latest-heading" className="border-t border-white/5">
         <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:pb-20 sm:pt-16">
           <div className="flex flex-wrap items-end justify-between gap-3">
@@ -575,7 +575,7 @@ export default function LandingView() {
                 Recent signals
               </p>
               <h2 id="latest-heading" className="mt-1.5 text-lg font-semibold tracking-tight text-white">
-                Latest civic information
+                Latest service information
               </h2>
             </div>
             <DemoBadge label="DEMO DATA" />

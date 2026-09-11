@@ -16,14 +16,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "SASI — South African Civic Intelligence Platform",
+    default: "SASI — South African Service Intelligence",
     template: "%s · SASI",
   },
   description:
     "SASI is an independent civic technology platform. Understand what is happening, build the evidence, and take the next step on civic service issues in South Africa.",
   keywords: [
     "SASI",
-    "civic intelligence",
+    "service intelligence",
     "South Africa",
     "municipal services",
     "water outages",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     apple: [{ url: "/sasi-icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {
-    title: "SASI — South African Civic Intelligence Platform",
+    title: "SASI — South African Service Intelligence",
     description:
       "Understand what is happening. Build the evidence. Take the next step.",
     siteName: "SASI",
@@ -47,9 +47,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SASI — South African Civic Intelligence Platform",
+    title: "SASI — South African Service Intelligence",
     description:
-      "Independent civic technology for South Africa. Civic intelligence, investigation and evidence.",
+      "Independent civic technology for South Africa. Service intelligence, investigation and evidence.",
   },
 };
 
