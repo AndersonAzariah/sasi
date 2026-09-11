@@ -1,12 +1,18 @@
 "use client";
 
 /* ============================================================
-   AUTH BRAND SHELL (Task 14) — shared fashion for login/signup:
-   dot-veiled brand panel with the circulating hero word, a
-   floating glass top bar, and the shared glow field shell.
+   AUTH BRAND SHELL (Task 21) — shared fashion for login/signup.
+   The left panel is now the SASIAUTH hero photograph (storm sky,
+   the S mark, the city at dusk, national light trails) behind
+   gradient scrims, with the editorial statement up top and the
+   principles plate at the bottom. On <lg screens the photograph
+   becomes a compact banner above the form card.
    Logic-free: pure presentation + navigation only.
    ============================================================ */
 
+import { useEffect, useRef } from "react";
+import Image from "next/image";
+import { gsap } from "gsap";
 import { ArrowLeft, BadgeCheck, Megaphone, SearchCheck, ShieldCheck, Lock, Sparkles } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { SasiLogo } from "@/components/sasi/primitives";
@@ -63,7 +69,36 @@ export function AuthTopBar() {
   );
 }
 
-/* ---------- Left brand panel — dots, hero word, principles plate ---------- */
+/* ---------- The SASIAUTH photograph, shared by panel + banner ---------- */
+const AUTH_IMG = "/sasi-auth.webp";
+const AUTH_IMG_FALLBACK = "/SASIAUTH.png";
+const AUTH_BLUR =
+  "data:image/webp;base64,UklGRpIAAABXRUJQVlA4IIYAAABQBACdASoQABgAPu1iqU2ppaQiMAgBMB2JQBkXCYwWYy//N7r6iojfmEEAAP7xS+8idelocArxCIinc8STQe/RYDk2Pr0bIvycQoysYxA93nuC6b2t/PiA1Vzd1gLvlaMpm3Qp2IbqmSq4eSD33wFRMz/IAwxsO/nw7xYsEChzAgA2oAAAAA==";
+
+/** Gradient scrims so editorial type stays readable over the photo. */
+function AuthImageScrims() {
+  return (
+    <>
+      {/* top — storm sky anchor for the eyebrow + headline */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[46%] bg-gradient-to-b from-[#050505]/88 via-[#050505]/42 to-transparent"
+      />
+      {/* bottom — deep anchor for the principles plate + brand line */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-[#050505]/94 via-[#050505]/58 to-transparent"
+      />
+      {/* left edge — seams the photo into the page background */}
+      <div
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#050505]/72 to-transparent"
+      />
+    </>
+  );
+}
+
+/* ---------- Left brand panel — the SASIAUTH photograph ---------- */
 const PRINCIPLES = [
   {
     n: "01",
@@ -95,50 +130,78 @@ const TRUST_CHIPS = [
 ] as const;
 
 export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
-  const ambients =
-    accent === "red"
-      ? {
-          top: "radial-gradient(closest-side, rgba(229,57,53,0.11), transparent)",
-          bottom:
-            "radial-gradient(closest-side, rgba(66,165,245,0.10), transparent)",
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  /* GSAP entrance — the statement, plate and brand line rise in
+     sequence over the photograph (reduced-motion-safe by guard). */
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (document.documentElement.classList.contains("sasi-data-saver")) return;
+
+    const targets = panel.querySelectorAll("[data-auth-reveal]");
+    if (!targets.length) return;
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        targets,
+        { opacity: 0, y: 18 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.85,
+          ease: "power3.out",
+          stagger: 0.12,
+          delay: 0.1,
+          clearProps: "transform",
         }
-      : {
-          top: "radial-gradient(closest-side, rgba(227,197,103,0.10), transparent)",
-          bottom:
-            "radial-gradient(closest-side, rgba(102,187,106,0.09), transparent)",
-        };
+      );
+      /* the photograph itself settles from a gentle 1.04 push-in */
+      const photo = panel.querySelector("[data-auth-photo]");
+      if (photo) {
+        gsap.fromTo(
+          photo,
+          { scale: 1.045, opacity: 0.4 },
+          { scale: 1, opacity: 1, duration: 1.6, ease: "power2.out" }
+        );
+      }
+    }, panel);
+
+    return () => ctx.revert();
+  }, []);
 
   return (
     <aside
+      ref={panelRef}
       aria-hidden={false}
       className="relative hidden w-[44%] max-w-[620px] shrink-0 flex-col justify-between overflow-hidden border-r border-white/6 bg-[#070708] p-10 pb-12 pt-24 lg:flex xl:p-14 xl:pt-28"
     >
-      {/* phase-3 dot matrix, melted at the edges */}
-      <div aria-hidden className="sasi-dot-veil absolute inset-0 opacity-70" />
+      {/* the SASIAUTH photograph — full bleed */}
+      <div className="absolute inset-0" aria-hidden>
+        <Image
+          data-auth-photo
+          src={AUTH_IMG}
+          alt=""
+          fill
+          priority
+          quality={88}
+          placeholder="blur"
+          blurDataURL={AUTH_BLUR}
+          sizes="(min-width: 1280px) 620px, 44vw"
+          className="object-cover object-center select-none"
+          onError={(e) => {
+            const img = e.target as HTMLImageElement;
+            if (img.srcset || img.src.includes(AUTH_IMG_FALLBACK)) return;
+            img.src = AUTH_IMG_FALLBACK;
+          }}
+        />
+        <AuthImageScrims />
+      </div>
 
-      {/* breathing national ambience */}
-      <div
-        aria-hidden
-        className="sasi-ambient -left-24 -top-24 h-96 w-96"
-        style={{ background: ambients.top }}
-      />
-      <div
-        aria-hidden
-        className="sasi-ambient -bottom-32 right-[-10%] h-[420px] w-[420px]"
-        style={{ background: ambients.bottom }}
-      />
-
-      {/* corner orbit ornament — faint static track + slow national ring */}
-      <div aria-hidden className="sasi-boot-orbit right-[-70px] top-[-70px] h-44 w-44" />
-      <div
-        aria-hidden
-        className="sasi-boot-ring right-[-58px] top-[-58px] h-20 w-20 opacity-50"
-        style={{ animationDuration: "9s" }}
-      />
-
-      {/* top — editorial eyebrow */}
+      {/* top — editorial eyebrow + statement (over the storm sky) */}
       <div className="relative">
-        <div className="sasi-eyebrow text-zinc-400">
+        <div data-auth-reveal className="sasi-eyebrow text-zinc-400">
           <span
             aria-hidden
             className="sasi-breathe h-1.5 w-1.5 rounded-full"
@@ -146,11 +209,10 @@ export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
           />
           Service intelligence
         </div>
-      </div>
-
-      {/* middle — serif statement + liquid glass principles plate */}
-      <div className="relative max-w-md">
-        <h2 className="sasi-serif text-[38px] font-medium leading-[1.1] tracking-tight text-white xl:text-[44px]">
+        <h2
+          data-auth-reveal
+          className="sasi-serif mt-6 max-w-md text-[36px] font-medium leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.65)] xl:text-[42px]"
+        >
           Service intelligence for{" "}
           <em
             className="bg-clip-text text-transparent"
@@ -163,11 +225,19 @@ export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
             South Africa.
           </em>
         </h2>
-        <p className="mt-5 max-w-sm text-[13.5px] leading-relaxed text-zinc-500">
+        <p
+          data-auth-reveal
+          className="mt-4 max-w-sm text-[13.5px] leading-relaxed text-zinc-300 drop-shadow-[0_1px_10px_rgba(0,0,0,0.9)]"
+        >
           Independent civic technology. Not a government website.
         </p>
+      </div>
 
-        <div className="sasi-auth-card mt-9 !rounded-3xl p-5">
+      {/* middle stays open — the S mark and the city light trails breathe */}
+
+      {/* bottom — principles plate + trust chips over the city dusk */}
+      <div className="relative">
+        <div data-auth-reveal className="sasi-auth-card mt-9 !rounded-3xl p-5">
           <div className="space-y-1">
             {PRINCIPLES.map(({ n, icon: Icon, accent, title, body }) => (
               <div
@@ -215,19 +285,85 @@ export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
             ))}
           </div>
         </div>
-      </div>
 
-      {/* bottom — national accent dot */}
-      <div className="relative flex items-center gap-3">
-        <span
-          aria-hidden
-          className="h-1.5 w-1.5 shrink-0 rounded-full"
-          style={{ background: NATIONAL_DOT_GRADIENT }}
-        />
-        <p className="text-[10.5px] font-medium uppercase tracking-[0.24em] text-zinc-600">
-          South African Service Intelligence
-        </p>
+        <div
+          data-auth-reveal
+          className="mt-6 flex items-center gap-3 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]"
+        >
+          <span
+            aria-hidden
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: NATIONAL_DOT_GRADIENT }}
+          />
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.24em] text-zinc-500">
+            South African Service Intelligence
+          </p>
+        </div>
       </div>
     </aside>
+  );
+}
+
+/* ---------- Mobile banner — compact SASIAUTH strip above the form ---------- */
+export function AuthMobileBanner({ accent }: { accent: "red" | "gold" }) {
+  return (
+    <div className="sasi-auth-card relative mb-5 h-40 w-full overflow-hidden !rounded-3xl lg:hidden">
+      <Image
+        src={AUTH_IMG}
+        alt="SASI — the S mark over a South African city at dusk, wrapped in national light trails"
+        fill
+        priority
+        quality={80}
+        placeholder="blur"
+        blurDataURL={AUTH_BLUR}
+        sizes="100vw"
+        className="object-cover object-[center_26%]"
+        onError={(e) => {
+          const img = e.target as HTMLImageElement;
+          if (img.src.includes(AUTH_IMG_FALLBACK)) return;
+          img.src = AUTH_IMG_FALLBACK;
+        }}
+      />
+      {/* scrims + wordmark line */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[#050505]/90 via-[#050505]/30 to-transparent"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-[#050505]/60 to-transparent"
+      />
+      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
+        <div>
+          <p className="sasi-serif text-[17px] font-medium leading-tight text-white">
+            Service intelligence for{" "}
+            <em
+              className="bg-clip-text text-transparent"
+              style={{
+                fontStyle: "italic",
+                backgroundImage:
+                  "linear-gradient(100deg, #f28b87, #90caf9 42%, #a5d6a7 68%, #eed582)",
+              }}
+            >
+              South Africa.
+            </em>
+          </p>
+          <p className="mt-1 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
+            Not a government website
+          </p>
+        </div>
+        <span
+          aria-hidden
+          className="mb-1 h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{
+            background: NATIONAL_DOT_GRADIENT,
+            boxShadow:
+              accent === "red"
+                ? "0 0 10px rgba(229,57,53,0.7)"
+                : "0 0 10px rgba(212,175,55,0.7)",
+          }}
+        />
+      </div>
+    </div>
   );
 }

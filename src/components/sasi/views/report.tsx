@@ -12,9 +12,11 @@ import {
   CheckCircle2,
   Link2,
   Loader2,
+  LocateFixed,
   RefreshCw,
   ScanSearch,
   ShieldCheck,
+  Sparkles,
   StickyNote,
   X,
 } from "lucide-react";
@@ -85,6 +87,21 @@ const LOCATION_CHIPS = [
 ];
 
 type EvidenceChip = { id: string; kind: "note" | "link" | "photo"; value: string };
+
+/** Task 21 — device GPS fix + AI/OSM enrichment metadata carried on
+ *  the draft; mirrors store.reportDraft.geo so the created case is
+ *  pinned at the REAL coordinates. */
+type DraftGeo = {
+  lat: number;
+  lng: number;
+  accuracyM: number | null;
+  source: "ai" | "osm" | "coords";
+  confidence: string;
+  notes: string;
+  landmark: string;
+  city?: string;
+  province?: string;
+};
 
 function serializeEvidence(items: EvidenceChip[]): string {
   return items
@@ -242,6 +259,13 @@ export default function ReportView() {
   const [noteInput, setNoteInput] = useState("");
   const [linkInput, setLinkInput] = useState("");
 
+  /* ---- Task 21: super-accurate location (device GPS + free AI) ---- */
+  const [geo, setGeo] = useState<DraftGeo | null>(storedDraft?.geo ?? null);
+  const [geoPhase, setGeoPhase] = useState<
+    "idle" | "locating" | "enriching" | "done" | "error"
+  >("idle");
+  const [geoError, setGeoError] = useState<string | null>(null);
+
   /* ---- photo evidence + SASI vision analysis ---- */
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [photo, setPhoto] = useState<{ dataUrl: string; name: string } | null>(null);
@@ -269,8 +293,91 @@ export default function ReportView() {
       when,
       impact,
       evidenceNote: serializeEvidence(evidenceItems),
+      geo,
     });
-  }, [service, problem, location, when, impact, evidenceItems]);
+  }, [service, problem, location, when, impact, evidenceItems, geo]);
+
+  /* ---- Task 21: GPS fix → /api/sasi/geo/enrich (OSM + free OpenRouter
+     models) → verified street address + honest confidence. Degrades to
+     raw coordinates so the flow never dies. ---- */
+  const geoBusy = geoPhase === "locating" || geoPhase === "enriching";
+
+  const locatePrecise = () => {
+    if (geoBusy) return;
+    setGeoError(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoPhase("error");
+      setGeoError("This browser can't share location — type the address instead.");
+      return;
+    }
+    setGeoPhase("locating");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setGeoPhase("enriching");
+        try {
+          const res = await fetch("/api/sasi/geo/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracyM: pos.coords.accuracy,
+            }),
+          });
+          const data = await res.json();
+          if (!data?.ok) throw new Error("enrich-failed");
+          setLocation(String(data.location ?? ""));
+          setGeo({
+            lat: data.precision.lat,
+            lng: data.precision.lng,
+            accuracyM: data.precision.accuracyM,
+            source: data.source,
+            confidence: data.confidence,
+            notes: data.notes ?? "",
+            landmark: data.parts?.landmark ?? "",
+            city: data.parts?.city || undefined,
+            province: data.parts?.province || undefined,
+          });
+          setGeoPhase("done");
+          toast.success("Precise location locked", {
+            description:
+              data.confidence === "high"
+                ? "Street-level address verified at your exact coordinates."
+                : "Address resolved from your GPS fix — check it reads correctly.",
+          });
+        } catch {
+          /* graceful: keep the raw fix so the flow never dies */
+          setGeo({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracyM: Math.round(pos.coords.accuracy),
+            source: "coords",
+            confidence: "low",
+            notes: "",
+            landmark: "",
+          });
+          setLocation(
+            (prev) =>
+              prev.trim() ||
+              `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`
+          );
+          setGeoPhase("done");
+          setGeoError(
+            "Address verification didn't answer — your exact GPS coordinates were kept instead."
+          );
+        }
+      },
+      (err) => {
+        setGeoPhase("error");
+        setGeoError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission was denied. You can type the address instead."
+            : "Couldn't get a GPS fix right now. Type the address, or try again."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 15000 }
+    );
+  };
 
   const stepValid = useMemo(() => {
     switch (step) {
@@ -548,6 +655,11 @@ export default function ReportView() {
                 value={location}
                 onChange={(e) => {
                   setLocation(e.target.value);
+                  /* hand-typed edits invalidate the GPS fix honestly */
+                  if (geo) {
+                    setGeo(null);
+                    setGeoPhase("idle");
+                  }
                   setAttempted(false);
                 }}
                 onKeyDown={handleEnterKey}
@@ -555,15 +667,86 @@ export default function ReportView() {
                 aria-label={t("rp.where.aria")}
                 className={INPUT_CLS}
               />
-              <p className="mt-1.5 text-[12px] text-zinc-600">
+
+              {/* ---- Task 21: super-accurate location (GPS + AI) ---- */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={locatePrecise}
+                  disabled={geoBusy}
+                  className="sasi-btn-glass inline-flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[12px] font-medium text-zinc-200"
+                >
+                  {geoBusy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <LocateFixed
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        geo ? "text-[#e3c567]" : "text-zinc-400"
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  {geoPhase === "locating"
+                    ? "Getting GPS fix…"
+                    : geoPhase === "enriching"
+                      ? "Verifying address…"
+                      : geo
+                        ? "Re-scan my location"
+                        : "Use my precise location"}
+                </button>
+                {geo && (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10.5px] font-medium tracking-wide text-zinc-400"
+                  >
+                    <LocateFixed className="h-3 w-3 text-[#e3c567]" aria-hidden />
+                    GPS ±{geo.accuracyM != null ? geo.accuracyM : "?"} m
+                  </span>
+                )}
+                {geo && geo.source === "ai" && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e3c567]/25 bg-[#e3c567]/[0.07] px-2.5 py-1 text-[10.5px] font-medium tracking-wide text-[#eed582]">
+                    <Sparkles className="h-3 w-3" aria-hidden />
+                    AI-verified address
+                  </span>
+                )}
+                {geo && geo.confidence === "high" && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#66bb6a]/25 bg-[#66bb6a]/[0.07] px-2.5 py-1 text-[10.5px] font-medium tracking-wide text-[#8ee09a]">
+                    <CheckCircle2 className="h-3 w-3" aria-hidden />
+                    High confidence
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-2 text-[12px] text-zinc-600">
                 {t("rp.where.hint")}
               </p>
+              {geo?.notes && (
+                <p className="mt-2 text-[12px] leading-relaxed text-zinc-500">
+                  {geo.notes}
+                </p>
+              )}
+              {geoPhase === "error" && geoError && (
+                <p
+                  role="alert"
+                  className="mt-2 flex items-center gap-1.5 text-[12px] text-[#fda4a0]"
+                >
+                  <AlertCircle className="h-3.5 w-3.5" aria-hidden />
+                  {geoError}
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap gap-2">
                 {[`${savedLocation.suburb}, ${savedLocation.city}`, ...LOCATION_CHIPS].map(
                   (chip) => (
                     <button
                       key={chip}
-                      onClick={() => setLocation(chip)}
+                      onClick={() => {
+                        setLocation(chip);
+                        /* a city chip replaces the precise fix */
+                        if (geo) {
+                          setGeo(null);
+                          setGeoPhase("idle");
+                        }
+                      }}
                       className={cn(
                         "min-h-9 rounded-full border px-3 text-[12px] transition-colors",
                         location === chip
@@ -973,7 +1156,15 @@ export default function ReportView() {
               : "—",
             editStep: 0,
           },
-          { label: t("rp.step.where"), value: location || "—", editStep: 1 },
+          {
+            label: t("rp.step.where"),
+            value:
+              (location || "—") +
+              (geo
+                ? `  ·  GPS ±${geo.accuracyM != null ? geo.accuracyM : "?"} m`
+                : ""),
+            editStep: 1,
+          },
           { label: t("rp.step.when"), value: whenLabel(when, t), editStep: 2 },
           { label: t("cd.impact"), value: impact.trim() || t("rp.review.not-provided"), editStep: 3 },
           {

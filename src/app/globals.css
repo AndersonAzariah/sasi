@@ -1082,13 +1082,34 @@ html::-webkit-scrollbar-thumb:hover {
 
 @property --sasi-glow-angle {
   syntax: "<angle>";
-  inherits: false;
+  /* Task 21 CGO v3: inherited so GSAP can animate the angle ON THE HOST
+     and the ::before ring (which reads it through conic-gradient) follows
+     along. The CSS keyframe still works locally on pseudos. */
+  inherits: true;
   initial-value: 0deg;
 }
 
 @keyframes sasi-glow-rotate {
   to {
     --sasi-glow-angle: 360deg;
+  }
+}
+
+/* ---------- CGO v3 (Task 21) — GSAP ownership + boost ----------
+   When GSAP takes over a host's ring it adds .sasi-cgo-gsap: the CSS
+   keyframe stands down and gsap-runtime writes the angle every frame.
+   --sasi-glow-boost (1 → ~1.5, tweened by GSAP on hover/focus) lets
+   the same rules breathe brighter instead of snapping between two
+   fixed opacities. */
+.sasi-cgo-gsap::before {
+  animation: none !important;
+}
+
+/* reduced motion: GSAP never starts (guarded in gsap-runtime), and the
+   ownership class is a no-op if something re-adds it */
+@media (prefers-reduced-motion: reduce) {
+  .sasi-cgo-gsap::before {
+    animation: none !important;
   }
 }
 
@@ -1790,10 +1811,10 @@ html::-webkit-scrollbar-thumb:hover {
     0 0 38px -12px rgba(212, 175, 55, 0.24);
 }
 
-/* the ring itself: thicker, brighter, faster */
+/* the ring itself: thicker, brighter, faster — CGO v3 (Task 21) */
 .sasi-search-glow::before,
 .sasi-command-focus::before {
-  padding: 1.5px;
+  padding: 2px;
   background: conic-gradient(
     from var(--sasi-glow-angle),
     rgba(255, 255, 255, 0.12) 0deg,
@@ -1809,16 +1830,21 @@ html::-webkit-scrollbar-thumb:hover {
 }
 .sasi-search-glow:focus-within::before,
 .sasi-command-focus:focus-within::before {
-  animation-duration: 3.2s;
-  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.4));
+  animation-duration: 2.6s;
+  filter: drop-shadow(
+      0 0 calc(8px * var(--sasi-glow-boost, 1)) rgba(212, 175, 55, 0.5)
+    )
+    drop-shadow(
+      0 0 calc(15px * var(--sasi-glow-boost, 1)) rgba(229, 57, 53, 0.3)
+    );
 }
 .sasi-search-glow-live::before {
-  opacity: 0.5;
+  opacity: 0.6;
   animation-duration: 6.5s;
 }
 .sasi-search-glow-live:focus-within::before {
   opacity: 1;
-  animation-duration: 3.2s;
+  animation-duration: 2.6s;
 }
 
 /* ============================================================
@@ -1991,16 +2017,24 @@ strong {
 .sasi-btn-white-glass:hover::before,
 .sasi-btn-white-glass:focus-visible::before {
   opacity: 1;
-  animation-duration: 2.2s;
-  filter: drop-shadow(0 0 7px rgba(212, 175, 55, 0.45))
-    drop-shadow(0 0 14px rgba(66, 165, 245, 0.3));
+  animation-duration: 1.9s;
+  filter: drop-shadow(
+      0 0 calc(9px * var(--sasi-glow-boost, 1)) rgba(212, 175, 55, 0.5)
+    )
+    drop-shadow(
+      0 0 calc(17px * var(--sasi-glow-boost, 1)) rgba(66, 165, 245, 0.32)
+    );
 }
 [data-slot="button"]:hover::before,
 [data-slot="button"]:focus-visible::before {
   opacity: 1;
-  animation-duration: 2.4s;
-  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.4))
-    drop-shadow(0 0 12px rgba(229, 57, 53, 0.25));
+  animation-duration: 2.1s;
+  filter: drop-shadow(
+      0 0 calc(8px * var(--sasi-glow-boost, 1)) rgba(212, 175, 55, 0.45)
+    )
+    drop-shadow(
+      0 0 calc(14px * var(--sasi-glow-boost, 1)) rgba(229, 57, 53, 0.28)
+    );
 }
 
 /* disabled still whispers (re-assert after the rest state above) */
@@ -2074,15 +2108,16 @@ strong {
   transition: opacity 0.35s ease;
   pointer-events: none;
 }
+/* CGO v3: hover light breathes with --sasi-glow-boost (GSAP-tweened) */
 .sasi-card:hover::before {
-  opacity: 0.55;
+  opacity: calc(0.74 * var(--sasi-glow-boost, 1));
 }
 .sasi-card:focus-within::before {
-  opacity: 0.85;
+  opacity: calc(0.9 * var(--sasi-glow-boost, 1));
 }
 .sasi-card-interactive:hover::before {
-  opacity: 0.9;
-  animation-duration: 3.2s;
+  opacity: 1;
+  animation-duration: 2.6s;
 }
 @media (prefers-reduced-motion: reduce) {
   .sasi-card::before {
@@ -2090,14 +2125,14 @@ strong {
   }
 }
 
-/* search shells: a whisper on hover, full light on focus */
+/* search shells: a whisper on hover, full light on focus — v3 breathing */
 .sasi-search-glow:hover::before,
 .sasi-command-focus:hover::before {
-  opacity: 0.4;
+  opacity: calc(0.48 * var(--sasi-glow-boost, 1));
 }
 .sasi-search-glow:focus-within::before,
 .sasi-command-focus:focus-within::before {
-  opacity: 1;
+  opacity: min(1, calc(0.88 * var(--sasi-glow-boost, 1)));
 }
 
 /* boot ring rides the same thicker standard */
@@ -2140,6 +2175,10 @@ strong {
 .sasi-data-saver .sasi-command-focus::before,
 .sasi-data-saver .sasi-search-glow-live::before {
   display: none;
+}
+/* CGO v3: data saver also stands down any GSAP-owned ring host */
+.sasi-data-saver .sasi-cgo-gsap::before {
+  display: none !important;
 }
 .sasi-data-saver .sasi-scroll-progress {
   display: none;

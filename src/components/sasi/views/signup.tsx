@@ -10,6 +10,7 @@ import { signIn as nextAuthSignIn } from "next-auth/react";
 import {
   AuthBrandPanel,
   AuthGlowField,
+  AuthMobileBanner,
   AuthTopBar,
   AUTH_FIELD_INPUT,
   NATIONAL_DOT_GRADIENT,
@@ -118,6 +119,9 @@ export default function SignupView() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: "easeOut" }}
         >
+          {/* ------- SASIAUTH banner (mobile only) ------- */}
+          <AuthMobileBanner accent="gold" />
+
           {/* ------- liquid glass form card ------- */}
           <div className="sasi-auth-card p-6 sm:p-8">
             <h1 className="sasi-serif text-[26px] font-medium tracking-tight text-white">

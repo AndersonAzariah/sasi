@@ -91,6 +91,11 @@ export function SasiGsapRuntime() {
       if (initial) ScrollTrigger.refresh();
     };
 
+    /** teardown for the CGO v3 delegated listeners + hot tweens
+     *  (assigned inside the context callback; ctx itself is still
+     *  initialising there, so ctx.add() would be a TDZ crash) */
+    let cgoCleanup: (() => void) | null = null;
+
     const ctx = gsap.context(() => {
       // 1 — reading progress across the whole document
       if (bar) {
@@ -186,8 +191,122 @@ export function SasiGsapRuntime() {
           }
         );
       });
-    });
 
+      /* ----------------------------------------------------------
+         7 — CGO v3 (Task 21): GSAP-owned circulating glow outlines.
+         Every glow-ring host (search shells, cards, buttons, boot
+         rings) hands its rotation to GSAP on hover/focus: the CSS
+         keyframe stands down (.sasi-cgo-gsap) and GSAP writes the
+         --sasi-glow-angle custom property every frame — plus a
+         --sasi-glow-boost breathing tween so the ring visibly
+         brightens instead of sitting at one fixed opacity.
+         Hero surfaces (.sasi-search-glow-live, .sasi-boot-ring)
+         run ALWAYS-ON so the national light never fully sleeps.
+         Delegated listeners mean zero rescans when views change.
+         ---------------------------------------------------------- */
+      const CGO_HOST_SELECTOR =
+        '.sasi-search-glow, .sasi-command-focus, .sasi-card, .sasi-auth-card, .sasi-btn-glass, .sasi-btn-white-glass, .sasi-btn-ring, [data-slot="button"], .sasi-boot-ring';
+      const CGO_LIVE_SELECTOR = ".sasi-search-glow-live, .sasi-boot-ring";
+
+      const dataSaverOn = () =>
+        document.documentElement.classList.contains("sasi-data-saver");
+
+      const hot = new Map<
+        HTMLElement,
+        { rot: gsap.core.Tween; boost: gsap.core.Tween | null }
+      >();
+
+      const startCgo = (el: HTMLElement, opts?: { live?: boolean }) => {
+        if (hot.has(el) || dataSaverOn()) return;
+        el.classList.add("sasi-cgo-gsap");
+        /* rotation: fast and endless — noticeably livelier than the
+           CSS keyframe it replaces (which ran 4.5–9s per lap) */
+        const rot = gsap.fromTo(
+          el,
+          { "--sasi-glow-angle": "0deg" },
+          {
+            "--sasi-glow-angle": "360deg",
+            duration: opts?.live ? 5.5 : 1.9,
+            ease: "none",
+            repeat: -1,
+            overwrite: "auto",
+          }
+        );
+        /* boost: a slow breathing brightening, 1 → 1.45 → 1, so the
+           ring pulses like a heartbeat while the host is hot */
+        const boost = opts?.live
+          ? null
+          : gsap.fromTo(
+              el,
+              { "--sasi-glow-boost": 1 },
+              {
+                "--sasi-glow-boost": 1.45,
+                duration: 0.85,
+                ease: "sine.inOut",
+                yoyo: true,
+                repeat: -1,
+                repeatDelay: 1.1,
+                delay: 0.3,
+              }
+            );
+        hot.set(el, { rot, boost });
+      };
+
+      const stopCgo = (el: HTMLElement) => {
+        const t = hot.get(el);
+        if (!t) return;
+        t.rot.kill();
+        t.boost?.kill();
+        el.style.removeProperty("--sasi-glow-angle");
+        el.style.removeProperty("--sasi-glow-boost");
+        el.classList.remove("sasi-cgo-gsap");
+        hot.delete(el);
+      };
+
+      const hostFromEvent = (target: EventTarget | null): HTMLElement | null => {
+        if (!(target instanceof Element)) return null;
+        const host = target.closest(CGO_HOST_SELECTOR);
+        return host instanceof HTMLElement ? host : null;
+      };
+
+      const onPointerOver = (e: PointerEvent) => {
+        const host = hostFromEvent(e.target);
+        if (host) startCgo(host);
+      };
+      const onPointerOut = (e: PointerEvent) => {
+        const host = hostFromEvent(e.target);
+        if (host && !host.contains(e.relatedTarget as Node)) stopCgo(host);
+      };
+      const onFocusIn = (e: FocusEvent) => {
+        const host = hostFromEvent(e.target);
+        if (host) startCgo(host);
+      };
+      const onFocusOut = (e: FocusEvent) => {
+        const host = hostFromEvent(e.target);
+        if (host && !host.contains(e.relatedTarget as Node)) stopCgo(host);
+      };
+
+      document.addEventListener("pointerover", onPointerOver, { passive: true });
+      document.addEventListener("pointerout", onPointerOut, { passive: true });
+      document.addEventListener("focusin", onFocusIn, true);
+      document.addEventListener("focusout", onFocusOut, true);
+
+      /* CGO listeners/tweens live outside gsap.context — the effect's
+         cleanup (below) tears them down; ctx is still initialising in
+         here, so ctx.add() would be a TDZ crash. */
+      cgoCleanup = () => {
+        document.removeEventListener("pointerover", onPointerOver);
+        document.removeEventListener("pointerout", onPointerOut);
+        document.removeEventListener("focusin", onFocusIn, true);
+        document.removeEventListener("focusout", onFocusOut, true);
+        hot.forEach((_t, el) => stopCgo(el));
+      };
+      /* always-on national light: hero search + boot rings rotate
+         from mount, even unhovered (few elements, no layout cost) */
+      gsap.utils
+        .toArray<HTMLElement>(CGO_LIVE_SELECTOR)
+        .forEach((el) => startCgo(el, { live: true }));
+    });
     // late-mounted cards (async lists, chat history, search results)
     let timer: number | undefined;
     const mo = new MutationObserver(() => {
@@ -203,6 +322,7 @@ export function SasiGsapRuntime() {
     return () => {
       window.clearTimeout(timer);
       mo.disconnect();
+      cgoCleanup?.();
       ctx.revert();
     };
   }, [view]);

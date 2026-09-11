@@ -978,7 +978,19 @@ function incidentToPin(i: Incident): PlotPin {
 }
 
 function caseToPin(c: SasiCase, fallbackCity: string): PlotPin {
-  const pos = placeAtCity(c.location.city || fallbackCity, c.ref);
+  /* Task 21: GPS-backed reports carry REAL device coordinates —
+     pin them exactly where the reporter stood. Everything else
+     still falls back to the city-level placement. */
+  const realLat = c.location.lat;
+  const realLng = c.location.lng;
+  const hasRealFix =
+    typeof realLat === "number" &&
+    typeof realLng === "number" &&
+    Number.isFinite(realLat) &&
+    Number.isFinite(realLng);
+  const pos = hasRealFix
+    ? null
+    : placeAtCity(c.location.city || fallbackCity, c.ref);
   return {
     id: c.id,
     kind: "case",
@@ -986,7 +998,9 @@ function caseToPin(c: SasiCase, fallbackCity: string): PlotPin {
     title: c.title,
     service: c.service,
     accent: SERVICE_ACCENT[c.service] ?? USER_GOLD,
-    latlng: svgToLatLng(pos.x, pos.y),
+    latlng: hasRealFix
+      ? [realLat as number, realLng as number]
+      : svgToLatLng(pos!.x, pos!.y),
     statusLabel: CASE_STATUS_META[c.status]?.label ?? c.status,
     priorityKey: c.priority,
     detail: PRIORITY_META[c.priority]?.label ?? c.priority,

@@ -102,6 +102,20 @@ interface SasiState {
     when: string;
     impact: string;
     evidenceNote: string;
+    /** Task 21: device GPS fix + AI/OSM enrichment metadata. When
+     *  present, the created case is pinned at the REAL coordinates
+     *  instead of the city-level fallback. */
+    geo?: {
+      lat: number;
+      lng: number;
+      accuracyM: number | null;
+      source: "ai" | "osm" | "coords";
+      confidence: string;
+      notes: string;
+      landmark: string;
+      city?: string;
+      province?: string;
+    } | null;
   } | null;
   setReportDraft: (draft: Partial<NonNullable<SasiState["reportDraft"]>>) => void;
   clearReportDraft: () => void;
@@ -1006,6 +1020,19 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     const id = `case-new-${caseCounter}`;
     const finalRef = `CASE-${String(caseCounter).padStart(6, "0")}`;
     caseCounter += 1;
+    /* Task 21: a GPS-backed draft pins the case at the REAL device
+       coordinates (projected into the stylised map space too), so
+       map markers land exactly where the reporter stood instead of
+       the city-centre fallback. */
+    const geo = draft.geo ?? null;
+    const geoX =
+      geo && Number.isFinite(geo.lng)
+        ? Math.min(100, Math.max(0, (geo.lng - 27.51385) / 0.010135))
+        : undefined;
+    const geoY =
+      geo && Number.isFinite(geo.lat)
+        ? Math.min(100, Math.max(0, (geo.lat - -25.58251) / -0.0109497))
+        : undefined;
     const newCase: SasiCase = {
       id,
       ref: finalRef,
@@ -1013,10 +1040,18 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       description: draft.impact || draft.problem,
       service: (draft.service as SasiCase["service"]) || "water",
       location: {
-        province: get().savedLocation.province,
+        province: geo?.province || get().savedLocation.province,
         municipality: "",
-        city: draft.location.split(",")[0]?.trim() || get().savedLocation.city,
+        city: geo?.city || draft.location.split(",")[0]?.trim() || get().savedLocation.city,
         suburb: draft.location,
+        ...(geo
+          ? {
+              lat: geo.lat,
+              lng: geo.lng,
+              mapX: geoX,
+              mapY: geoY,
+            }
+          : {}),
       },
       status: "OPEN",
       priority: "MEDIUM",
