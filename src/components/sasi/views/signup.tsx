@@ -2,37 +2,33 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  Info,
-  Loader2,
-} from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
-import {
-  DemoBadge,
-  PrimaryButton,
-  SasiLogo,
-} from "@/components/sasi/primitives";
+import { PrimaryButton } from "@/components/sasi/primitives";
 import { Input } from "@/components/ui/input";
 import { signIn as nextAuthSignIn } from "next-auth/react";
+import {
+  AuthBrandPanel,
+  AuthGlowField,
+  AuthTopBar,
+  AUTH_FIELD_INPUT,
+  NATIONAL_DOT_GRADIENT,
+} from "@/components/sasi/auth-brand";
 
-/* Shared field shell — circulating national glow ring appears on focus */
-function GlowField({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="sasi-search-glow rounded-lg border border-white/10 bg-white/[0.02] transition-colors focus-within:border-white/20">
-      {children}
-    </div>
-  );
+/* ---------- Local, honest password strength (display only —
+   the server enforces the real policy with zod + bcrypt) ---------- */
+const STRENGTH_LABELS = ["Too short", "Weak", "Fair", "Strong", "Excellent"];
+
+function strengthOf(pw: string): number {
+  let s = 0;
+  if (pw.length >= 8) s++;
+  if (pw.length >= 12) s++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
+  if (/\d/.test(pw) || /[^A-Za-z0-9]/.test(pw)) s++;
+  return s;
 }
 
-const FIELD_INPUT =
-  "h-11 rounded-lg border-0 bg-transparent text-[13px] shadow-none focus-visible:shadow-none focus-visible:ring-0";
-
-const NATIONAL_DOT_GRADIENT =
-  "linear-gradient(90deg, #ef5350, #64b5f6, #66bb6a, #e3c567)";
+const STRENGTH_COLORS = ["#ef5350", "#e3c567", "#66bb6a", "#43a047"];
 
 export default function SignupView() {
   const navigate = useSasiStore((s) => s.navigate);
@@ -52,6 +48,8 @@ export default function SignupView() {
     const pending = timers.current;
     return () => pending.forEach(clearTimeout);
   }, []);
+
+  const score = strengthOf(password);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,199 +105,168 @@ export default function SignupView() {
 
   return (
     <div className="relative flex min-h-screen w-full overflow-x-clip bg-[#050505]">
+      <AuthTopBar />
+
       {/* ================= LEFT — brand panel (desktop only) ================= */}
-      <aside
-        aria-hidden={false}
-        className="relative hidden w-[44%] max-w-[620px] shrink-0 flex-col justify-between overflow-hidden border-r border-white/6 bg-[#070708] p-10 lg:flex xl:p-14"
-      >
-        {/* giant outlined background word with circulating national light */}
-        <div aria-hidden className="sasi-hero-word">
-          SASI
-        </div>
-
-        {/* breathing national ambience — gold / green variant for signup */}
-        <div
-          aria-hidden
-          className="sasi-ambient -left-24 -top-24 h-96 w-96"
-          style={{
-            background: "radial-gradient(closest-side, rgba(227,197,103,0.10), transparent)",
-          }}
-        />
-        <div
-          aria-hidden
-          className="sasi-ambient -bottom-32 right-[-10%] h-[420px] w-[420px]"
-          style={{
-            background: "radial-gradient(closest-side, rgba(102,187,106,0.09), transparent)",
-          }}
-        />
-
-        {/* top — editorial eyebrow */}
-        <div className="relative">
-          <div className="sasi-eyebrow text-zinc-400">
-            <span
-              aria-hidden
-              className="sasi-breathe h-1.5 w-1.5 rounded-full"
-              style={{ background: NATIONAL_DOT_GRADIENT }}
-            />
-            Service intelligence
-          </div>
-        </div>
-
-        {/* middle — serif statement */}
-        <div className="relative max-w-md">
-          <h2 className="sasi-serif text-[38px] font-medium leading-[1.1] tracking-tight text-white xl:text-[44px]">
-            Service intelligence for South&nbsp;Africa.
-          </h2>
-          <p className="mt-5 max-w-sm text-[13.5px] leading-relaxed text-zinc-500">
-            Independent civic technology. Not a government website.
-          </p>
-        </div>
-
-        {/* bottom — national accent dot */}
-        <div className="relative flex items-center gap-3">
-          <span
-            aria-hidden
-            className="h-1.5 w-1.5 shrink-0 rounded-full"
-            style={{ background: NATIONAL_DOT_GRADIENT }}
-          />
-          <p className="text-[10.5px] font-medium uppercase tracking-[0.24em] text-zinc-600">
-            South African Service Intelligence
-          </p>
-        </div>
-      </aside>
+      <AuthBrandPanel accent="gold" />
 
       {/* ================= RIGHT — form ================= */}
-      <main className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6 lg:w-auto">
+      <main className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-24 sm:px-6 lg:w-auto">
         <motion.div
-          className="w-full max-w-[400px]"
+          className="w-full max-w-[420px]"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: "easeOut" }}
         >
-          {/* compact brand header — mobile only */}
-          <div className="mb-9 lg:hidden">
-            <SasiLogo size={28} />
-            <div className="sasi-line mt-7" aria-hidden />
-          </div>
+          {/* ------- liquid glass form card ------- */}
+          <div className="sasi-auth-card p-6 sm:p-8">
+            <h1 className="sasi-serif text-[26px] font-medium tracking-tight text-white">
+              Create your account
+            </h1>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">
+              Report problems, follow investigations and approve every action
+              before it happens.
+            </p>
 
-          <h1 className="sasi-serif text-[26px] font-medium tracking-tight text-white">
-            Create your account
-          </h1>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">
-            Report problems, follow investigations and approve every action before it happens.
-          </p>
-
-          <form onSubmit={handleCreate} className="mt-7 space-y-4" noValidate>
-            <div>
-              <label
-                htmlFor="signup-name"
-                className="mb-1.5 block text-[12px] font-medium text-zinc-400"
-              >
-                Full name
-              </label>
-              <GlowField>
-                <Input
-                  id="signup-name"
-                  type="text"
-                  autoComplete="name"
-                  placeholder="Your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className={FIELD_INPUT}
-                  aria-required="true"
-                />
-              </GlowField>
-            </div>
-
-            <div>
-              <label
-                htmlFor="signup-email"
-                className="mb-1.5 block text-[12px] font-medium text-zinc-400"
-              >
-                Email
-              </label>
-              <GlowField>
-                <Input
-                  id="signup-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.co.za"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={FIELD_INPUT}
-                  aria-required="true"
-                />
-              </GlowField>
-            </div>
-
-            <div>
-              <label
-                htmlFor="signup-password"
-                className="mb-1.5 block text-[12px] font-medium text-zinc-400"
-              >
-                Password
-              </label>
-              <GlowField>
-                <div className="relative">
+            <form onSubmit={handleCreate} className="mt-7 space-y-4" noValidate>
+              <div>
+                <label
+                  htmlFor="signup-name"
+                  className="mb-1.5 block text-[12px] font-medium text-zinc-400"
+                >
+                  Full name
+                </label>
+                <AuthGlowField>
                   <Input
-                    id="signup-password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    placeholder="Create a password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={`${FIELD_INPUT} pr-12`}
+                    id="signup-name"
+                    type="text"
+                    autoComplete="name"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className={AUTH_FIELD_INPUT}
                     aria-required="true"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    aria-pressed={showPassword}
-                    className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200"
+                </AuthGlowField>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="signup-email"
+                  className="mb-1.5 block text-[12px] font-medium text-zinc-400"
+                >
+                  Email
+                </label>
+                <AuthGlowField>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.co.za"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={AUTH_FIELD_INPUT}
+                    aria-required="true"
+                  />
+                </AuthGlowField>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="signup-password"
+                  className="mb-1.5 block text-[12px] font-medium text-zinc-400"
+                >
+                  Password
+                </label>
+                <AuthGlowField>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="Create a password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={`${AUTH_FIELD_INPUT} pr-12`}
+                      aria-required="true"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <Eye className="h-4 w-4" aria-hidden />
+                      )}
+                    </button>
+                  </div>
+                </AuthGlowField>
+
+                {/* strength meter — local estimate, honestly labelled */}
+                {password.length > 0 && (
+                  <div
+                    className="mt-2.5"
+                    role="status"
+                    aria-label={`Password strength: ${STRENGTH_LABELS[score]}`}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" aria-hidden />
-                    ) : (
-                      <Eye className="h-4 w-4" aria-hidden />
-                    )}
-                  </button>
-                </div>
-              </GlowField>
-            </div>
+                    <div className="flex items-center gap-1.5" aria-hidden>
+                      {[0, 1, 2, 3].map((i) => (
+                        <span
+                          key={i}
+                          className="h-1 flex-1 rounded-full transition-colors duration-300"
+                          style={{
+                            background:
+                              i < score
+                                ? STRENGTH_COLORS[Math.min(score - 1, 3)]
+                                : "rgba(255,255,255,0.08)",
+                          }}
+                        />
+                      ))}
+                      <span className="ml-1.5 w-[4.5rem] text-right text-[10.5px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+                        {STRENGTH_LABELS[score]}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-            {error && (
-              <p
-                role="alert"
-                className="rounded-lg border border-[#ef5350]/25 bg-[#ef5350]/[0.06] p-3 text-[12px] leading-relaxed text-[#fda4a0]"
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-xl border border-[#ef5350]/25 bg-[#ef5350]/[0.06] p-3 text-[12px] leading-relaxed text-[#fda4a0]"
+                >
+                  {error}
+                </p>
+              )}
+
+              <PrimaryButton
+                type="submit"
+                disabled={loading || success}
+                className="sasi-btn-white-glass mt-1 h-11 w-full text-[13.5px]"
+                aria-label="Create account"
               >
-                {error}
-              </p>
-            )}
+                {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+                {success ? "Account created" : loading ? "Creating account…" : "Create account"}
+              </PrimaryButton>
 
-            <PrimaryButton
-              type="submit"
-              disabled={loading || success}
-              className="sasi-btn-white-glass mt-1 h-11 w-full text-[13.5px]"
-              aria-label="Create account"
-            >
-              {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
-              {success ? "Account created" : loading ? "Creating account…" : "Create account"}
-            </PrimaryButton>
-
-            {success && (
-              <p
-                role="status"
-                className="flex items-center gap-2 rounded-lg border border-[#66bb6a]/20 bg-[#66bb6a]/5 p-3 text-[12px] text-[#8ee09a]"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                Account created and signed in. Taking you to your dashboard…
-              </p>
-            )}
-          </form>
+              {success && (
+                <p
+                  role="status"
+                  className="flex items-center gap-2 rounded-xl border border-[#66bb6a]/20 bg-[#66bb6a]/5 p-3 text-[12px] text-[#8ee09a]"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Account created and signed in. Taking you to your dashboard…
+                </p>
+              )}
+            </form>
+          </div>
 
           {/* ---------- Toggle to sign in ---------- */}
-          <div className="mt-4 flex min-h-[44px] items-center justify-between text-[12.5px]">
+          <div className="mt-4 flex min-h-[44px] items-center justify-between px-1 text-[12.5px]">
             <span className="text-zinc-600">Already have an account?</span>
             <button
               onClick={() => navigate("login")}
@@ -311,7 +278,7 @@ export default function SignupView() {
           </div>
 
           {/* ---------- Terms note ---------- */}
-          <p className="mt-6 text-[11.5px] leading-relaxed text-zinc-600">
+          <p className="mt-6 px-1 text-[11.5px] leading-relaxed text-zinc-600">
             By continuing you agree to the{" "}
             <button
               onClick={() => navigate("terms")}
@@ -329,23 +296,23 @@ export default function SignupView() {
             .
           </p>
 
-          {/* ---------- Back to home + demo hint ---------- */}
-          <div className="mt-4 flex flex-col gap-1">
-            <button
-              onClick={() => navigate("landing")}
-              className="inline-flex h-11 w-fit items-center gap-1.5 text-[12px] text-zinc-600 transition-colors hover:text-zinc-300"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-              Back to home
-            </button>
-            <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-zinc-600">
-              <p className="flex items-center gap-2">
-                <Info className="h-3.5 w-3.5 shrink-0 text-[#e3c567]" aria-hidden />
-                Accounts are local to this demo.
-              </p>
-              <DemoBadge label="NOT SENT ANYWHERE" />
-            </div>
-          </div>
+          {/* ---------- Honesty line ---------- */}
+          <p className="mt-3 flex items-center gap-2 px-1 text-[11.5px] text-zinc-600">
+            <ShieldCheck
+              className="h-3.5 w-3.5 shrink-0 text-[#e3c567]"
+              aria-hidden
+            />
+            Passwords are hashed with bcrypt — SASI never sees or stores the
+            plain text.
+          </p>
+          <p className="mt-1.5 flex items-center gap-2 px-1 text-[11.5px] text-zinc-600">
+            <span
+              aria-hidden
+              className="h-1 w-1 shrink-0 rounded-full"
+              style={{ background: NATIONAL_DOT_GRADIENT }}
+            />
+            Your reports stay on this device until you choose to act.
+          </p>
         </motion.div>
       </main>
     </div>

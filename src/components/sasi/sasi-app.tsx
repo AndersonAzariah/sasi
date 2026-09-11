@@ -60,43 +60,128 @@ const PUBLIC_VIEWS = new Set<View>([
    logout (no shell swap, no "Sign in" header). */
 const APP_ELIGIBLE_PUBLIC = new Set<View>(["services", "service-detail"]);
 
+/* ============================================================
+   SPLASH — the phase-3 boot experience: dot matrix, liquid glass
+   plate, the national light circulating around the mark, honest
+   copy. Exits with a graceful blur-fade into the app.
+   ============================================================ */
+const BOOT_LETTERS = ["S", "A", "S", "I"];
+
 function SplashScreen() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#050505]">
-      <div className="relative">
-        <div
-          className="sasi-ambient left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(229,72,77,0.14), rgba(100,181,246,0.1) 45%, rgba(102,187,106,0.08) 65%, rgba(227,197,103,0.1) 85%, transparent)",
-          }}
-        />
+    <motion.div
+      key="sasi-boot"
+      className="fixed inset-0 z-[80] flex flex-col items-center justify-center overflow-hidden bg-[#050505]"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.045, filter: "blur(6px)" }}
+      transition={{ duration: 0.5, ease: [0.32, 0, 0.2, 1] }}
+      role="status"
+      aria-label="SASI is starting"
+    >
+      {/* dot matrix — melts toward the edges */}
+      <div aria-hidden className="sasi-dot-veil absolute inset-0" />
+
+      {/* breathing national ambience */}
+      <div
+        aria-hidden
+        className="sasi-ambient -left-32 -top-32 h-[420px] w-[420px]"
+        style={{ background: "radial-gradient(closest-side, rgba(229,57,53,0.13), transparent)" }}
+      />
+      <div
+        aria-hidden
+        className="sasi-ambient -bottom-40 -right-24 h-[460px] w-[460px]"
+        style={{ background: "radial-gradient(closest-side, rgba(66,165,245,0.11), transparent)" }}
+      />
+      <div
+        aria-hidden
+        className="sasi-ambient left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2"
+        style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.1), transparent)" }}
+      />
+
+      <motion.div
+        className="relative flex flex-col items-center"
+        initial={{ opacity: 0, y: 14, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.55, ease: [0.23, 1, 0.32, 1] }}
+      >
+        {/* ------- liquid glass boot plate ------- */}
+        <div className="sasi-boot-plate flex flex-col items-center px-12 py-10 sm:px-16">
+          {/* mark in a circulating national-light orbit */}
+          <div className="relative flex h-[92px] w-[92px] items-center justify-center">
+            <div aria-hidden className="sasi-boot-orbit -inset-3.5" />
+            <div aria-hidden className="sasi-boot-ring -inset-3.5" />
+            <div
+              aria-hidden
+              className="sasi-ambient left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2"
+              style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.16), transparent)" }}
+            />
+            <div className="sasi-principle-tile !h-16 !w-16 !rounded-[18px]">
+              <SasiLogo size={40} withWordmark={false} />
+            </div>
+          </div>
+
+          {/* wordmark — letters rise in */}
+          <div className="mt-6 flex items-center" aria-hidden>
+            {BOOT_LETTERS.map((letter, i) => (
+              <motion.span
+                key={i}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.22 + i * 0.08, duration: 0.4, ease: "easeOut" }}
+                className="text-[16px] font-semibold tracking-[0.42em] text-white"
+              >
+                {letter}
+              </motion.span>
+            ))}
+          </div>
+
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 0.5, duration: 0.6, ease: "easeOut" }}
+            className="sasi-line mt-5 w-40"
+            aria-hidden
+          />
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.62 }}
+            className="sasi-eyebrow mt-5 text-zinc-500"
+          >
+            Service intelligence
+          </motion.p>
+        </div>
+
+        {/* ------- national-light boot progress ------- */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="relative"
+          className="mt-9 flex w-56 flex-col items-center gap-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.55 }}
         >
-          <SasiLogo size={52} withWordmark={false} className="justify-center" />
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.15 }}
-            className="mt-4 text-center text-[13px] font-medium tracking-[0.32em] text-zinc-400"
-          >
-            SASI
-          </motion.p>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="mt-1.5 text-center text-[11px] tracking-wide text-zinc-700"
-          >
-            Service intelligence for South Africa
-          </motion.p>
+          <div className="sasi-boot-bar w-full" aria-hidden />
+          <p className="text-center text-[11px] leading-relaxed tracking-wide text-zinc-600">
+            Preparing your workspace — everything stays on this device.
+          </p>
         </motion.div>
-      </div>
-    </div>
+      </motion.div>
+
+      {/* honesty line pinned to the boot floor */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
+        className="absolute bottom-6 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.24em] text-zinc-700"
+      >
+        <span
+          aria-hidden
+          className="h-1 w-1 rounded-full"
+          style={{ background: "linear-gradient(90deg, #ef5350, #64b5f6, #66bb6a, #e3c567)" }}
+        />
+        Not a government website
+      </motion.p>
+    </motion.div>
   );
 }
 
@@ -159,7 +244,7 @@ export function SasiApp() {
   useEffect(() => {
     // pull persisted chat / cases / location while the splash is up
     void hydrate();
-    const t = setTimeout(() => setMounted(true), 650);
+    const t = setTimeout(() => setMounted(true), 950);
     return () => clearTimeout(t);
   }, [hydrate]);
 
@@ -181,25 +266,29 @@ export function SasiApp() {
     });
   }, [updateReady, clearUpdateReady]);
 
-  if (!mounted) return <SplashScreen />;
-
   const isPublic =
     PUBLIC_VIEWS.has(view) && !(authed && APP_ELIGIBLE_PUBLIC.has(view));
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
-      {isPublic ? (
-        <PublicShell>
-          <ViewRenderer />
-        </PublicShell>
-      ) : (
-        <AppShell>
-          <ViewRenderer />
-        </AppShell>
+      {/* the app mounts beneath the splash so the boot exit reveals it */}
+      {!mounted ? null : (
+        <>
+          {isPublic ? (
+            <PublicShell>
+              <ViewRenderer />
+            </PublicShell>
+          ) : (
+            <AppShell>
+              <ViewRenderer />
+            </AppShell>
+          )}
+          <CommandPalette />
+          <PwaRuntime />
+          <SasiGsapRuntime />
+        </>
       )}
-      <CommandPalette />
-      <PwaRuntime />
-      <SasiGsapRuntime />
+      <AnimatePresence>{!mounted && <SplashScreen />}</AnimatePresence>
       <Toaster
         position="bottom-right"
         theme="dark"

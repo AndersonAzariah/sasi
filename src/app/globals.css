@@ -1467,3 +1467,209 @@ html::-webkit-scrollbar-thumb:hover {
     opacity: 1 !important;
   }
 }
+
+/* ============================================================
+   SPLASH + AUTH FASHION LAYER (Task 14)
+   Boot experience + auth screens in the phase-3 language:
+   dot matrix, liquid glass, circulating national light.
+   ============================================================ */
+
+/* ---------- Dot veil — dots that melt toward the edges ---------- */
+.sasi-dot-veil {
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.07) 1px,
+    transparent 1.1px
+  );
+  background-size: 22px 22px;
+  background-position: -1px -1px;
+  -webkit-mask-image: radial-gradient(
+    115% 85% at 50% 42%,
+    #000 28%,
+    rgba(0, 0, 0, 0.45) 62%,
+    transparent 88%
+  );
+  mask-image: radial-gradient(
+    115% 85% at 50% 42%,
+    #000 28%,
+    rgba(0, 0, 0, 0.45) 62%,
+    transparent 88%
+  );
+}
+
+/* ---------- Boot orbit — circulating national light ring ---------- */
+.sasi-boot-ring {
+  position: absolute;
+  border-radius: 9999px;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--sasi-glow-angle),
+    rgba(255, 255, 255, 0.05) 0deg,
+    rgba(229, 57, 53, 0.78) 40deg,
+    rgba(255, 255, 255, 0.04) 92deg,
+    rgba(66, 165, 245, 0.68) 150deg,
+    rgba(255, 255, 255, 0.04) 206deg,
+    rgba(67, 160, 71, 0.62) 258deg,
+    rgba(255, 255, 255, 0.04) 300deg,
+    rgba(212, 175, 55, 0.82) 338deg,
+    rgba(255, 255, 255, 0.05) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: sasi-glow-rotate 3.4s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.16));
+  pointer-events: none;
+}
+
+/* faint static orbit the animated ring travels along */
+.sasi-boot-orbit {
+  position: absolute;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  pointer-events: none;
+}
+
+/* ---------- Boot plate — liquid glass slab ---------- */
+.sasi-boot-plate {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.015) 55%,
+    rgba(255, 255, 255, 0.03)
+  );
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02),
+    0 30px 80px -30px rgba(0, 0, 0, 0.9),
+    0 0 70px -32px rgba(66, 165, 245, 0.22);
+}
+.sasi-boot-plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    120% 55% at 50% -10%,
+    rgba(255, 255, 255, 0.12),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* ---------- Boot progress — national light sweep ---------- */
+.sasi-boot-bar {
+  position: relative;
+  overflow: hidden;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.sasi-boot-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #ef5350 22%,
+    #64b5f6 48%,
+    #66bb6a 70%,
+    #e3c567 88%,
+    transparent
+  );
+  animation: sasi-boot-sweep 1.15s ease-in-out infinite;
+}
+@keyframes sasi-boot-sweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+/* ---------- Auth glass card — the form's liquid slab ---------- */
+.sasi-auth-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0.012) 55%,
+    rgba(255, 255, 255, 0.025)
+  );
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02),
+    0 30px 80px -32px rgba(0, 0, 0, 0.92);
+}
+.sasi-auth-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    110% 50% at 26% -6%,
+    rgba(255, 255, 255, 0.09),
+    transparent 58%
+  );
+  pointer-events: none;
+}
+
+/* ---------- Auth floating top bar ---------- */
+.sasi-auth-nav {
+  background: linear-gradient(
+    180deg,
+    rgba(5, 5, 5, 0.6),
+    rgba(5, 5, 5, 0.22) 68%,
+    transparent
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+/* ---------- Auth principle tile (icon in a glass square) ---------- */
+.sasi-principle-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.09),
+    rgba(255, 255, 255, 0.02)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sasi-boot-ring,
+  .sasi-boot-bar::after {
+    animation: none;
+  }
+}
