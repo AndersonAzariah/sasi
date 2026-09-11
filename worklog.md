@@ -728,3 +728,30 @@ Stage Summary:
 - Unresolved/risks: (1) remember the -webkit-first ordering rule for ANY future backdrop-filter declaration in this project; (2) dev.log grows unbounded (tee) — consider rotation; (3) preview gateway "refused to connect" was transient — if it recurs, check `curl localhost:3000` + `ss -tlnp | grep 3000` first.
 - Carried: profile real-identity wiring, state-route userId migration, map marker glyph tiles, golden-path run under real account, zu/af proofing, follow-up quick-reply chips.
 - Recommended next-phase priorities: (1) golden-path: signup → report → investigate → briefing → map under a real account; (2) wire real account name/email into Profile; (3) per-service map marker glyph tiles; (4) hover CGO audit on remaining interactive tiles.
+
+---
+Task ID: 18-b
+Agent: main
+Task: User follow-up — "preview still refusing to connect; inspect SSE server, wrapper CSS position:relative, build output". Continued Task 18 polish (follow-up quick-reply chips).
+
+Work Log:
+- PREVIEW DIAGNOSIS (all three user checkpoints verified healthy — nothing app-side to fix):
+  (1) SSE server: POST /api/sasi/ask streams real LLM deltas instantly (curl -N verified token flow); closed-flag guards + cancel() intact; malformed POST returns 400 in <600ms — non-blocking by construction.
+  (2) Wrapper CSS: chat log wrapper is `relative min-h-0 flex-1` → `absolute inset-0` child cannot collapse (position:relative confirmed in source).
+  (3) Build output: .next/dev freshly compiled; server binds *:3000 AND external IP 21.0.7.38:3000 → 200; /, /manifest.json, /sw.js, /sasi-logo.png all 200; served HTML 32KB with full splash markup; agent-browser render clean (h1, no error dialog, no console errors).
+  ROOT CAUSE: stale sandbox preview TUNNEL (server restart at 21:48 orphaned the gateway route) — fix is reloading the preview pane; app side healthy. An agent-browser "white screen" mid-session turned out to be about:blank (open call failed silently after close --all — always verify location.href, not just eval results).
+- .env HARDENING: NEXTAUTH_SECRET (openssl rand) + NEXTAUTH_URL added — NextAuth v4 NO_SECRET warning gone; JWT sessions previously used an unstable dev-derived secret → every server restart silently signed everyone out. Server restarted cleanly to pick up env (attempt 1 → 200).
+- GOLDEN PATH E2E (real account, agent-browser): signup (POST /api/sasi/auth/signup 201, bcrypt) → auto sign-in (NextAuth credentials 200) → dashboard authed:true + accountName wired → report wizard 7 steps (Water → No water → saved location → Today) → CASE-000001 created → Start investigation → full 7-event agentic script ran to WAITING_FOR_APPROVAL with finding (AI-INFERRED, Medium confidence) + live notification → Ask SASI real streamed answer (594 chars, grounded in Melrose, gold RichText bullets, "Draft a report from this" chip) → map with user's own report plotted as gold "Your reports" marker (real dark imagery, 11 markers).
+  NOTE: new accounts now start with ZERO cases by design (data.ts CASES = [], user-generated only) — not a bug; "cases:1 after first report" is correct.
+- FEATURE — follow-up quick replies (ask-sasi.tsx): FOLLOW_UP_POOL (6 topic regexes: water/electricity/cases/billing/roads/emergency × 2-4 questions each + 4 defaults); pickFollowUps() dedupes vs asked question, seeds rotation from answer id hash (consecutive answers rotate chips); renders under newest done answer when !chatBusy as "CONTINUE THE THREAD" group (national gradient dot, staggered chip entrance, min-h-9 touch targets, MessageCircleQuestion icon → gold on hover). Zero LLM cost — local heuristics only.
+- BUGFIX: last follow-up chip had 9px overlap with floating "Summarise as briefing" pill at scroll bottom (measured via getBoundingClientRect) → messages container gets pb-14; re-verified: 68px clearance.
+- QA: lint PASS, tsc src PASS (zero non-example errors), dev.log zero compile/runtime errors, desktop 1280 + mobile 390 no horizontal overflow, no error overlay, two-round chat thread verified (click chip → streams → chips rotate), console errors ZERO.
+- Files: src/components/sasi/views/ask-sasi.tsx (follow-ups + pb-14), .env (NEXTAUTH_SECRET/NEXTAUTH_URL), worklog.md.
+
+Stage Summary:
+- Preview "refused to connect" conclusively diagnosed as a stale sandbox gateway tunnel, NOT an app defect — all three user-suspected areas (SSE/CSS/build) verified healthy with hard evidence; preview reload re-establishes the route.
+- Golden path under a real account is now browser-verified end-to-end for the first time (signup → report → investigate → chat → map).
+- Ask SASI closes the conversation loop: answer → contextual follow-up chips → one tap continues the thread, chips rotate per answer.
+- Remember: set .value+dispatchEvent does NOT drive React controlled inputs — use agent-browser `type` for form QA.
+- Carried: profile real-identity wiring (accountName already flows; email/avatar next), state-route userId migration, map marker glyph tiles, zu/af proofing.
+- Next-phase priorities: (1) wire session user email/avatar into Profile + topbar; (2) per-service map marker glyph tiles; (3) hover CGO audit on remaining tiles; (4) dev.log rotation (tee grows unbounded).

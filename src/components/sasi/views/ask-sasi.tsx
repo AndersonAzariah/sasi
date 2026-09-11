@@ -93,6 +93,102 @@ const ACCENT_TILE: Record<string, string> = {
 
 const MAX_INPUT = 500;
 
+/* ============================================================
+   FOLLOW-UP QUICK REPLIES — after SASI answers, offer three
+   contextual next questions. Picked locally (topic heuristics on
+   the answer text) so it is instant, free and private; the seed
+   rotates per answer so two answers in a row never show the
+   exact same chips.
+   ============================================================ */
+
+const FOLLOW_UP_POOL: {
+  /** match any of these (case-insensitive) in the user question OR SASI answer */
+  match: RegExp;
+  qs: string[];
+}[] = [
+  {
+    match: /\b(water|outage|burst|pipe|tap|leak|reservoir|pressure)\b/i,
+    qs: [
+      "How long do water outages usually take to fix?",
+      "Who do I call about a burst pipe?",
+      "How do I store water safely during an outage?",
+      "How do I report a water fault to the municipality?",
+    ],
+  },
+  {
+    match: /\b(electricity|power|load.?shed|eskom|outage stage| prepaid |meter)\b/i,
+    qs: [
+      "How do I prepare for load-shedding?",
+      "How do I protect my appliances during outages?",
+      "Where do I report a streetlight outage?",
+    ],
+  },
+  {
+    match: /\b(CASE-\d{6}|case|report|investigat|evidence|status)\b/i,
+    qs: [
+      "What is the status of my case?",
+      "What happens after SASI investigates?",
+      "Can I add evidence to an existing case?",
+    ],
+  },
+  {
+    match: /\b(bill|account|payment|tariff|charge|municipal account)\b/i,
+    qs: [
+      "How do I query a municipal bill?",
+      "Where is my nearest municipal walk-in centre?",
+    ],
+  },
+  {
+    match: /\b(road|pothole|traffic light|streetlight|sidewalk|storm drain)\b/i,
+    qs: [
+      "Who fixes potholes in Johannesburg?",
+      "How do I report a broken traffic light?",
+    ],
+  },
+  {
+    match: /\b(10111|10177|emergency|danger|safety|crime)\b/i,
+    qs: ["What counts as a real emergency?", "Which number do I call for an ambulance?"],
+  },
+];
+
+/** always-available fillers, least topic-specific last */
+const FOLLOW_UP_DEFAULTS = [
+  "What can SASI actually do for me?",
+  "How do I start a new report?",
+  "Which municipality handles streetlights?",
+  "How does SASI verify its findings?",
+];
+
+function pickFollowUps(lastUser: string, lastAnswer: string, seed: number): string[] {
+  const hay = `${lastUser} ${lastAnswer}`;
+  const seen = new Set<string>();
+  const norm = (q: string) => q.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+  const asked = norm(lastUser);
+  const out: string[] = [];
+  const push = (q: string) => {
+    const n = norm(q);
+    if (seen.has(n) || n === asked) return;
+    if (out.some((x) => norm(x) === n)) return;
+    seen.add(n);
+    out.push(q);
+  };
+  /* topic matches first — most specific pool wins */
+  for (const t of FOLLOW_UP_POOL) {
+    if (t.match.test(hay)) {
+      /* seed rotates the starting index so answers vary their chips */
+      for (let i = 0; i < t.qs.length && out.length < 3; i++) {
+        push(t.qs[(i + seed) % t.qs.length]);
+      }
+    }
+    if (out.length >= 3) break;
+  }
+  for (const q of FOLLOW_UP_DEFAULTS) {
+    if (out.length >= 3) break;
+    push(q);
+  }
+  return out.slice(0, 3);
+}
+
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -372,6 +468,22 @@ export default function AskSasiView() {
     else openIncident(ref);
   };
 
+  /* ---------- follow-up quick replies ----------
+     Show three contextual next questions once the newest answer is
+     complete. Seeded from the answer id so consecutive answers
+     rotate their chips instead of repeating the same three. */
+  const followUps = useMemo(() => {
+    if (chatBusy || chatMessages.length === 0) return [];
+    const last = chatMessages[chatMessages.length - 1];
+    if (last.role !== "assistant" || last.state !== "done" || !last.content.trim()) {
+      return [];
+    }
+    const prevUser = [...chatMessages].reverse().find((m) => m.role === "user");
+    let seed = 0;
+    for (const ch of last.id) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
+    return pickFollowUps(prevUser?.content ?? "", last.content, seed);
+  }, [chatMessages, chatBusy]);
+
   /* honest retry: re-ask the question that produced this failed reply */
   const retry = (msgId: string) => {
     if (chatBusy) return;
@@ -566,7 +678,9 @@ export default function AskSasiView() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-5">
+              /* pb-14: last elements (follow-up chips) must scroll clear of
+                 the floating summarise pill + composer hint row */
+              <div className="space-y-5 pb-14">
                 {/* today divider */}
                 <div className="flex items-center gap-3 pt-1" aria-hidden>
                   <span className="h-px flex-1 bg-white/6" />
@@ -600,6 +714,56 @@ export default function AskSasiView() {
                       {lastAssistantLen > 0
                         ? "SASI is answering live — you can keep reading while it streams."
                         : "SASI is checking public information and your case context…"}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* follow-up quick replies — contextual, one tap to continue */}
+                <AnimatePresence>
+                  {followUps.length > 0 && !chatBusy && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.28, ease: "easeOut" }}
+                      className="flex flex-col gap-1.5 pl-1"
+                      role="group"
+                      aria-label="Suggested follow-up questions"
+                    >
+                      <span className="flex items-center gap-2 text-[9.5px] font-medium uppercase tracking-[0.16em] text-zinc-700">
+                        <span
+                          aria-hidden
+                          className="h-1 w-1 rounded-full"
+                          style={{
+                            background:
+                              "linear-gradient(90deg, #ef5350, #64b5f6, #66bb6a, #e3c567)",
+                          }}
+                        />
+                        Continue the thread
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {followUps.map((q, i) => (
+                          <motion.button
+                            key={q}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{
+                              delay: 0.1 + i * 0.07,
+                              duration: 0.26,
+                              ease: "easeOut",
+                            }}
+                            onClick={() => send(q)}
+                            className="sasi-chip-brief group flex min-h-9 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 text-[11.5px] text-zinc-400 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-zinc-100"
+                            aria-label={`Ask follow-up: ${q}`}
+                          >
+                            <MessageCircleQuestion
+                              className="h-3 w-3 text-zinc-600 transition group-hover:text-[#e3c567]"
+                              aria-hidden
+                            />
+                            {q}
+                          </motion.button>
+                        ))}
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
