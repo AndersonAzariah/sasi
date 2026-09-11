@@ -358,6 +358,29 @@
    SCROLLBARS — transparent until hover, whisper when needed
    ============================================================ */
 
+/* GLOBAL: every scrollable area gets a ghost scrollbar — transparent
+   track, faint floating pill thumb (no boxed track anywhere) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.07) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
 /* page-level scrollbar: nearly invisible hairline thumb */
 html {
   scrollbar-width: thin;
@@ -379,31 +402,6 @@ html::-webkit-scrollbar-thumb {
 html::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.18);
   background-clip: content-box;
-}
-
-/* inner scroll areas: fully transparent until the area is hovered */
-.sasi-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-.sasi-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.sasi-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.sasi-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0);
-  border-radius: 999px;
-  transition: background 0.35s ease;
-}
-.sasi-scroll:hover::-webkit-scrollbar-thumb,
-.sasi-scroll:focus-within::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-}
-.sasi-scroll:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 
 /* Command bar focus — subtle national light */
@@ -1327,23 +1325,25 @@ html::-webkit-scrollbar-thumb:hover {
 }
 .sasi-scroll:hover,
 .sasi-scroll:focus-within {
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
 .sasi-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 .sasi-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 .sasi-scroll::-webkit-scrollbar-thumb {
-  background: transparent;
+  background-color: rgba(255, 255, 255, 0);
   border-radius: 999px;
-  transition: background 0.3s ease;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.3s ease;
 }
 .sasi-scroll:hover::-webkit-scrollbar-thumb,
 .sasi-scroll:focus-within::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
+  background-color: rgba(255, 255, 255, 0.16);
 }
 
 /* ---------- Custom selects + dropdown panels ---------- */
@@ -2203,14 +2203,16 @@ strong {
   scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 #sasi-ask-input::-webkit-scrollbar {
-  width: 5px;
-}
-#sasi-ask-input::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  width: 6px;
 }
 #sasi-ask-input::-webkit-scrollbar-track {
   background: transparent;
+}
+#sasi-ask-input::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  background-color: rgba(255, 255, 255, 0.14);
 }
 
 /* assistant bubbles inherit the content CGO — keep it subtle here so long
@@ -2351,3 +2353,116 @@ strong {
   color: #ffffff;
 }
 
+
+/* ============================================================
+   TASK 19 — COLLAPSED RAIL + GLASS TOOLTIPS
+   The collapsed sidebar becomes a proper member of the glass
+   family: gradient body, inner edge light, active "lit key"
+   tile, gradient section dividers and portal glass tooltips.
+   ============================================================ */
+
+/* ---------- rail body (collapsed aside only) ---------- */
+.sasi-sidebar-rail {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.03),
+      transparent 26%,
+      transparent 72%,
+      rgba(255, 255, 255, 0.018)
+    ),
+    #080808;
+  box-shadow:
+    inset -1px 0 0 rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset -16px 0 32px -24px rgba(255, 255, 255, 0.14);
+  border-right-color: transparent; /* the inset edge replaces the flat border */
+}
+
+/* ---------- active item: the "lit key" ---------- */
+.sasi-sidebar-rail-active {
+  background:
+    radial-gradient(
+      130% 130% at 50% 0%,
+      rgba(255, 255, 255, 0.09),
+      rgba(255, 255, 255, 0.028) 72%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 0 18px -6px rgba(255, 255, 255, 0.3);
+}
+.sasi-sidebar-rail-active:hover {
+  background:
+    radial-gradient(
+      130% 130% at 50% 0%,
+      rgba(255, 255, 255, 0.11),
+      rgba(255, 255, 255, 0.035) 72%
+    );
+}
+
+/* ---------- gradient section divider (replaces flat hairline) ---------- */
+.sasi-sidebar-rail-divider {
+  height: 1px;
+  width: 28px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.16),
+    transparent
+  );
+}
+
+/* ---------- glass tooltip (portal-rendered at body level) ---------- */
+.sasi-rail-tip {
+  transform: translateY(-50%) translateX(-3px);
+  background: rgba(16, 16, 18, 0.92);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%); /* unprefixed LAST — Lightning CSS strips the first of a pair */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow:
+    0 10px 28px -12px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #e4e4e7;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+  z-index: 90;
+}
+.sasi-rail-tip.sasi-tip-on {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+.sasi-rail-tip .sasi-tip-badge {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(227, 197, 103, 0.3);
+  background: rgba(227, 197, 103, 0.12);
+  color: #e3c567;
+  font-family: var(--font-mono, ui-monospace), monospace;
+  font-size: 9.5px;
+  line-height: 16px;
+  display: inline-block;
+  vertical-align: 1px;
+}
+
+/* ---------- guards: data saver + reduced motion ---------- */
+.sasi-data-saver .sasi-rail-tip {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-rail-tip {
+    transition: none;
+  }
+}

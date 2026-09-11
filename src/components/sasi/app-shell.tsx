@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   Activity,
   Bell,
@@ -102,8 +103,62 @@ function writeSidebarCollapsed(collapsed: boolean) {
 }
 
 /* ============================================================
+   RAIL TOOLTIP — glass label rendered through a portal at body
+   level, so the nav's overflow-y-auto can never clip it. CSS
+   transition (not framer) so reduced-motion handling is trivial.
+   ============================================================ */
+
+function useRailTip(collapsed: boolean) {
+  const [tip, setTip] = useState<{ open: boolean; rect: DOMRect | null }>({
+    open: false,
+    rect: null,
+  });
+  const bind = collapsed
+    ? {
+        onMouseEnter: (e: React.SyntheticEvent<HTMLElement>) =>
+          setTip({ open: true, rect: e.currentTarget.getBoundingClientRect() }),
+        onMouseLeave: () => setTip((s) => ({ ...s, open: false })),
+        onFocus: (e: React.SyntheticEvent<HTMLElement>) =>
+          setTip({ open: true, rect: e.currentTarget.getBoundingClientRect() }),
+        onBlur: () => setTip((s) => ({ ...s, open: false })),
+      }
+    : {};
+  return { bind, tip };
+}
+
+function RailTip({
+  open,
+  anchor,
+  label,
+  badge,
+}: {
+  open: boolean;
+  anchor: DOMRect | null;
+  label: string;
+  badge?: number;
+}) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <span
+      role="tooltip"
+      aria-hidden={!open}
+      className={cn("sasi-rail-tip fixed", open && "sasi-tip-on")}
+      style={
+        anchor
+          ? { left: anchor.right + 10, top: anchor.top + anchor.height / 2 }
+          : { left: -9999, top: -9999 }
+      }
+    >
+      {label}
+      {badge ? <span className="sasi-tip-badge">{badge}</span> : null}
+    </span>,
+    document.body
+  );
+}
+
+/* ============================================================
    SIDEBAR LINK — expands to a labelled row, collapses to a
-   centered 44px icon with a native floating label on hover
+   centered 44px "lit key" with a glass portal tooltip
    ============================================================ */
 
 function SidebarLink({
@@ -122,32 +177,37 @@ function SidebarLink({
   collapsed?: boolean;
 }) {
   const navigate = useSasiStore((s) => s.navigate);
+  const { bind, tip } = useRailTip(collapsed);
   return (
     <button
       onClick={() => navigate(view)}
       aria-current={active ? "page" : undefined}
       aria-label={collapsed ? label : undefined}
-      title={collapsed ? label : undefined}
+      {...bind}
       className={cn(
         "group relative flex w-full items-center rounded-lg text-[13px] transition-colors",
         collapsed ? "mx-auto h-11 w-11 justify-center" : "gap-2.5 px-2.5 py-[7px]",
         active
-          ? "bg-white/[0.05] text-white"
+          ? collapsed
+            ? "sasi-sidebar-rail-active text-white"
+            : "bg-white/[0.05] text-white"
           : "text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-200"
       )}
     >
-      <span
-        className={cn(
-          "absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full transition-all",
-          active
-            ? "bg-white shadow-[0_0_8px_2px_rgba(255,255,255,0.25)]"
-            : "bg-transparent"
-        )}
-      />
+      {!collapsed && (
+        <span
+          className={cn(
+            "absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full transition-all",
+            active
+              ? "bg-white shadow-[0_0_8px_2px_rgba(255,255,255,0.25)]"
+              : "bg-transparent"
+          )}
+        />
+      )}
       <Icon
         className={cn(
-          "h-[15px] w-[15px] shrink-0",
-          active ? "text-white" : "text-zinc-600 group-hover:text-zinc-400"
+          "h-[15px] w-[15px] shrink-0 transition-colors",
+          active ? "text-white" : "text-zinc-600 group-hover:text-zinc-300"
         )}
         aria-hidden
       />
@@ -159,10 +219,11 @@ function SidebarLink({
       ) : null}
       {collapsed && badge ? (
         <span
-          className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#e3c567]"
+          className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#e3c567] shadow-[0_0_6px_1px_rgba(227,197,103,0.5)]"
           aria-label={`${badge} unread`}
         />
       ) : null}
+      {collapsed && <RailTip open={tip.open} anchor={tip.rect} label={label} badge={badge} />}
     </button>
   );
 }
@@ -179,24 +240,34 @@ function Sidebar({
   const navigate = useSasiStore((s) => s.navigate);
   const t = useT();
   const unread = notifications.filter((n) => !n.read).length;
-  const initials = `${DEMO_USER.firstName[0]}${DEMO_USER.name.split(" ")[1]?.[0] ?? ""}`;
 
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-white/6 bg-[#080808] lg:flex",
+        "fixed inset-y-0 left-0 z-40 hidden flex-col lg:flex",
         "transition-[width] duration-300 ease-in-out motion-reduce:transition-none",
-        collapsed ? "w-[60px]" : "w-[228px]"
+        collapsed
+          ? "sasi-sidebar-rail w-[64px]"
+          : "w-[228px] border-r border-white/6 bg-[#080808]"
       )}
     >
-      {/* header — brand when open, collapse toggle always reachable */}
+      {/* header — brand when open, brand mark when a rail; toggle sits in
+          the footer while collapsed so the mark owns the top slot */}
       <div
         className={cn(
           "flex h-14 shrink-0 items-center",
           collapsed ? "justify-center" : "justify-between px-4"
         )}
       >
-        {!collapsed && (
+        {collapsed ? (
+          <button
+            onClick={() => navigate("landing")}
+            aria-label="SASI home"
+            className="group flex h-11 w-11 items-center justify-center rounded-xl transition hover:bg-white/[0.05]"
+          >
+            <SasiLogo size={28} withWordmark={false} />
+          </button>
+        ) : (
           <button
             onClick={() => navigate("landing")}
             aria-label="SASI home"
@@ -205,22 +276,17 @@ function Sidebar({
             <SasiLogo size={26} />
           </button>
         )}
-        <button
-          onClick={onToggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-expanded={!collapsed}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            "flex items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-white",
-            collapsed ? "h-11 w-11" : "h-9 w-9"
-          )}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="h-[18px] w-[18px]" aria-hidden />
-          ) : (
+        {!collapsed && (
+          <button
+            onClick={onToggle}
+            aria-label="Collapse sidebar"
+            aria-expanded={!collapsed}
+            title="Collapse sidebar"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-white"
+          >
             <PanelLeftClose className="h-[17px] w-[17px]" aria-hidden />
-          )}
-        </button>
+          </button>
+        )}
       </div>
 
       <nav
@@ -233,7 +299,7 @@ function Sidebar({
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             {collapsed ? (
-              <div className="mx-auto mb-2 h-px w-6 bg-white/8" aria-hidden />
+              <div className="sasi-sidebar-rail-divider mx-auto mb-2" aria-hidden />
             ) : (
               <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
                 {t(section.label)}
@@ -255,7 +321,7 @@ function Sidebar({
         ))}
         <div>
           {collapsed ? (
-            <div className="mx-auto mb-2 h-px w-6 bg-white/8" aria-hidden />
+            <div className="sasi-sidebar-rail-divider mx-auto mb-2" aria-hidden />
           ) : (
             <p className="mb-1.5 px-2.5 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-700">
               {t("nav.services")}
@@ -276,49 +342,103 @@ function Sidebar({
         </div>
       </nav>
 
-      <div className={cn("shrink-0 border-t border-white/6", collapsed ? "p-2" : "p-3")}>
-        <button
-          onClick={() => navigate("profile")}
-          aria-label={collapsed ? `Profile — ${DEMO_USER.name}` : undefined}
-          title={collapsed ? DEMO_USER.name : undefined}
-          className={cn(
-            "flex w-full items-center rounded-lg text-left transition-colors",
-            collapsed ? "h-11 justify-center" : "gap-2.5 px-2 py-2",
-            view === "profile" ? "bg-white/[0.05]" : "hover:bg-white/[0.03]"
-          )}
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[10.5px] font-semibold text-zinc-300">
-            {initials}
-          </span>
-          {!collapsed && (
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12.5px] font-medium text-zinc-200">
-                {DEMO_USER.name}
-              </span>
-              <span className="block truncate text-[10.5px] text-zinc-600">
-                {DEMO_USER.location.city}
-              </span>
-            </span>
-          )}
-          {!collapsed && <CircleUser className="h-4 w-4 text-zinc-700" aria-hidden />}
-        </button>
-        <button
-          onClick={() => navigate("admin")}
-          aria-label={collapsed ? t("nav.admin") : undefined}
-          title={collapsed ? t("nav.admin") : undefined}
-          className={cn(
-            "flex w-full items-center rounded-lg transition-colors",
-            collapsed
-              ? "mt-1 h-11 justify-center text-zinc-600 hover:text-zinc-400"
-              : "mt-1 gap-2 px-2 py-1.5 text-[11.5px]",
-            !collapsed && (view === "admin" ? "text-zinc-200" : "text-zinc-600 hover:text-zinc-400")
-          )}
-        >
-          <Settings className={cn("shrink-0", collapsed ? "h-4 w-4" : "h-3.5 w-3.5")} aria-hidden />
-          {!collapsed && t("nav.admin")}
-        </button>
+      <div className={cn("shrink-0", collapsed ? "border-t border-transparent p-2" : "border-t border-white/6 p-3")}>
+        {collapsed && (
+          <RailToggleButton collapsed onToggle={onToggle} />
+        )}
+        <ProfileButton collapsed={collapsed} active={view === "profile"} />
+        <AdminButton collapsed={collapsed} active={view === "admin"} label={t("nav.admin")} />
       </div>
     </aside>
+  );
+}
+
+/* ---------- footer pieces (rail tooltips + collapsed variants) ---------- */
+
+function RailToggleButton({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const { bind, tip } = useRailTip(collapsed);
+  return (
+    <button
+      onClick={onToggle}
+      aria-label="Expand sidebar"
+      aria-expanded={!collapsed}
+      {...bind}
+      className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.05] hover:text-white"
+    >
+      <PanelLeftOpen className="h-[18px] w-[18px]" aria-hidden />
+      {collapsed && <RailTip open={tip.open} anchor={tip.rect} label="Expand sidebar" />}
+    </button>
+  );
+}
+
+function ProfileButton({ collapsed, active }: { collapsed: boolean; active: boolean }) {
+  const navigate = useSasiStore((s) => s.navigate);
+  const { bind, tip } = useRailTip(collapsed);
+  const initials = `${DEMO_USER.firstName[0]}${DEMO_USER.name.split(" ")[1]?.[0] ?? ""}`;
+  return (
+    <button
+      onClick={() => navigate("profile")}
+      aria-label={collapsed ? `Profile — ${DEMO_USER.name}` : undefined}
+      {...bind}
+      className={cn(
+        "flex w-full items-center rounded-lg text-left transition-colors",
+        collapsed ? "h-11 justify-center" : "gap-2.5 px-2 py-2",
+        active ? "bg-white/[0.05]" : "hover:bg-white/[0.03]"
+      )}
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[10.5px] font-semibold text-zinc-300">
+        {initials}
+      </span>
+      {!collapsed && (
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12.5px] font-medium text-zinc-200">
+            {DEMO_USER.name}
+          </span>
+          <span className="block truncate text-[10.5px] text-zinc-600">
+            {DEMO_USER.location.city}
+          </span>
+        </span>
+      )}
+      {!collapsed && <CircleUser className="h-4 w-4 text-zinc-700" aria-hidden />}
+      {collapsed && <RailTip open={tip.open} anchor={tip.rect} label={DEMO_USER.name} />}
+    </button>
+  );
+}
+
+function AdminButton({
+  collapsed,
+  active,
+  label,
+}: {
+  collapsed: boolean;
+  active: boolean;
+  label: string;
+}) {
+  const navigate = useSasiStore((s) => s.navigate);
+  const { bind, tip } = useRailTip(collapsed);
+  return (
+    <button
+      onClick={() => navigate("admin")}
+      aria-label={collapsed ? label : undefined}
+      {...bind}
+      className={cn(
+        "flex w-full items-center rounded-lg transition-colors",
+        collapsed
+          ? "mx-auto h-11 w-11 justify-center text-zinc-600 hover:bg-white/[0.04] hover:text-zinc-300"
+          : "mt-1 gap-2 px-2 py-1.5 text-[11.5px]",
+        !collapsed && (active ? "text-zinc-200" : "text-zinc-600 hover:text-zinc-400")
+      )}
+    >
+      <Settings className={cn("shrink-0", collapsed ? "h-4 w-4" : "h-3.5 w-3.5")} aria-hidden />
+      {!collapsed && label}
+      {collapsed && <RailTip open={tip.open} anchor={tip.rect} label={label} />}
+    </button>
   );
 }
 
@@ -326,7 +446,7 @@ function Sidebar({
    TOPBAR
    ============================================================ */
 
-function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
+function Topbar() {
   const navigate = useSasiStore((s) => s.navigate);
   const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
   const savedLocation = useSasiStore((s) => s.savedLocation);
@@ -342,17 +462,6 @@ function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
       <button className="lg:hidden" onClick={() => navigate("landing")} aria-label="SASI home">
         <SasiLogo size={24} withWordmark={false} />
       </button>
-
-      {/* desktop logo — only while the sidebar rail is collapsed */}
-      {sidebarCollapsed && (
-        <button
-          className="hidden lg:block"
-          onClick={() => navigate("landing")}
-          aria-label="SASI home"
-        >
-          <SasiLogo size={24} withWordmark={false} />
-        </button>
-      )}
 
       {/* command trigger (desktop renders fake input, mobile icon) */}
       <button
@@ -587,10 +696,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div
         className={cn(
           "transition-[padding] duration-300 ease-in-out motion-reduce:transition-none",
-          sidebarCollapsed ? "lg:pl-[60px]" : "lg:pl-[228px]"
+          sidebarCollapsed ? "lg:pl-[64px]" : "lg:pl-[228px]"
         )}
       >
-        <Topbar sidebarCollapsed={sidebarCollapsed} />
+        <Topbar />
         <main className="min-h-[calc(100vh-3.5rem)] pb-24 lg:pb-8">{children}</main>
       </div>
       <MobileNav />

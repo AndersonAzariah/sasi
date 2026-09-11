@@ -755,3 +755,29 @@ Stage Summary:
 - Remember: set .value+dispatchEvent does NOT drive React controlled inputs — use agent-browser `type` for form QA.
 - Carried: profile real-identity wiring (accountName already flows; email/avatar next), state-route userId migration, map marker glyph tiles, zu/af proofing.
 - Next-phase priorities: (1) wire session user email/avatar into Profile + topbar; (2) per-service map marker glyph tiles; (3) hover CGO audit on remaining tiles; (4) dev.log rotation (tee grows unbounded).
+
+---
+Task ID: 19
+Agent: main
+Task: User — "improve closed side bars. make scroll bars transparent" — collapsed sidebar rail redesign + site-wide ghost scrollbars.
+
+Work Log:
+- SCROLLBARS — TRANSPARENT SITE-WIDE (globals.css scrollbars block rewritten):
+  * NEW global ghost rule: `* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.07) transparent }` + `*::-webkit-scrollbar { 8px }`, track `transparent`, thumb = floating pill (rgba 0.07, border 2px transparent, background-clip content-box), thumb:hover 0.18. This finally covers the many plain `overflow-y-auto` areas (view panels, dropdown lists) that never had `.sasi-scroll`.
+  * `.sasi-scroll` = fully invisible until the AREA is hovered/focused (thumb background-color 0 → 0.16, Firefox via scrollbar-color), 8px, floating pill; consolidated the two competing duplicate blocks (old block removed, later block canonical) so they stop fighting.
+  * `html` page scrollbar: 0.08→0.18 hairline pill; `#sasi-ask-input` composer thumb also floated (background-clip), duplicate track rule removed; reduced-motion: scrollbar transitions none.
+- COLLAPSED RAIL REDESIGN (app-shell.tsx + Task 19 CSS layer):
+  * Rail body: new `.sasi-sidebar-rail` — gradient glass body (white 3% → transparent → 1.8%), inner edge lights (inset -1px hairline + top specular + wide soft inner glow), border-right transparent (inset edge replaces flat border); width 60→64px (topbar padding synced).
+  * Active item = "lit key": `.sasi-sidebar-rail-active` radial white tile + inset specular ring + outer glow (left indicator bar intentionally dropped in collapsed mode — the glow tile is the indicator; expanded mode keeps its left bar).
+  * GLASS PORTAL TOOLTIPS replace native `title` everywhere in the rail: `useRailTip()` hook (mouseenter/leave/focus/blur → getBoundingClientRect) + `RailTip` rendered via createPortal(document.body) so the nav's overflow-y-auto can NEVER clip them; `.sasi-rail-tip` glass pill (blur(12px) saturate(160%) — -webkit FIRST per the Lightning CSS rule, border, shadow, translateY(-50%) slide-in 0.16s, reduced-motion + data-saver guards) with gold mono badge slot (unread count inside tooltip). Tooltips mounted always (opacity-toggled) → CSS transitions stay simple.
+  * Structure: collapsed rail header = SASI logo mark (tap → landing); expand toggle MOVED to the footer (PanelLeftOpen above avatar); expanded header unchanged (wordmark + collapse toggle); Topbar's duplicate collapsed-logo removed (rail owns the mark now); section dividers → `.sasi-sidebar-rail-divider` gradient hairlines; profile/admin/toggle all extracted into ProfileButton/AdminButton/RailToggleButton with tooltips; footer border-t hidden while collapsed.
+- ⚠️ CLASS-NAME COLLISION BUG (found via QA): first attempt reused the name `.sasi-rail` — ALREADY TAKEN by the how-it-works TIMELINE rail (position:relative) → the aside silently computed position:relative, took 827px of flow, and pushed the whole app below the fold (black content area, DOM perfectly fine). Fix: renamed all Task 19 rail classes to `.sasi-sidebar-rail*` (only `.sasi-rail-tip` was unique). LESSON: before coining any `sasi-*` class, `rg "sasi-<name>" src/app/globals.css` first.
+- ⚠️ TURBOPACK STALE-CSS EPISODE #2: after the rename, the served chunk (`[root-of-the-server]__85f70f4d._.css` — SAME URL) alternated between compile states (browser had sasi-rail-tip but not sasi-sidebar-rail; curl flipped too). `rm -rf .next` + clean restart = single compile graph, all rules live. Also re-learned: (a) synthetic `mouseenter` does NOT trigger React's delegation — use `.focus()` in evals (onFocus is bound); (b) CSSStyleRule.cssRules is ALWAYS truthy — naive walks skip every rule (recurse only when `cssRules.length > 0`); grep the served chunk with curl instead.
+- QA (agent-browser): rail 64px fixed pos ✓; lit-key active tile (radial bg + shadow) ✓; gradient dividers ✓; tooltip "Incidents"/"Cases" glass pills at icon mid-height, gold badge "2" inside Notifications tooltip ✓; expand 64→228 (wordmark returns) → collapse 228→64 ✓; scrollbar rules verified in CSSOM (sasi-scroll thumb 0→0.16 hover, html pill, global ghost) ✓; mobile 390: rail hidden, bottom nav fixed, 0 overflow ✓; console errors ZERO; lint PASS; tsc src PASS; dev.log clean.
+
+Stage Summary:
+- The collapsed sidebar is now a designed surface — glass rail body, lit-key active state, gradient dividers, logo mark, footer toggle, and clip-proof glass tooltips with badge counts — and every scrollbar on the site is a transparent floating ghost pill that wakes on hover (page level: constant faint).
+- Files: src/components/sasi/app-shell.tsx (rail restructure + tooltip system), src/app/globals.css (global ghost scrollbars + Task 19 layer).
+- Unresolved/risks: (1) turbopack dev can serve same-hash chunks with stale content after out-of-band file edits (python/sed) — restart with `.next` wipe if CSS edits don't appear; (2) tooltip left edge never flips (rail is left-anchored; right side always has viewport room — fine); (3) `*` scrollbar rule is global by design — native select popups unaffected.
+- Carried: profile real-identity wiring, state-route userId migration, map marker glyph tiles, zu/af proofing, hover CGO audit.
+- Next-phase priorities: (1) wire session user email/avatar into Profile + topbar; (2) per-service map marker glyph tiles; (3) golden-path re-run under real account after rail changes; (4) dev.log rotation.
