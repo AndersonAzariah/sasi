@@ -10,6 +10,7 @@ import {
   Download,
   FileText,
   FolderSearch,
+  Gauge,
   Globe,
   HardDrive,
   Info,
@@ -33,6 +34,7 @@ import {
 import { toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
 import { usePwaStore } from "@/lib/sasi/pwa-store";
+import { readDataSaver, writeDataSaver } from "@/lib/sasi/data-saver";
 import { applyPwaUpdate, promptPwaInstall } from "@/components/sasi/pwa";
 import { DEMO_USER, GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
 import { LANGUAGES, PLANNED_LANGUAGES, useT } from "@/lib/sasi/i18n";
@@ -247,6 +249,70 @@ function CoverageTable() {
         <span className="ml-auto font-mono text-[10px] text-zinc-600">
           isiZulu {fullZu}/{I18N_COVERAGE.length} · Afrikaans {fullAf}/{I18N_COVERAGE.length}
         </span>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   DATA SAVER CARD (Task 16) — one simple switch: less data,
+   less battery, same information. Honest about what it does.
+   ============================================================ */
+
+function DataSaverCard() {
+  /* lazy init is safe here — Settings renders client-side only (after mount) */
+  const [on, setOn] = useState(() => readDataSaver());
+  const [touched, setTouched] = useState(false);
+
+  const toggle = (next: boolean) => {
+    setOn(next);
+    setTouched(true);
+    writeDataSaver(next);
+    toast(next ? "Data Saver is on" : "Data Saver is off", {
+      description: next
+        ? "Animations and blur are switched off to save data and battery."
+        : "The full experience is back — animations and glass.",
+    });
+  };
+
+  return (
+    <div className="sasi-card p-5">
+      <SectionLabel>Data</SectionLabel>
+      <div className="mt-1 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2
+            id="settings-data-saver"
+            className="flex items-center gap-2 text-[15px] font-semibold text-white"
+          >
+            <Gauge className="h-4 w-4 text-[#66bb6a]" aria-hidden />
+            Data Saver
+          </h2>
+          <p className="mt-2 max-w-xl text-[12.5px] leading-relaxed text-zinc-400">
+            Made for small data bundles. Turning this on removes animations,
+            blur and glow effects so SASI uses less data and battery. Your
+            cases, evidence and settings stay exactly the same.
+          </p>
+          <p className="mt-2 text-[11.5px] text-zinc-600">
+            Works offline too — your last session is kept on this device.
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1.5">
+          <Switch
+            checked={on}
+            onCheckedChange={toggle}
+            aria-labelledby="settings-data-saver"
+            aria-label="Data Saver"
+          />
+          <span
+            className={cn(
+              "text-[10.5px] font-semibold uppercase tracking-[0.14em]",
+              on ? "text-[#8ee09a]" : "text-zinc-600"
+            )}
+            role="status"
+          >
+            {on ? "Saving data" : touched ? "Full experience" : "Off"}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -1132,6 +1198,8 @@ export default function SettingsView() {
 
         {active === "data" && (
           <section aria-labelledby="settings-data" className="space-y-4">
+            <DataSaverCard />
+
             <div className="sasi-card p-5">
               <SectionLabel>Data</SectionLabel>
               <h2 id="settings-data" className="mt-1 text-[15px] font-semibold text-white">Your data in this demo</h2>

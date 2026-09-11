@@ -468,12 +468,16 @@ function persistLocation(loc: SasiState["savedLocation"]) {
 export const useSasiStore = create<SasiState>((set, get) => ({
   view: "landing",
   param: null,
-  navigate: (view, param) =>
+  navigate: (view, param) => {
     set({
       view,
       param: param ?? null,
       commandOpen: false,
-    }),
+    });
+    /* smoother navigation: every view change starts at the top of the page —
+       no half-scrolled surprises, no lost users (Task 16) */
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
+  },
 
   /* ---------- demo session ---------- */
   authed: false,

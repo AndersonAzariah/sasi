@@ -1307,38 +1307,7 @@ html::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
 }
 
-/* ---------- Hero background word — outlined + circulating light ---------- */
-.sasi-hero-word {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  line-height: 1;
-  font-size: clamp(9rem, 30vw, 26rem);
-  user-select: none;
-  pointer-events: none;
-  color: rgba(255, 255, 255, 0.012);
-  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.075);
-  background: conic-gradient(
-    from var(--sasi-glow-angle),
-    rgba(255, 255, 255, 0) 0deg,
-    rgba(229, 57, 53, 0.16) 42deg,
-    rgba(255, 255, 255, 0) 92deg,
-    rgba(66, 165, 245, 0.15) 150deg,
-    rgba(255, 255, 255, 0) 205deg,
-    rgba(67, 160, 71, 0.13) 258deg,
-    rgba(255, 255, 255, 0) 300deg,
-    rgba(212, 175, 55, 0.17) 336deg,
-    rgba(255, 255, 255, 0) 360deg
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: sasi-glow-rotate 16s linear infinite;
-}
+
 
 /* ---------- Ambient breathing light ---------- */
 .sasi-ambient {
@@ -1413,7 +1382,6 @@ html::-webkit-scrollbar-thumb:hover {
   .sasi-search-glow::before,
   .sasi-command-focus::before,
   .sasi-search-glow-live::before,
-  .sasi-hero-word,
   .sasi-ambient {
     animation: none;
   }
@@ -2003,3 +1971,224 @@ html::-webkit-scrollbar-thumb:hover {
   }
 }
 /* task15-confirm */
+
+/* ============================================================
+   TASK 16 — ONE TYPE FOR EVERYTHING
+   One font family across the whole site (serif + mono unified
+   into the Inter sans) and a bolder default reading weight.
+   ============================================================ */
+
+.sasi-serif {
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+kbd,
+code,
+pre,
+samp,
+.font-mono {
+  font-family: inherit;
+}
+
+body {
+  font-weight: 500;
+}
+b,
+strong {
+  font-weight: 700;
+}
+.sasi-eyebrow {
+  font-weight: 600;
+}
+
+/* ============================================================
+   TASK 16 — CGO v2 (Circulating Glow Outline)
+   Hidden at rest, snaps alive on hover / focus. Thicker
+   (2.5px at -3px inset), brighter stops, national light halo.
+   ============================================================ */
+
+.sasi-btn-ring::before,
+.sasi-btn-glass::before,
+.sasi-btn-white-glass::before,
+[data-slot="button"]::before {
+  inset: -3px;
+  padding: 2.5px;
+  opacity: 0;
+  background: conic-gradient(
+    from var(--sasi-glow-angle),
+    rgba(255, 255, 255, 0.3) 0deg,
+    rgba(229, 57, 53, 1) 40deg,
+    rgba(255, 255, 255, 0.22) 94deg,
+    rgba(66, 165, 245, 0.95) 152deg,
+    rgba(255, 255, 255, 0.22) 208deg,
+    rgba(67, 160, 71, 0.9) 260deg,
+    rgba(255, 255, 255, 0.22) 302deg,
+    rgba(212, 175, 55, 1) 342deg,
+    rgba(255, 255, 255, 0.3) 360deg
+  );
+}
+
+/* hover / focus: the national light snaps on, thick and fast */
+.sasi-btn-ring:hover::before,
+.sasi-btn-ring:focus-visible::before,
+.sasi-btn-glass:hover::before,
+.sasi-btn-glass:focus-visible::before,
+.sasi-btn-white-glass:hover::before,
+.sasi-btn-white-glass:focus-visible::before {
+  opacity: 1;
+  animation-duration: 2.2s;
+  filter: drop-shadow(0 0 7px rgba(212, 175, 55, 0.45))
+    drop-shadow(0 0 14px rgba(66, 165, 245, 0.3));
+}
+[data-slot="button"]:hover::before,
+[data-slot="button"]:focus-visible::before {
+  opacity: 1;
+  animation-duration: 2.4s;
+  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.4))
+    drop-shadow(0 0 12px rgba(229, 57, 53, 0.25));
+}
+
+/* disabled still whispers (re-assert after the rest state above) */
+.sasi-btn-ring[disabled]::before,
+.sasi-btn-ring[aria-disabled="true"]::before,
+.sasi-btn-glass[disabled]::before,
+.sasi-btn-glass[aria-disabled="true"]::before,
+.sasi-btn-white-glass[disabled]::before,
+.sasi-btn-white-glass[aria-disabled="true"]::before,
+[data-slot="button"][disabled]::before,
+[data-slot="button"][aria-disabled="true"]::before {
+  opacity: 0.12;
+  animation-play-state: paused;
+}
+
+/* reduced motion: no rotation, but the hover still lights a static ring */
+@media (prefers-reduced-motion: reduce) {
+  .sasi-btn-ring::before,
+  .sasi-btn-glass::before,
+  .sasi-btn-white-glass::before,
+  [data-slot="button"]::before {
+    animation: none;
+    opacity: 0;
+  }
+  .sasi-btn-ring:hover::before,
+  .sasi-btn-glass:hover::before,
+  .sasi-btn-white-glass:hover::before,
+  [data-slot="button"]:hover::before {
+    opacity: 0.85;
+  }
+}
+
+/* ============================================================
+   TASK 16 — CGO ON CONTENT (cards + search hosts)
+   "Other content" carries the same hover light: cards and
+   search shells reveal the circulating outline when hovered.
+   ============================================================ */
+
+.sasi-card,
+.sasi-search-glow,
+.sasi-command-focus {
+  position: relative;
+}
+.sasi-card::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--sasi-glow-angle),
+    rgba(255, 255, 255, 0.22) 0deg,
+    rgba(229, 57, 53, 0.9) 40deg,
+    rgba(255, 255, 255, 0.16) 94deg,
+    rgba(66, 165, 245, 0.85) 152deg,
+    rgba(255, 255, 255, 0.16) 208deg,
+    rgba(67, 160, 71, 0.8) 260deg,
+    rgba(255, 255, 255, 0.16) 302deg,
+    rgba(212, 175, 55, 0.92) 342deg,
+    rgba(255, 255, 255, 0.22) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.sasi-card:hover::before {
+  opacity: 0.55;
+}
+.sasi-card:focus-within::before {
+  opacity: 0.85;
+}
+.sasi-card-interactive:hover::before {
+  opacity: 0.9;
+  animation-duration: 3.2s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-card::before {
+    animation: none;
+  }
+}
+
+/* search shells: a whisper on hover, full light on focus */
+.sasi-search-glow:hover::before,
+.sasi-command-focus:hover::before {
+  opacity: 0.4;
+}
+.sasi-search-glow:focus-within::before,
+.sasi-command-focus:focus-within::before {
+  opacity: 1;
+}
+
+/* boot ring rides the same thicker standard */
+.sasi-boot-ring {
+  padding: 2.5px;
+}
+
+/* ============================================================
+   TASK 16 — DATA SAVER
+   The settings toggle drops the expensive paint: no blur, no
+   ambient animation, no rings. Content and data are unchanged.
+   ============================================================ */
+
+.sasi-data-saver *,
+.sasi-data-saver *::before,
+.sasi-data-saver *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.sasi-data-saver .sasi-ambient {
+  animation: none;
+  opacity: 0.08;
+  filter: none;
+}
+.sasi-data-saver .sasi-dot-veil {
+  display: none;
+}
+.sasi-data-saver .sasi-boot-ring,
+.sasi-data-saver .sasi-boot-bar::after,
+.sasi-data-saver .sasi-breathe,
+.sasi-data-saver .sasi-shimmer-text,
+.sasi-data-saver .sasi-glow-multi {
+  animation: none;
+}
+.sasi-data-saver .sasi-btn-ring::before,
+.sasi-data-saver .sasi-btn-glass::before,
+.sasi-data-saver .sasi-btn-white-glass::before,
+.sasi-data-saver [data-slot="button"]::before,
+.sasi-data-saver .sasi-card::before,
+.sasi-data-saver .sasi-search-glow::before,
+.sasi-data-saver .sasi-command-focus::before,
+.sasi-data-saver .sasi-search-glow-live::before {
+  display: none;
+}
+.sasi-data-saver .sasi-scroll-progress {
+  display: none;
+}
+/* task16-confirm */

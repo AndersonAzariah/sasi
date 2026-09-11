@@ -98,10 +98,6 @@ export default function LandingView() {
     <div className="relative overflow-x-clip">
       {/* ================================================== HERO */}
       <section aria-labelledby="hero-heading" className="sasi-grid-bg relative overflow-hidden">
-        {/* giant background word — outlined, with a circulating national light */}
-        <div aria-hidden className="sasi-hero-word">
-          SASI
-        </div>
         {/* very subtle national-light ambience */}
         <div
           aria-hidden

@@ -116,11 +116,6 @@ export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
       {/* phase-3 dot matrix, melted at the edges */}
       <div aria-hidden className="sasi-dot-veil absolute inset-0 opacity-70" />
 
-      {/* giant outlined background word with circulating national light */}
-      <div aria-hidden className="sasi-hero-word">
-        SASI
-      </div>
-
       {/* breathing national ambience */}
       <div
         aria-hidden

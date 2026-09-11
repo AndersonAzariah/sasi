@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
 import { usePwaStore } from "@/lib/sasi/pwa-store";
+import { initDataSaver } from "@/lib/sasi/data-saver";
 import type { View } from "@/lib/sasi/types";
 import { AppShell } from "./app-shell";
 import { PublicShell } from "./public-shell";
@@ -61,22 +62,32 @@ const PUBLIC_VIEWS = new Set<View>([
 const APP_ELIGIBLE_PUBLIC = new Set<View>(["services", "service-detail"]);
 
 /* ============================================================
-   SPLASH — the phase-3 boot experience: dot matrix, liquid glass
-   plate, the national light circulating around the mark, honest
-   copy. Exits with a graceful blur-fade into the app.
+   SPLASH — the boot experience: the mark, big, centered, with
+   the national light circulating around it. Nothing else.
+   Lasts 7 seconds; a tap or any key skips it honestly.
    ============================================================ */
-const BOOT_LETTERS = ["S", "A", "S", "I"];
 
-function SplashScreen() {
+const BOOT_MS = 7000;
+
+function SplashScreen({ onSkip }: { onSkip: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") onSkip();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onSkip]);
+
   return (
     <motion.div
       key="sasi-boot"
-      className="fixed inset-0 z-[80] flex flex-col items-center justify-center overflow-hidden bg-[#050505]"
+      className="fixed inset-0 z-[80] flex cursor-pointer flex-col items-center justify-center overflow-hidden bg-[#050505]"
       initial={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.045, filter: "blur(6px)" }}
-      transition={{ duration: 0.5, ease: [0.32, 0, 0.2, 1] }}
+      exit={{ opacity: 0, scale: 1.06, filter: "blur(8px)" }}
+      transition={{ duration: 0.55, ease: [0.32, 0, 0.2, 1] }}
+      onClick={onSkip}
       role="status"
-      aria-label="SASI is starting"
+      aria-label="SASI is starting — tap anywhere to skip"
     >
       {/* dot matrix — melts toward the edges */}
       <div aria-hidden className="sasi-dot-veil absolute inset-0" />
@@ -84,94 +95,60 @@ function SplashScreen() {
       {/* breathing national ambience */}
       <div
         aria-hidden
-        className="sasi-ambient -left-32 -top-32 h-[420px] w-[420px]"
-        style={{ background: "radial-gradient(closest-side, rgba(229,57,53,0.13), transparent)" }}
+        className="sasi-ambient -left-40 -top-40 h-[520px] w-[520px]"
+        style={{ background: "radial-gradient(closest-side, rgba(229,57,53,0.14), transparent)" }}
       />
       <div
         aria-hidden
-        className="sasi-ambient -bottom-40 -right-24 h-[460px] w-[460px]"
-        style={{ background: "radial-gradient(closest-side, rgba(66,165,245,0.11), transparent)" }}
+        className="sasi-ambient -bottom-48 -right-32 h-[560px] w-[560px]"
+        style={{ background: "radial-gradient(closest-side, rgba(66,165,245,0.12), transparent)" }}
       />
       <div
         aria-hidden
-        className="sasi-ambient left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2"
-        style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.1), transparent)" }}
+        className="sasi-ambient left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2"
+        style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.12), transparent)" }}
       />
 
+      {/* ------- the mark, scaled big, circulating national light ------- */}
       <motion.div
-        className="relative flex flex-col items-center"
-        initial={{ opacity: 0, y: 14, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.55, ease: [0.23, 1, 0.32, 1] }}
+        className="relative flex items-center justify-center"
+        initial={{ opacity: 0, scale: 0.86 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
       >
-        {/* ------- liquid glass boot plate ------- */}
-        <div className="sasi-boot-plate flex flex-col items-center px-12 py-10 sm:px-16">
-          {/* mark in a circulating national-light orbit */}
-          <div className="relative flex h-[92px] w-[92px] items-center justify-center">
-            <div aria-hidden className="sasi-boot-orbit -inset-3.5" />
-            <div aria-hidden className="sasi-boot-ring -inset-3.5" />
-            <div
-              aria-hidden
-              className="sasi-ambient left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2"
-              style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.16), transparent)" }}
-            />
-            <div className="sasi-principle-tile !h-16 !w-16 !rounded-[18px]">
-              <SasiLogo size={40} withWordmark={false} />
-            </div>
-          </div>
-
-          {/* wordmark — letters rise in */}
-          <div className="mt-6 flex items-center" aria-hidden>
-            {BOOT_LETTERS.map((letter, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.22 + i * 0.08, duration: 0.4, ease: "easeOut" }}
-                className="text-[16px] font-semibold tracking-[0.42em] text-white"
-              >
-                {letter}
-              </motion.span>
-            ))}
-          </div>
-
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 0.5, duration: 0.6, ease: "easeOut" }}
-            className="sasi-line mt-5 w-40"
-            aria-hidden
-          />
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.62 }}
-            className="sasi-eyebrow mt-5 text-zinc-500"
-          >
-            Service intelligence
-          </motion.p>
-        </div>
-
-        {/* ------- national-light boot progress ------- */}
-        <motion.div
-          className="mt-9 flex w-56 flex-col items-center gap-3"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.55 }}
+        <div aria-hidden className="sasi-boot-orbit -inset-7" />
+        <div aria-hidden className="sasi-boot-ring -inset-7" />
+        <div
+          aria-hidden
+          className="sasi-ambient left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2"
+          style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.2), transparent)" }}
+        />
+        <div
+          className="sasi-principle-tile !h-[132px] !w-[132px] !rounded-[34px] sm:!h-[152px] sm:!w-[152px]"
+          aria-hidden
         >
-          <div className="sasi-boot-bar w-full" aria-hidden />
-          <p className="text-center text-[11px] leading-relaxed tracking-wide text-zinc-600">
-            Preparing your workspace — everything stays on this device.
-          </p>
-        </motion.div>
+          <SasiLogo size={96} withWordmark={false} />
+        </div>
+      </motion.div>
+
+      {/* ------- national-light boot progress ------- */}
+      <motion.div
+        className="mt-14 flex w-52 flex-col items-center gap-3"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="sasi-boot-bar w-full" aria-hidden />
+        <p className="text-center text-[11px] tracking-wide text-zinc-600">
+          Tap anywhere to skip
+        </p>
       </motion.div>
 
       {/* honesty line pinned to the boot floor */}
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
+        transition={{ delay: 0.6 }}
         className="absolute bottom-6 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.24em] text-zinc-700"
       >
         <span
@@ -244,9 +221,13 @@ export function SasiApp() {
   useEffect(() => {
     // pull persisted chat / cases / location while the splash is up
     void hydrate();
-    const t = setTimeout(() => setMounted(true), 950);
+    // restore the Data Saver choice before anything paints
+    initDataSaver();
+    const t = setTimeout(() => setMounted(true), BOOT_MS);
     return () => clearTimeout(t);
   }, [hydrate]);
+
+  const skipBoot = useCallback(() => setMounted(true), []);
 
   /* a new service worker finished installing in the background → offer the swap */
   useEffect(() => {
@@ -288,7 +269,7 @@ export function SasiApp() {
           <SasiGsapRuntime />
         </>
       )}
-      <AnimatePresence>{!mounted && <SplashScreen />}</AnimatePresence>
+      <AnimatePresence>{!mounted && <SplashScreen onSkip={skipBoot} />}</AnimatePresence>
       <Toaster
         position="bottom-right"
         theme="dark"

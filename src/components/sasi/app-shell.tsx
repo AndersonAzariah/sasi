@@ -391,7 +391,7 @@ function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
         <div className="relative">
           <button
             onClick={() => setNtfOpen((o) => !o)}
-            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.04] hover:text-white"
+            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.04] hover:text-white lg:h-9 lg:w-9"
             aria-label={`${t("shell.notifications")}${unread ? ` (${unread} unread)` : ""}`}
             aria-expanded={ntfOpen}
           >
@@ -452,7 +452,7 @@ function Topbar({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
 
         <button
           onClick={() => navigate("profile")}
-          className="ml-1 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[10.5px] font-semibold text-zinc-300 transition hover:border-white/25"
+          className="ml-1 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[11px] font-semibold text-zinc-300 transition hover:border-white/25 lg:h-8 lg:w-8 lg:text-[10.5px]"
           aria-label="Profile"
         >
           {DEMO_USER.firstName[0]}
@@ -494,7 +494,7 @@ function MobileNav() {
             <button
               key={item.view}
               onClick={() => navigate(item.view)}
-              className="relative flex flex-col items-center gap-1 py-2.5"
+              className="relative flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2.5 transition-transform active:scale-95"
               aria-current={active ? "page" : undefined}
             >
               <span
@@ -507,14 +507,14 @@ function MobileNav() {
               />
               <item.icon
                 className={cn(
-                  "h-[19px] w-[19px]",
+                  "h-[21px] w-[21px]",
                   active ? "text-white" : "text-zinc-600"
                 )}
                 aria-hidden
               />
               <span
                 className={cn(
-                  "text-[9.5px] font-medium",
+                  "text-[10px] font-semibold",
                   active ? "text-white" : "text-zinc-600"
                 )}
               >
