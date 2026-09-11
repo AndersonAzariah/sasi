@@ -919,8 +919,8 @@ html::-webkit-scrollbar-thumb:hover {
   border-radius: 10px;
   border: 1px solid rgba(255, 167, 38, 0.28);
   background: rgba(20, 15, 8, 0.92);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   font-size: 11.5px;
   line-height: 1.3;
   color: #ffcc80;
@@ -1185,8 +1185,8 @@ html::-webkit-scrollbar-thumb:hover {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.05));
-  backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 0 -1px 0 rgba(255, 255, 255, 0.03),
@@ -1234,8 +1234,8 @@ html::-webkit-scrollbar-thumb:hover {
   border: 1px solid rgba(255, 255, 255, 0.4);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.84));
   color: #09090b;
-  backdrop-filter: blur(12px) saturate(150%);
   -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 0 -1px 0 rgba(0, 0, 0, 0.06),
@@ -1371,8 +1371,8 @@ html::-webkit-scrollbar-thumb:hover {
 [data-slot="command-dialog"] {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(9, 9, 11, 0.92);
-  backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   box-shadow:
     0 24px 60px -18px rgba(0, 0, 0, 0.8),
     0 0 40px -18px rgba(66, 165, 245, 0.22);
@@ -1514,8 +1514,8 @@ html::-webkit-scrollbar-thumb:hover {
     rgba(255, 255, 255, 0.015) 55%,
     rgba(255, 255, 255, 0.03)
   );
-  backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 -1px 0 rgba(255, 255, 255, 0.02),
@@ -1583,8 +1583,8 @@ html::-webkit-scrollbar-thumb:hover {
     rgba(255, 255, 255, 0.012) 55%,
     rgba(255, 255, 255, 0.025)
   );
-  backdrop-filter: blur(24px) saturate(155%);
   -webkit-backdrop-filter: blur(24px) saturate(155%);
+  backdrop-filter: blur(24px) saturate(155%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(255, 255, 255, 0.02),
@@ -1611,8 +1611,8 @@ html::-webkit-scrollbar-thumb:hover {
     rgba(5, 5, 5, 0.22) 68%,
     transparent
   );
-  backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
 
@@ -1806,8 +1806,8 @@ html::-webkit-scrollbar-thumb:hover {
     rgba(255, 255, 255, 0.055),
     rgba(255, 255, 255, 0.018)
   );
-  backdrop-filter: blur(14px) saturate(150%);
   -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 10px 30px -22px rgba(0, 0, 0, 0.9);
@@ -1883,8 +1883,8 @@ html::-webkit-scrollbar-thumb:hover {
     rgba(18, 18, 21, 0.94),
     rgba(10, 10, 12, 0.97)
   );
-  backdrop-filter: blur(28px) saturate(170%);
   -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     0 30px 70px -20px rgba(0, 0, 0, 0.92),
@@ -1906,8 +1906,8 @@ html::-webkit-scrollbar-thumb:hover {
     rgba(255, 255, 255, 0.07),
     rgba(255, 255, 255, 0.02)
   );
-  backdrop-filter: blur(12px) saturate(150%);
   -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
@@ -2160,8 +2160,8 @@ strong {
 .sasi-data-saver *,
 .sasi-data-saver *::before,
 .sasi-data-saver *::after {
-  backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 .sasi-data-saver .sasi-ambient {
   animation: none;
@@ -2217,5 +2217,137 @@ strong {
    reading surfaces don't feel like buttons (hover whisper only) */
 .sasi-data-saver .sasi-caret {
   display: none;
+}
+
+/* ============================================================
+   TASK 18 — LIQUID GLASS SEARCH v2
+   True liquid glass for every search surface (hero bar, palette
+   trigger, palette dialog, services search, chat composer, auth
+   fields): deeper refraction, dual specular edges, elliptical
+   sheen + diagonal caustic that lean on hover, liquid lift.
+   ============================================================ */
+
+.sasi-search-glow,
+.sasi-command-focus {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.075),
+      rgba(255, 255, 255, 0.022) 55%,
+      rgba(255, 255, 255, 0.045)
+    ),
+    radial-gradient(
+      120% 90% at 18% 0%,
+      rgba(255, 255, 255, 0.05),
+      transparent 55%
+    );
+  -webkit-backdrop-filter: blur(22px) saturate(190%) brightness(1.05);
+  backdrop-filter: blur(22px) saturate(190%) brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 22px -12px rgba(255, 255, 255, 0.22),
+    0 12px 34px -22px rgba(0, 0, 0, 0.95);
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background 0.3s ease,
+    transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* liquid sheen: elliptical specular + caustic streak (::after was free) */
+.sasi-search-glow::after,
+.sasi-command-focus::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      120% 62% at 20% -8%,
+      rgba(255, 255, 255, 0.14),
+      rgba(255, 255, 255, 0.02) 52%,
+      transparent 68%
+    ),
+    linear-gradient(
+      112deg,
+      transparent 42%,
+      rgba(255, 255, 255, 0.05) 50%,
+      transparent 58%
+    );
+  background-size: 100% 100%, 240% 100%;
+  background-position: 0 0, 120% 0;
+  opacity: 0.75;
+  transition:
+    background-position 0.9s cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+.sasi-search-glow:hover::after,
+.sasi-command-focus:hover::after {
+  background-position: 0 0, -20% 0;
+  opacity: 1;
+}
+.sasi-search-glow:focus-within::after,
+.sasi-command-focus:focus-within::after {
+  background-position: 0 0, -20% 0;
+  opacity: 0.9;
+}
+
+/* liquid lift + deepened national halo on focus */
+.sasi-search-glow:hover,
+.sasi-command-focus:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.sasi-search-glow:focus-within,
+.sasi-command-focus:focus-within {
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 26px -12px rgba(255, 255, 255, 0.28),
+    0 0 0 1px rgba(229, 57, 53, 0.14),
+    0 0 30px -8px rgba(229, 57, 53, 0.26),
+    0 0 38px -10px rgba(66, 165, 245, 0.34),
+    0 0 42px -12px rgba(212, 175, 55, 0.28);
+}
+
+/* ---------- Task 18 guards: data saver + reduced motion ---------- */
+.sasi-data-saver .sasi-search-glow::after,
+.sasi-data-saver .sasi-command-focus::after {
+  display: none;
+}
+.sasi-data-saver .sasi-search-glow:hover,
+.sasi-data-saver .sasi-command-focus:hover,
+.sasi-data-saver .sasi-search-glow:focus-within,
+.sasi-data-saver .sasi-command-focus:focus-within {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sasi-search-glow::after,
+  .sasi-command-focus::after {
+    transition: none;
+  }
+  .sasi-search-glow:hover,
+  .sasi-command-focus:hover {
+    transform: none;
+  }
+}
+
+/* ---------- Task 18 site polish micro-pass ---------- */
+
+/* cards: faint top specular so surfaces read as one glass family */
+.sasi-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* national gold selection highlight across the site */
+::selection {
+  background: rgba(212, 175, 55, 0.28);
+  color: #ffffff;
 }
 
