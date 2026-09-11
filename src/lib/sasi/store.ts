@@ -152,6 +152,8 @@ interface SasiState {
   pendingAsk: string | null;
   setPendingAsk: (q: string | null) => void;
   askSasi: (question: string) => Promise<void>;
+  /** stop an in-flight streamed answer — keeps whatever was already received */
+  stopSasi: () => void;
   clearChat: () => void;
 
   /* ---- chat → report loop ---- */
@@ -253,6 +255,9 @@ function mirrorChat(list: ChatMessage[]) {
     .map((m) => ({ id: m.id, role: m.role, content: m.content, at: m.at, refs: m.refs }));
   void snapshotChat(done);
 }
+
+/** abort handle for the in-flight Ask SASI stream (stop-generation) */
+let chatAbort: AbortController | null = null;
 
 /** newest first, capped — shared by push and hydrate merges */
 function mergeNotifications(current: AppNotification[], incoming: AppNotification[]): AppNotification[] {
@@ -1205,6 +1210,9 @@ export const useSasiStore = create<SasiState>((set, get) => ({
   chatBusy: false,
   pendingAsk: null,
   setPendingAsk: (q) => set({ pendingAsk: q }),
+  stopSasi: () => {
+    chatAbort?.abort();
+  },
   clearChat: () => {
     set({ chatMessages: [], pendingAsk: null });
     void clearSnapshotChat();
@@ -1244,10 +1252,14 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         ),
       }));
 
+    chatAbort = new AbortController();
+    const { signal } = chatAbort;
+
     try {
       const res = await fetch("/api/sasi/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal,
         body: JSON.stringify({
           messages: history
             .filter((m) => m.state === "done")
@@ -1350,6 +1362,21 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       set({ chatBusy: false });
       mirrorChat(get().chatMessages);
     } catch (err) {
+      /* user pressed stop — keep what already streamed in, honestly labelled */
+      if (err instanceof DOMException && err.name === "AbortError") {
+        const current = get().chatMessages.find((m) => m.id === replyId);
+        const partial = current?.content ?? "";
+        patchReply({
+          state: "done",
+          content:
+            partial.trim().length > 0
+              ? `${partial}\n\n*(Stopped — this answer may be incomplete.)*`
+              : "*(Stopped before SASI started answering.)*",
+        });
+        set({ chatBusy: false });
+        mirrorChat(get().chatMessages);
+        return;
+      }
       patchReply({
         content:
           err instanceof Error && err.message

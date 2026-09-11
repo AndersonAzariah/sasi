@@ -225,7 +225,13 @@ export async function POST(req: Request) {
     const sse = new ReadableStream<Uint8Array>({
       async start(controller) {
         const push = (obj: Record<string, unknown>) => {
-          if (!closed) controller.enqueue(sseChunk(obj));
+          if (closed) return;
+          try {
+            controller.enqueue(sseChunk(obj));
+          } catch {
+            /* client aborted / controller already closed — stop pushing */
+            closed = true;
+          }
         };
         try {
           for await (const delta of upstreamDeltas(upstream)) {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowUp,
   Check,
   CloudCheck,
@@ -15,9 +16,12 @@ import {
   MapPin,
   MessageCircleQuestion,
   MessageSquareText,
+  RotateCcw,
   ScrollText,
   ShieldCheck,
   Sparkles,
+  ThumbsDown,
+  ThumbsUp,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,48 +29,77 @@ import { useSasiStore } from "@/lib/sasi/store";
 import { toast } from "sonner";
 import type { ChatMessage } from "@/lib/sasi/types";
 import { RichText } from "../rich-text";
+import { SasiLogo } from "../primitives";
 
 /* ============================================================
    ASK SASI — free-text civic assistant (LLM-backed, grounded only
-   in what you provide)
+   in what you provide). Built to stay SIMPLE: big touch targets,
+   one obvious send button, honest errors, stop/retry when the
+   answer is not right.
    ============================================================ */
 
 const SUGGESTIONS: {
   icon: typeof Sparkles;
   q: string;
   hint: string;
+  /** national accent — light tints only, never paint */
+  accent: "red" | "blue" | "green" | "gold" | "plain";
 }[] = [
   {
     icon: MessageCircleQuestion,
     q: "Why is my water off?",
     hint: "Outages · faults · next steps",
+    accent: "blue",
   },
   {
     icon: Zap,
     q: "Is load-shedding affecting my area, and what can I do?",
     hint: "Electricity · preparedness",
+    accent: "gold",
   },
   {
     icon: ScrollText,
     q: "What is the status of my case?",
     hint: "Your cases · explained",
+    accent: "green",
   },
   {
     icon: FileWarning,
     q: "How do I report a burst pipe to Joburg Water?",
     hint: "Official pathways",
+    accent: "red",
   },
   {
     icon: ShieldCheck,
     q: "What can SASI actually do for me?",
     hint: "Capabilities · limits",
+    accent: "plain",
   },
   {
     icon: MapPin,
     q: "Which municipality handles streetlights in Johannesburg?",
     hint: "Service directory",
+    accent: "blue",
   },
 ];
+
+const ACCENT_TILE: Record<string, string> = {
+  red: "border-[#ef5350]/25 bg-[#ef5350]/[0.08] text-[#f08c88]",
+  blue: "border-[#64b5f6]/25 bg-[#64b5f6]/[0.08] text-[#a7d3f5]",
+  green: "border-[#66bb6a]/25 bg-[#66bb6a]/[0.08] text-[#9ccc9f]",
+  gold: "border-[#e3c567]/25 bg-[#e3c567]/[0.08] text-[#e3c567]",
+  plain: "border-white/10 bg-white/[0.04] text-zinc-400",
+};
+
+const MAX_INPUT = 500;
+
+function formatTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
 
 /* ---------- typing indicator ---------- */
 
@@ -85,20 +118,44 @@ function TypingDots() {
   );
 }
 
-/* ---------- message row ---------- */
+/* ---------- message row: user ---------- */
+
+function UserMessage({ msg }: { msg: ChatMessage }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="flex flex-col items-end gap-1"
+    >
+      <div className="max-w-[85%] rounded-xl rounded-tr-sm border border-white/12 bg-gradient-to-b from-white/[0.09] to-white/[0.05] px-3.5 py-2.5 text-[13px] leading-relaxed text-zinc-100 shadow-sm shadow-black/30 sm:max-w-[70%]">
+        {msg.content}
+      </div>
+      <span className="pr-1 text-[9.5px] tabular-nums text-zinc-700">
+        {formatTime(msg.at)}
+      </span>
+    </motion.div>
+  );
+}
+
+/* ---------- message row: assistant ---------- */
 
 function AssistantMessage({
   msg,
   onRef,
   onDraftReport,
+  onRetry,
 }: {
   msg: ChatMessage;
   onRef: (ref: string) => void;
   onDraftReport: (id: string) => void;
+  onRetry: (id: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const isError = msg.state === "error";
   const isStreaming = msg.state === "streaming" || msg.state === "sending";
+  const isDone = msg.state === "done" && !isError && msg.content.trim().length > 0;
 
   const copy = async () => {
     try {
@@ -107,6 +164,14 @@ function AssistantMessage({
       setTimeout(() => setCopied(false), 1600);
     } catch {
       /* clipboard unavailable — ignore */
+    }
+  };
+
+  const rate = (v: "up" | "down") => {
+    const next = feedback === v ? null : v;
+    setFeedback(next);
+    if (next) {
+      toast("Thanks — noted on this device.", { duration: 1800 });
     }
   };
 
@@ -162,22 +227,67 @@ function AssistantMessage({
           </div>
         )}
 
-        {msg.state === "done" && !isError && msg.content && (
-          <button
-            onClick={copy}
-            className="mt-1.5 flex h-6 items-center gap-1 rounded px-1.5 text-[10.5px] text-zinc-600 opacity-0 transition hover:bg-white/[0.05] hover:text-zinc-300 focus-visible:opacity-100 group-hover/msg:opacity-100"
-            aria-label="Copy answer"
-          >
-            {copied ? (
-              <>
-                <Check className="h-3 w-3 text-[#66bb6a]" /> Copied
-              </>
-            ) : (
-              <>
-                <Copy className="h-3 w-3" /> Copy
-              </>
-            )}
-          </button>
+        {isError && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <button
+              onClick={() => onRetry(msg.id)}
+              className="flex h-7 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] px-2.5 text-[11px] font-medium text-zinc-300 transition hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
+              aria-label="Ask SASI again"
+            >
+              <RotateCcw className="h-3 w-3" aria-hidden />
+              Try again
+            </button>
+          </div>
+        )}
+
+        {isDone && (
+          <div className="mt-1 flex items-center gap-2">
+            <button
+              onClick={copy}
+              className="flex h-6 items-center gap-1 rounded px-1.5 text-[10.5px] text-zinc-600 transition hover:bg-white/[0.05] hover:text-zinc-300 focus-visible:text-zinc-300 sm:opacity-0 sm:group-hover/msg:opacity-100"
+              aria-label="Copy answer"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3 text-[#66bb6a]" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3 w-3" /> Copy
+                </>
+              )}
+            </button>
+            <span className="hidden h-3 w-px bg-white/8 sm:block" aria-hidden />
+            <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition sm:group-hover/msg:opacity-100">
+              <button
+                onClick={() => rate("up")}
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded transition hover:bg-white/[0.06]",
+                  feedback === "up" ? "text-[#66bb6a]" : "text-zinc-600 hover:text-zinc-300"
+                )}
+                aria-label="Helpful answer"
+                aria-pressed={feedback === "up"}
+                title="Noted on this device"
+              >
+                <ThumbsUp className="h-3 w-3" aria-hidden />
+              </button>
+              <button
+                onClick={() => rate("down")}
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded transition hover:bg-white/[0.06]",
+                  feedback === "down" ? "text-[#ef5350]" : "text-zinc-600 hover:text-zinc-300"
+                )}
+                aria-label="Not helpful"
+                aria-pressed={feedback === "down"}
+                title="Noted on this device"
+              >
+                <ThumbsDown className="h-3 w-3" aria-hidden />
+              </button>
+            </div>
+            <span className="text-[9.5px] tabular-nums text-zinc-700">
+              {formatTime(msg.at)}
+            </span>
+          </div>
         )}
       </div>
     </motion.div>
@@ -192,6 +302,7 @@ export default function AskSasiView() {
   const chatMessages = useSasiStore((s) => s.chatMessages);
   const chatBusy = useSasiStore((s) => s.chatBusy);
   const askSasi = useSasiStore((s) => s.askSasi);
+  const stopSasi = useSasiStore((s) => s.stopSasi);
   const pendingAsk = useSasiStore((s) => s.pendingAsk);
   const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
   const clearChat = useSasiStore((s) => s.clearChat);
@@ -205,7 +316,9 @@ export default function AskSasiView() {
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const consumedPending = useRef(false);
+  const [showJump, setShowJump] = useState(false);
 
   /* consume a question queued from the command palette */
   useEffect(() => {
@@ -231,6 +344,14 @@ export default function AskSasiView() {
     return () => cancelAnimationFrame(id);
   }, [chatMessages.length, chatBusy, lastAssistantLen]);
 
+  /* auto-grow the composer textarea (1 → ~5 lines) */
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [input]);
+
   const send = (text?: string) => {
     const q = (text ?? input).trim();
     if (!q || chatBusy) return;
@@ -238,9 +359,30 @@ export default function AskSasiView() {
     void askSasi(q);
   };
 
+  /* Enter sends · Shift+Enter makes a new line */
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
+
   const onRef = (ref: string) => {
     if (ref.startsWith("CASE-")) openCase(ref);
     else openIncident(ref);
+  };
+
+  /* honest retry: re-ask the question that produced this failed reply */
+  const retry = (msgId: string) => {
+    if (chatBusy) return;
+    const idx = chatMessages.findIndex((m) => m.id === msgId);
+    for (let i = idx - 1; i >= 0; i--) {
+      const m = chatMessages[i];
+      if (m.role === "user" && m.content.trim()) {
+        void askSasi(m.content);
+        return;
+      }
+    }
   };
 
   const empty = chatMessages.length === 0;
@@ -259,12 +401,14 @@ export default function AskSasiView() {
     void briefingFromChat();
   };
 
+  const nearLimit = input.length > MAX_INPUT - 80;
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-5 sm:px-6 lg:px-8">
       {/* fixed-height flex column: topbar 3.5rem + pt-5 + bottom clearance */}
-      <div className="flex min-h-0 flex-1 flex-col max-lg:h-[calc(100vh-3.5rem-1.25rem-6rem)] max-lg:supports-[height:100dvh]:h-[calc(100dvh-3.5rem-1.25rem-6rem)] lg:h-[calc(100vh-3.5rem-1.25rem-2rem)] lg:supports-[height:100dvh]:h-[calc(100dvh-3.5rem-1.25rem-2rem)]">
+      <div className="flex min-h-0 flex-col max-lg:h-[calc(100vh_-_3.5rem_-_1.25rem_-_6rem)] max-lg:supports-[height:100dvh]:h-[calc(100dvh_-_3.5rem_-_1.25rem_-_6rem)] lg:h-[calc(100vh_-_3.5rem_-_1.25rem_-_2rem)] lg:supports-[height:100dvh]:h-[calc(100dvh_-_3.5rem_-_1.25rem_-_2rem)]">
         {/* ---------- header ---------- */}
-        <header className="flex items-center gap-3 pb-4">
+        <header className="flex shrink-0 items-center gap-3 pb-4">
           <div
             className="sasi-ambient left-1/2 top-1/2 h-10 w-10 shrink-0 -translate-x-1/2 -translate-y-1/2"
             style={{
@@ -279,6 +423,12 @@ export default function AskSasiView() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-[15px] font-semibold text-white">Ask SASI</h1>
+              {chatBusy && (
+                <span className="flex items-center gap-1.5 rounded-full border border-[#e3c567]/20 bg-[#e3c567]/[0.06] px-2 py-0.5 text-[10px] font-medium text-[#e3c567]">
+                  <TypingDots />
+                  Thinking
+                </span>
+              )}
             </div>
             <p className="truncate text-[11.5px] text-zinc-500">
               Answers are AI-assisted — unverified. Grounded only in what you provide.
@@ -344,112 +494,145 @@ export default function AskSasiView() {
         </header>
 
         {/* ---------- conversation ---------- */}
-        <div
-          ref={scrollRef}
-          role="log"
-          aria-label="SASI conversation"
-          aria-live="polite"
-          className="sasi-scroll min-h-0 flex-1 overflow-y-auto pb-3"
-        >
-          {empty ? (
-            <div className="flex h-full flex-col items-center justify-center py-6">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="flex flex-col items-center text-center"
-              >
-                <div className="relative">
-                  <div
-                    className="sasi-ambient left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2"
-                    style={{
-                      background:
-                        "radial-gradient(circle, rgba(227,197,103,0.16), rgba(100,181,246,0.08) 55%, transparent 75%)",
-                    }}
-                    aria-hidden
-                  />
-                  <div className="sasi-glow-soft relative flex h-14 w-14 items-center justify-center rounded-2xl border border-[#e3c567]/25 bg-[#e3c567]/10">
-                    <Sparkles className="h-6 w-6 text-[#e3c567]" aria-hidden />
-                  </div>
-                </div>
-                <h2 className="mt-4 text-[16px] font-semibold text-white">
-                  What is happening around you?
-                </h2>
-                <p className="mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-zinc-500">
-                  Ask about outages, municipal services, or your cases. SASI answers with
-                  sources — and never contacts an authority without your approval.
-                </p>
-              </motion.div>
-
-              <div className="mt-7 grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
-                {SUGGESTIONS.map((s, i) => (
-                  <motion.button
-                    key={s.q}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.08 + i * 0.05, duration: 0.3, ease: "easeOut" }}
-                    onClick={() => send(s.q)}
-                    className="group flex items-start gap-2.5 rounded-xl border border-white/8 bg-white/[0.02] p-3 text-left transition hover:border-white/16 hover:bg-white/[0.045]"
-                    aria-label={`Ask: ${s.q}`}
-                  >
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03] text-zinc-400 transition group-hover:text-[#e3c567]">
-                      <s.icon className="h-3.5 w-3.5" aria-hidden />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[12.5px] font-medium text-zinc-200 group-hover:text-white">
-                        {s.q}
-                      </span>
-                      <span className="mt-0.5 block text-[10.5px] text-zinc-600">{s.hint}</span>
-                    </span>
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {chatMessages.map((m) =>
-                m.role === "user" ? (
-                  <motion.div
-                    key={m.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, ease: "easeOut" }}
-                    className="flex justify-end"
-                  >
-                    <div className="max-w-[85%] rounded-xl rounded-tr-sm border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-[13px] leading-relaxed text-zinc-100 sm:max-w-[70%]">
-                      {m.content}
+        <div className="relative min-h-0 flex-1">
+          <div
+            ref={scrollRef}
+            role="log"
+            aria-label="SASI conversation"
+            aria-live="polite"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 260);
+            }}
+            className="sasi-scroll absolute inset-0 min-h-0 overflow-y-auto pb-3"
+          >
+            {empty ? (
+              <div className="flex min-h-full flex-col items-center justify-center pb-28 pt-6">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="flex flex-col items-center text-center"
+                >
+                  <div className="relative">
+                    <div
+                      className="sasi-ambient left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        background:
+                          "radial-gradient(circle, rgba(227,197,103,0.16), rgba(100,181,246,0.08) 55%, transparent 75%)",
+                      }}
+                      aria-hidden
+                    />
+                    <div className="sasi-glow-soft relative overflow-hidden rounded-2xl border border-[#e3c567]/25">
+                      <SasiLogo size={56} withWordmark={false} />
                     </div>
-                  </motion.div>
-                ) : (
-                  <AssistantMessage
-                    key={m.id}
-                    msg={m}
-                    onRef={onRef}
-                    onDraftReport={draftReportFromChat}
-                  />
-                )
-              )}
-              <AnimatePresence>
-                {chatBusy && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center gap-2 pl-1 text-[11px] text-zinc-600"
-                  >
-                    <Lightbulb className="h-3 w-3 text-[#e3c567]/60" aria-hidden />
-                    {lastAssistantLen > 0
-                      ? "SASI is answering live — you can keep reading while it streams."
-                      : "SASI is checking public information and your case context…"}
-                  </motion.div>
+                  </div>
+                  <h2 className="mt-4 text-[16px] font-semibold text-white">
+                    What is happening around you?
+                  </h2>
+                  <p className="mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-zinc-500">
+                    Ask about outages, municipal services, or your cases. SASI answers with
+                    sources — and never contacts an authority without your approval.
+                  </p>
+                </motion.div>
+
+                <div className="mt-7 grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
+                  {SUGGESTIONS.map((s, i) => (
+                    <motion.button
+                      key={s.q}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.08 + i * 0.05, duration: 0.3, ease: "easeOut" }}
+                      onClick={() => send(s.q)}
+                      className="sasi-card group flex min-h-[52px] items-start gap-2.5 p-3 text-left"
+                      aria-label={`Ask: ${s.q}`}
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition",
+                          ACCENT_TILE[s.accent]
+                        )}
+                      >
+                        <s.icon className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[12.5px] font-medium text-zinc-200 group-hover:text-white">
+                          {s.q}
+                        </span>
+                        <span className="mt-0.5 block text-[10.5px] text-zinc-600">{s.hint}</span>
+                      </span>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* today divider */}
+                <div className="flex items-center gap-3 pt-1" aria-hidden>
+                  <span className="h-px flex-1 bg-white/6" />
+                  <span className="text-[9.5px] font-medium uppercase tracking-[0.14em] text-zinc-700">
+                    Today
+                  </span>
+                  <span className="h-px flex-1 bg-white/6" />
+                </div>
+                {chatMessages.map((m) =>
+                  m.role === "user" ? (
+                    <UserMessage key={m.id} msg={m} />
+                  ) : (
+                    <AssistantMessage
+                      key={m.id}
+                      msg={m}
+                      onRef={onRef}
+                      onDraftReport={draftReportFromChat}
+                      onRetry={retry}
+                    />
+                  )
                 )}
-              </AnimatePresence>
-            </div>
-          )}
+                <AnimatePresence>
+                  {chatBusy && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex items-center gap-2 pl-1 text-[11px] text-zinc-600"
+                    >
+                      <Lightbulb />
+                      {lastAssistantLen > 0
+                        ? "SASI is answering live — you can keep reading while it streams."
+                        : "SASI is checking public information and your case context…"}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+
+          {/* scroll-to-bottom pill — appears when you scrolled up while SASI streams */}
+          <AnimatePresence>
+            {showJump && !empty && (
+              <motion.button
+                initial={{ opacity: 0, y: 6, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.94 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                onClick={() =>
+                  scrollRef.current?.scrollTo({
+                    top: scrollRef.current.scrollHeight,
+                    behavior: "smooth",
+                  })
+                }
+                className="sasi-btn-ring absolute bottom-2 left-1/2 flex h-9 -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/12 bg-[#101012]/90 px-3 text-[11px] font-medium text-zinc-300 shadow-xl shadow-black/50 backdrop-blur-sm transition hover:text-white"
+                aria-label="Jump to the newest message"
+              >
+                <ArrowDown className="h-3.5 w-3.5" aria-hidden />
+                Latest
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* ---------- composer ---------- */}
-        <div className="sticky bottom-0 mt-auto">
+        <div className="sticky bottom-0 mt-auto shrink-0">
           {/* reverse-loop hint: quiet affordance once there is something worth distilling */}
           {canDistil && !chatBusy && !briefingBusy && (
             <div className="mb-2 flex justify-center">
@@ -484,35 +667,62 @@ export default function AskSasiView() {
               <label htmlFor="sasi-ask-input" className="sr-only">
                 Ask SASI a question
               </label>
-              <input
+              <textarea
                 id="sasi-ask-input"
+                ref={textareaRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={chatBusy ? "SASI is answering…" : "Ask about services, outages, or your cases…"}
+                onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT))}
+                onKeyDown={onKeyDown}
+                rows={1}
+                placeholder={
+                  chatBusy
+                    ? "SASI is answering — stop it below if you need to…"
+                    : "Ask about services, outages, or your cases…"
+                }
                 autoComplete="off"
-                maxLength={500}
-                className="h-10 min-w-0 flex-1 bg-transparent text-[13.5px] text-white outline-none placeholder:text-zinc-600"
+                maxLength={MAX_INPUT}
+                className="max-h-[120px] min-h-[40px] min-w-0 flex-1 resize-none bg-transparent py-2.5 text-[13.5px] leading-relaxed text-white outline-none placeholder:text-zinc-600"
               />
-              <button
-                type="submit"
-                disabled={!input.trim() || chatBusy}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                aria-label="Send question to SASI"
-              >
-                {chatBusy ? (
-                  <motion.span
-                    className="h-3.5 w-3.5 rounded-full border-[1.5px] border-black/25 border-t-black"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 0.7, repeat: Infinity, ease: "linear" }}
-                  />
-                ) : (
+              {chatBusy ? (
+                /* STOP — one obvious square while SASI is streaming */
+                <button
+                  type="button"
+                  onClick={stopSasi}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/[0.07] transition hover:border-[#ef5350]/50 hover:bg-[#ef5350]/10"
+                  aria-label="Stop SASI's answer"
+                  title="Stop this answer"
+                >
+                  <span className="h-3 w-3 rounded-[3px] bg-zinc-200" aria-hidden />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim()}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label="Send question to SASI"
+                >
                   <ArrowUp className="h-4 w-4" aria-hidden />
+                </button>
+              )}
+            </div>
+            {/* char counter — only when near the limit (kept quiet on purpose) */}
+            <div className="flex items-center justify-between px-1 pt-1">
+              <span className="hidden text-[9.5px] text-zinc-800 sm:block">
+                Enter to send · Shift+Enter for a new line
+              </span>
+              <span
+                className={cn(
+                  "ml-auto text-[9.5px] tabular-nums transition",
+                  nearLimit ? "text-[#e3c567]/80" : "text-transparent"
                 )}
-              </button>
+                aria-hidden={!nearLimit}
+              >
+                {input.length}/{MAX_INPUT}
+              </span>
             </div>
           </form>
 
-          <p className="flex items-center justify-center gap-1.5 py-2 text-center text-[10px] text-zinc-700">
+          <p className="flex items-center justify-center gap-1.5 pb-2 text-center text-[10px] text-zinc-700">
             <ShieldCheck className="h-3 w-3 text-zinc-600" aria-hidden />
             SASI can be wrong about public information — verify what matters. Nothing is
             submitted without your approval.

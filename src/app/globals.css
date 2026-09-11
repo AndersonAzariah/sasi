@@ -2192,3 +2192,30 @@ strong {
   display: none;
 }
 /* task16-confirm */
+
+/* ============================================================
+   CHAT INTERFACE LAYER (Task 17) — Ask SASI upgrades
+   ============================================================ */
+
+/* composer textarea: thin unobtrusive scrollbar when it grows past 3 lines */
+#sasi-ask-input {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+#sasi-ask-input::-webkit-scrollbar {
+  width: 5px;
+}
+#sasi-ask-input::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+#sasi-ask-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* assistant bubbles inherit the content CGO — keep it subtle here so long
+   reading surfaces don't feel like buttons (hover whisper only) */
+.sasi-data-saver .sasi-caret {
+  display: none;
+}
+
