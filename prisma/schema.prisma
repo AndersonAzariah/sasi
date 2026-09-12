@@ -1,14 +1,18 @@
 // SASI — persistence schema.
-// The product is a demo-first single-route SPA; these tables back the
-// "survive a reload" layer: user-created cases (reports), Ask SASI chat
-// history and saved preferences, keyed by an anonymous browser session id.
+// One source of truth for EVERY environment: local development, CI and
+// production all run the SAME PostgreSQL database architecture (Supabase
+// PostgreSQL). Dev connects through the IPv4 session pooler; CI applies
+// the schema + RLS hardening; production (Vercel) uses the transaction
+// pooler. There is no separate SQLite environment anymore.
+// JSON payloads are stored as String columns — the exact shape the client
+// already knows how to render, rehydrated verbatim.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -123,6 +127,80 @@ model AuditEvent {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
+}
+
+/// Phase 9 — one resident's progress through a service journey.
+/// stepsDone is a JSON array of step indexes already completed.
+/// The payload snapshot rehydrates the journey exactly as it was when
+/// the run started. Checklist completion is NOT government completion —
+/// the status column only ever reflects the resident's own progress.
+model JourneyRun {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String?
+  journeyId String // e.g. "passport-apply"
+  status    String   // ACTIVE | PAUSED | COMPLETED
+  stepsDone String   // JSON number array, e.g. "[0,1]"
+  payload   String   // journey snapshot (title, description, steps, source)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, journeyId])
+  @@index([userId])
+}
+
+/// Phase 11 — a saved item in My SASI (service, journey, answer,
+/// civic information). Unique per session + kind + item so saving
+/// twice is idempotent.
+model SavedItem {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String?
+  kind      String // "service" | "journey" | "answer" | "info"
+  itemId    String // slug or ref (e.g. "passport", "CASE-000124")
+  payload   String   // what to render when the resident returns
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, kind, itemId])
+  @@index([userId])
+}
+
+/// Phase 11 — a resident-created reminder. Always labelled as a SASI
+/// reminder in the UI; NEVER presented as an official government
+/// communication (Phase 19 rule).
+model Reminder {
+  id        String    @id @default(cuid())
+  sessionId String
+  userId    String?
+  title     String
+  note      String?
+  dueAt     DateTime?
+  done      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([sessionId, done])
+  @@index([userId])
+}
+
+/// Phase 15 — a civic document the resident uploaded. Only metadata and
+/// the AI analysis (summary, key information, dates, required actions)
+/// are stored — never the raw file bytes. Rows are deleted immediately
+/// and permanently when the resident deletes the document.
+model DocumentRecord {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String?
+  name      String
+  mimeType  String
+  sizeBytes Int
+  summary   String?
+  keyInfo   String? // JSON { importantInfo[], dates[], actions[] }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId, createdAt])
+  @@index([userId])
 }
 
 /// A PREPARATION record for institutional submission. No adapter exists

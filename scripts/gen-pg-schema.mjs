@@ -1,35 +1,42 @@
 /**
- * Generate prisma/schema.postgres.prisma from prisma/schema.prisma.
+ * Regenerate supabase/migrations/0001_init.sql from prisma/schema.prisma.
  *
- * SASI keeps ONE source of truth for the data model (prisma/schema.prisma,
- * written against SQLite so the sandbox dev server works offline). The
- * production database is Supabase PostgreSQL — this script derives the
- * identical model set with a postgres datasource. Run before any command
- * that targets Supabase:
+ * Since Task 28 the single source of truth (prisma/schema.prisma) is
+ * PostgreSQL-native — local development, CI and production all use the
+ * same Supabase PostgreSQL architecture. This script keeps the committed
+ * SQL snapshot in supabase/migrations/ in lock-step with the schema, so
+ * it can be pasted into the Supabase SQL Editor at any time:
  *
  *   bun scripts/gen-pg-schema.mjs
- *   bunx prisma db push --schema prisma/schema.postgres.prisma
- *   bunx prisma migrate diff --from-empty --to-schema-datamodel \
- *        prisma/schema.postgres.prisma --script > supabase/migrations/0001_init.sql
  *
- * The GitHub Action "supabase-db" does all of this automatically.
+ * (Historical name kept: this used to derive a postgres schema from a
+ * SQLite source of truth. That fork is gone — one schema everywhere.)
  */
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const SRC = "prisma/schema.prisma";
-const DEST = "prisma/schema.postgres.prisma";
+const DEST = "supabase/migrations/0001_init.sql";
 
 const src = readFileSync(SRC, "utf8");
-
-const out = src.replace(
-  /datasource db \{[\s\S]*?\n\}/,
-  'datasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}'
-);
-
-if (out === src || !out.includes('provider = "postgresql"')) {
-  console.error("[gen-pg-schema] FAILED: datasource block was not replaced.");
+if (!src.includes('provider = "postgresql"')) {
+  console.error("[gen-pg-schema] FAILED: prisma/schema.prisma is not PostgreSQL-native.");
   process.exit(1);
 }
 
-writeFileSync(DEST, out);
-console.log(`[gen-pg-schema] wrote ${DEST} (postgresql datasource, identical models)`);
+const sql = execFileSync(
+  "bunx",
+  [
+    "prisma",
+    "migrate",
+    "diff",
+    "--from-empty",
+    "--to-schema-datamodel",
+    SRC,
+    "--script",
+  ],
+  { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+);
+
+writeFileSync(DEST, sql);
+console.log(`[gen-pg-schema] wrote ${DEST} (${sql.split("\n").length} lines) from the PostgreSQL-native schema.`);

@@ -30,6 +30,9 @@ import LoginView from "./views/login";
 import SignupView from "./views/signup";
 import DashboardView from "./views/dashboard";
 import AskSasiView from "./views/ask-sasi";
+import JourneysView from "./views/journeys";
+import JourneyView from "./views/journey";
+import DocumentsView from "./views/documents";
 import InvestigateView from "./views/investigate";
 import StartInvestigationView from "./views/start-investigation";
 import ReportView from "./views/report";
@@ -297,6 +300,9 @@ const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   map: MapView,
   evidence: EvidenceView,
   activity: ActivityView,
+  journeys: JourneysView,
+  journey: JourneyView,
+  documents: DocumentsView,
   notifications: NotificationsView,
   settings: SettingsView,
   profile: ProfileView,

@@ -1025,3 +1025,24 @@ Task 27 — POST-PUSH EXECUTION & LIVE VERIFICATION (same task, continued):
 - CI: typecheck was failing on pre-existing example/skill dirs → tsconfig excludes (examples, skills, mini-services) scoped to app code; tsc now fully clean locally AND in CI (both workflows green on run 2).
 - AGENT-BROWSER QA (desktop 1280 + mobile 390): landing renders (white h1, five actions, composer); report wizard has 0 role=progressbar and 0 full-width bar elements (step chips only); signup password strength renders "Strength: Excellent" as text+dot with 0 segment bars; settings Cloud database row live-updates from the real endpoint; login with golden.path@sasi.test works (10/5min throttle transparent to legit users) → straight to dashboard; 390px zero horizontal overflow; stale-console "Export ConfidenceBar" errors were pre-fix buffer entries — page renders clean, dev.log has 0 error lines after full restart + .next wipe.
 - Repo state: 89f65d9 (main Task 27) + fa48a91 (tsconfig scope fix). GitHub secrets set (encrypted): SUPABASE_DIRECT_DATABASE_URL (pooler), NEXTAUTH_SECRET, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY. Cron review job recreated as 380546 (old 380436 disabled by exec limits).
+
+---
+Task ID: 28-1
+Agent: main
+Task: Task 28 Phase 1 — PostgreSQL everywhere (dev/CI/prod) + schema for Civic Intelligence + view scaffolding; deliver all user-provided keys for Vercel setup.
+
+Work Log:
+- Delivered ALL user-provided keys (Supabase URL/publishable/secret, DB password, JWT key id, pooler URLs) + exact Vercel env-var table in the reply (user was waiting on the Vercel import page).
+- Verified sandbox CAN reach Supabase IPv4 session pooler (aws-1-eu-west-1.pooler.supabase.com:5432) → dev on real PostgreSQL is now practical.
+- prisma/schema.prisma flipped to datasource provider "postgresql" (single source of truth; SQLite fork retired). Local db/custom.db file left untouched (nothing destroyed).
+- Added 4 models for the civic-intelligence phases: JourneyRun (progress, ACTIVE/PAUSED/COMPLETED, stepsDone JSON), SavedItem (session+kind+item unique), Reminder (SASI-side, never official), DocumentRecord (metadata + AI analysis only, never raw bytes).
+- ROOT-CAUSED shadowed env: sandbox exports DATABASE_URL=file:...custom.db in the shell, which overrides .env for both Prisma CLI and Next. Permanent fix: package.json scripts (dev/start/db:push/postdb:push/db:*) now source .env first via `bash -c 'set -a; . ./.env; set +a; exec ...'`.
+- .env: DATABASE_URL = Supabase session pooler (postgresql://postgres.<ref>:<pw>@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require).
+- bun run db:push against Supabase → schema in sync (9.6s) + postdb:push golden-path hook ran against Postgres ("already exists").
+- .github/workflows/supabase-db.yml now applies prisma/schema.prisma directly (no derive step). scripts/gen-pg-schema.mjs repurposed: regenerates supabase/migrations/0001_init.sql (243 lines, 4 new tables included) via prisma migrate diff. Stale prisma/schema.postgres.prisma deleted; vercel.json buildCommand simplified to `prisma generate && next build`.
+- Dev server restarted on PostgreSQL: /api/sasi/system-status reports {database:{provider:"postgres",ok:true}, supabase:{schemaApplied:true,anonLocked:true}}.
+- Scaffolded 3 new app views (agent conflict-free partition): types.ts View union + store.ts ALL_VIEWS + sasi-app.tsx imports/VIEW_COMPONENTS + app-shell.tsx sidebar (Journeys under Investigate w/ Route icon, Documents under Evidence w/ FileText icon) + i18n keys (en/zu/af) + placeholder views/journeys.tsx, journey.tsx, documents.tsx. Lint PASS.
+
+Stage Summary:
+- Dev = CI = prod = Supabase PostgreSQL (no behavioural fork). RLS hardening auto-covers new tables (DO-loop over all public tables).
+- Next: agents 28-a (auth+security+rate-limit service), 28-b (structured AI answers+actions), 28-c (service registry+journeys+My SASI), 28-d (document intelligence).

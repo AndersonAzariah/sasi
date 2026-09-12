@@ -23,11 +23,13 @@ import {
   Map,
   PanelLeftClose,
   PanelLeftOpen,
+  Route,
   ScanSearch,
   Search,
   Settings,
   Siren,
   ShieldCheck,
+  FileText,
   Sparkles,
   Zap,
 } from "lucide-react";
@@ -64,6 +66,7 @@ const NAV_SECTIONS: {
     label: "nav.investigate",
     items: [
       { view: "investigate", label: "nav.investigate.item", icon: Sparkles },
+      { view: "journeys", label: "nav.journeys", icon: Route },
       { view: "cases", label: "nav.cases", icon: FolderLock },
       { view: "incidents", label: "nav.incidents", icon: Zap },
       { view: "map", label: "nav.map", icon: Map },
@@ -73,6 +76,7 @@ const NAV_SECTIONS: {
     label: "nav.evidence",
     items: [
       { view: "evidence", label: "nav.evidence.item", icon: FolderLock },
+      { view: "documents", label: "nav.documents", icon: FileText },
       { view: "activity", label: "nav.activity", icon: Activity },
     ],
   },

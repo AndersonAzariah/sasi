@@ -4,6 +4,9 @@ name: Supabase database sync
 # RLS/grant hardening. GitHub-hosted runners can reach Supabase on
 # port 5432 (this is the ONLY place with database credentials, and
 # they live in encrypted repo secrets — never in the repo).
+#
+# prisma/schema.prisma is PostgreSQL-native since Task 28 (dev, CI and
+# production all run the same database architecture — no SQLite fork).
 
 on:
   workflow_dispatch:
@@ -12,7 +15,6 @@ on:
     paths:
       - "prisma/schema.prisma"
       - "supabase/**"
-      - "scripts/gen-pg-schema.mjs"
       - "scripts/ensure-golden-path.mjs"
       - ".github/workflows/supabase-db.yml"
 
@@ -33,18 +35,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Derive PostgreSQL schema
-        run: bun scripts/gen-pg-schema.mjs
-
       - name: Apply schema (prisma db push)
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DIRECT_DATABASE_URL }}
-        run: bunx prisma db push --schema prisma/schema.postgres.prisma --accept-data-loss
+        run: bunx prisma db push --schema prisma/schema.prisma --accept-data-loss
 
       - name: Apply RLS / grant hardening
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DIRECT_DATABASE_URL }}
-        run: bunx prisma db execute --schema prisma/schema.postgres.prisma --file supabase/rls-hardening.sql
+        run: bunx prisma db execute --schema prisma/schema.prisma --file supabase/rls-hardening.sql
 
       - name: Seed QA account (idempotent)
         env:
