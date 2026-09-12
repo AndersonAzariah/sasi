@@ -214,16 +214,7 @@ export function AuthBrandPanel({ accent }: { accent: "red" | "gold" }) {
           className="sasi-serif mt-6 max-w-md text-[36px] font-medium leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.65)] xl:text-[42px]"
         >
           Service intelligence for{" "}
-          <em
-            className="bg-clip-text text-transparent"
-            style={{
-              fontStyle: "italic",
-              backgroundImage:
-                "linear-gradient(100deg, #f28b87, #90caf9 42%, #a5d6a7 68%, #eed582)",
-            }}
-          >
-            South Africa.
-          </em>
+          <em className="italic text-white">South Africa.</em>
         </h2>
         <p
           data-auth-reveal
@@ -337,16 +328,7 @@ export function AuthMobileBanner({ accent }: { accent: "red" | "gold" }) {
         <div>
           <p className="sasi-serif text-[17px] font-medium leading-tight text-white">
             Service intelligence for{" "}
-            <em
-              className="bg-clip-text text-transparent"
-              style={{
-                fontStyle: "italic",
-                backgroundImage:
-                  "linear-gradient(100deg, #f28b87, #90caf9 42%, #a5d6a7 68%, #eed582)",
-              }}
-            >
-              South Africa.
-            </em>
+            <em className="italic text-white">South Africa.</em>
           </p>
           <p className="mt-1 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
             Not a government website

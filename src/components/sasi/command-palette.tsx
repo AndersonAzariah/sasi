@@ -12,6 +12,7 @@ import {
   Map as MapIcon,
   Search,
   Settings,
+  Siren,
   Sparkles,
   Zap,
 } from "lucide-react";
@@ -171,6 +172,7 @@ export function CommandPalette() {
       { view: "activity" as const, label: "Activity", icon: Zap },
       { view: "notifications" as const, label: "Notifications", icon: Bell },
       { view: "gov" as const, label: "Government", icon: Landmark },
+      { view: "emergency" as const, label: "Emergency contacts", icon: Siren },
       { view: "settings" as const, label: "Settings", icon: Settings },
     ];
     navItems.forEach((n) => {

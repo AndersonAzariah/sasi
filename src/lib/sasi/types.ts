@@ -333,6 +333,7 @@ export type View =
   | "privacy"
   | "terms"
   | "gov"
+  | "emergency"
   | "login"
   | "signup"
   | "dashboard"

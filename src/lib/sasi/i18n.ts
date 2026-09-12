@@ -141,6 +141,59 @@ const DICT: Dict = {
   /* ---------- landing ---------- */
   "landing.hero.a": { en: "Service intelligence for", zu: "Ukwazi ngezinsizakusebenza", af: "Diensintelligensie vir" },
   "landing.hero.b": { en: "South Africa", zu: "eNingizimu Afrika", af: "Suid-Afrika" },
+  "landing.hero.ask": {
+    en: "What do you need help with?",
+    zu: "Udinga usizo ngani?",
+    af: "Waarmee kan ek help?",
+  },
+  "landing.hero.askSub": {
+    en: "SASI helps you navigate South African public services and civic information — plain-language guidance, official sources, and nothing submitted without your approval.",
+  },
+  "landing.input.placeholder": {
+    en: "Ask SASI anything about public services…",
+    zu: "Buza noma yini ngezinsizakalo zikahulumeni…",
+    af: "Vra SASI enigiets oor openbare dienste…",
+  },
+  "landing.entries.title": {
+    en: "Where do you want to start?",
+    zu: "Uqala ngaphi?",
+    af: "Waar wil jy begin?",
+  },
+  "landing.entry.services": { en: "Government services", zu: "Izinsizakalo zikahulumeni", af: "Regeringsdienste" },
+  "landing.entry.services.sub": { en: "Requirements, steps, official info" },
+  "landing.entry.documents": { en: "Documents", zu: "Amadokhumenti", af: "Dokumente" },
+  "landing.entry.documents.sub": { en: "In build — ask SASI meanwhile" },
+  "landing.entry.nearby": { en: "Nearby", zu: "Okuseduze", af: "Nabygeleë" },
+  "landing.entry.nearby.sub": { en: "Your service map and reports" },
+  "landing.entry.civic": { en: "Civic help", zu: "Usizo lomphakathi", af: "Burgerhulp" },
+  "landing.entry.civic.sub": { en: "Government, departments, processes" },
+  "landing.entry.report": { en: "Report an issue", zu: "Bika inkinga", af: "Rapporteer 'n probleem" },
+  "landing.entry.report.sub": { en: "Structured, evidence-backed" },
+  "landing.entry.emergency": { en: "Emergency", zu: "Isimo esiphuthumayo", af: "Noodgeval" },
+  "landing.entry.emergency.sub": { en: "Verified contacts, one tap to call" },
+  "landing.voice.unsupported": {
+    en: "Voice input isn't supported in this browser yet",
+  },
+  "landing.voice.unsupported.sub": {
+    en: "Type your question for now — SASI reads it the same way. Voice arrives with browsers that expose speech recognition.",
+  },
+  "landing.voice.error": {
+    en: "Voice input stopped",
+  },
+  "landing.voice.error.sub": {
+    en: "Your microphone didn't deliver audio — try again or type instead.",
+  },
+  "documents.build.title": {
+    en: "The Documents workspace is being built",
+  },
+  "documents.build.sub": {
+    en: "Uploads and plain-language document explanations arrive with it. Meanwhile, ask SASI about any government document or form — it can walk you through one today.",
+  },
+  "nav.emergency": { en: "Emergency", zu: "Isimo esiphuthumayo", af: "Noodgeval" },
+  "emergency.title": { en: "Emergency", zu: "Isimo esiphuthumayo", af: "Noodgeval" },
+  "emergency.sub": {
+    en: "Verified national contacts. Tap to call — SASI never dispatches.",
+  },
   "landing.hero.sub": {
     en: "Understand what is happening. Build the evidence. Take the next step.",
     zu: "Qonda okwenzakalayo. Yaka ubufakazi. Thatha isinyathelo esilandelayo.",

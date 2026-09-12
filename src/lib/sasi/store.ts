@@ -418,6 +418,7 @@ const ALL_VIEWS: readonly View[] = [
   "privacy",
   "terms",
   "gov",
+  "emergency",
   "login",
   "signup",
   "dashboard",
@@ -469,6 +470,7 @@ const PUBLIC_VIEWS: ReadonlySet<string> = new Set<View>([
   "security",
   "privacy",
   "terms",
+  "emergency",
   "login",
   "signup",
 ]);

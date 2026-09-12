@@ -4,6 +4,7 @@ import Image from "next/image";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ArrowUpRight,
   BookOpen,
   Droplets,
   FileText,
@@ -560,5 +561,97 @@ export function GhostButton({
     >
       {children}
     </button>
+  );
+}
+
+/* ============================================================
+   TRUST LAYER PRIMITIVES (Task 24 — master prompt §35/§42)
+   Reusable honesty surfaces: a standing "SASI is informational"
+   notice and a structured official-source card. Every factual
+   government-related surface should compose these instead of
+   hand-rolling its own disclaimer.
+   ============================================================ */
+
+export function TrustNotice({
+  children,
+  variant = "info",
+  className,
+}: {
+  children: ReactNode;
+  variant?: "info" | "warning";
+  className?: string;
+}) {
+  const danger = variant === "warning";
+  return (
+    <div
+      role="note"
+      className={cn(
+        "flex items-start gap-2.5 rounded-xl border p-3.5",
+        danger
+          ? "border-[#ef5350]/25 bg-[#ef5350]/[0.05]"
+          : "border-white/8 bg-white/[0.025]",
+        className
+      )}
+    >
+      {danger ? (
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#ef5350]" aria-hidden />
+      ) : (
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#e3c567]" aria-hidden />
+      )}
+      <p className="text-[12.5px] leading-relaxed text-zinc-400">{children}</p>
+    </div>
+  );
+}
+
+export function OfficialSource({
+  title,
+  organisation,
+  href,
+  note,
+  className,
+}: {
+  /** what the source is, e.g. "National emergency contacts directory" */
+  title: string;
+  /** who publishes it, e.g. "South African Government" */
+  organisation: string;
+  /** verified external link — omit when SASI cannot verify one */
+  href?: string;
+  /** optional extra context, e.g. what to do if the link changes */
+  note?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-white/8 bg-white/[0.02] p-4",
+        className
+      )}
+    >
+      <p className="text-[9.5px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
+        Official source
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <p className="text-[13.5px] font-medium text-white">{title}</p>
+        <span className="text-[12px] text-zinc-500">· {organisation}</span>
+      </div>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-white/25 hover:text-white"
+        >
+          {title}
+          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      ) : (
+        <p className="mt-2 text-[12px] text-zinc-500">
+          SASI has not verified an official link for this — confirm through{" "}
+          {organisation} directly.
+        </p>
+      )}
+      {note ? <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-600">{note}</p> : null}
+    </div>
   );
 }

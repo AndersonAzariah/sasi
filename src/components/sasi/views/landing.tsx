@@ -1,16 +1,23 @@
 "use client";
 
 import { motion, type Variants } from "framer-motion";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import {
-  ArrowRight,
+  ArrowUp,
   ChevronRight,
   Eye,
   FileSearch,
+  FileText,
   Flag,
   FlaskConical,
+  Landmark,
+  MapPin,
   MessageSquareQuote,
-  Search,
+  Mic,
+  Scale,
   ShieldCheck,
+  Siren,
   Sparkles,
   UserCheck,
 } from "lucide-react";
@@ -41,6 +48,39 @@ const EXAMPLE_PROMPTS = [
   "landing.quick.pipe",
   "landing.quick.near",
 ] as const;
+
+/* Task 24 — real entry points, each wired to a working destination
+   (or an honest in-build notice). No decorative cards. */
+type EntryAction = "services" | "documents" | "map" | "gov" | "report" | "emergency";
+
+const ENTRY_POINTS: {
+  icon: typeof ShieldCheck;
+  label: string;
+  sub: string;
+  action: EntryAction;
+  danger?: boolean;
+}[] = [
+  { icon: Landmark, label: "landing.entry.services", sub: "landing.entry.services.sub", action: "services" },
+  { icon: FileText, label: "landing.entry.documents", sub: "landing.entry.documents.sub", action: "documents" },
+  { icon: MapPin, label: "landing.entry.nearby", sub: "landing.entry.nearby.sub", action: "map" },
+  { icon: Scale, label: "landing.entry.civic", sub: "landing.entry.civic.sub", action: "gov" },
+  { icon: FileSearch, label: "landing.entry.report", sub: "landing.entry.report.sub", action: "report" },
+  { icon: Siren, label: "landing.entry.emergency", sub: "landing.entry.emergency.sub", action: "emergency", danger: true },
+];
+
+/* Minimal shape of the Web Speech API — real browser functionality,
+   not simulated: where the browser exposes it, voice works; where it
+   doesn't, the UI says so honestly (master prompt §21). */
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((ev: { resultIndex: number; results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
 
 const STEPS = [
   {
@@ -84,11 +124,83 @@ const heroItem: Variants = {
 
 export default function LandingView() {
   const navigate = useSasiStore((s) => s.navigate);
-  const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
+  const setPendingAsk = useSasiStore((s) => s.setPendingAsk);
   const openService = useSasiStore((s) => s.openService);
   const openCase = useSasiStore((s) => s.openCase);
   const cases = useSasiStore((s) => s.cases);
   const t = useT();
+
+  /* ---------- the hero AI input (Task 24) ---------- */
+  const [askDraft, setAskDraft] = useState("");
+  const [listening, setListening] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recogRef = useRef<SpeechRecognitionLike | null>(null);
+
+  const askSasi = (q: string) => {
+    const text = q.trim();
+    if (!text) {
+      inputRef.current?.focus();
+      return;
+    }
+    setPendingAsk(text);
+    navigate("ask-sasi");
+  };
+
+  const autoGrow = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  };
+
+  const startVoice = () => {
+    if (listening) {
+      recogRef.current?.stop();
+      return;
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SR) {
+      toast(t("landing.voice.unsupported"), {
+        description: t("landing.voice.unsupported.sub"),
+      });
+      return;
+    }
+    try {
+      const rec = new SR();
+      rec.lang = document.documentElement.lang || "en-ZA";
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.onresult = (ev) => {
+        let text = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) text += ev.results[i][0].transcript;
+        setAskDraft(text);
+        if (inputRef.current) autoGrow(inputRef.current);
+      };
+      rec.onend = () => setListening(false);
+      rec.onerror = () => {
+        setListening(false);
+        toast(t("landing.voice.error"), {
+          description: t("landing.voice.error.sub"),
+        });
+      };
+      recogRef.current = rec;
+      setListening(true);
+      rec.start();
+    } catch {
+      setListening(false);
+    }
+  };
+
+  const runEntry = (action: EntryAction) => {
+    if (action === "documents") {
+      /* honest in-build state — the capability is coming, the click still answers */
+      toast(t("documents.build.title"), { description: t("documents.build.sub") });
+      return;
+    }
+    navigate(action);
+  };
 
   const recentCases = [...cases]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -134,17 +246,13 @@ export default function LandingView() {
             Independent civic technology
           </motion.div>
 
-          {/* headline */}
+          {/* headline — solid white, no gradient text (Task 24) */}
           <motion.h1
             id="hero-heading"
             variants={heroItem}
             className="sasi-serif mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl"
           >
-            {t("landing.hero.a")}{" "}
-            <span className="bg-gradient-to-r from-[#64b5f6] via-[#66bb6a] to-[#e3c567] bg-clip-text text-transparent">
-              {t("landing.hero.b")}
-            </span>
-            .
+            {t("landing.hero.ask")}
           </motion.h1>
 
           {/* sub copy */}
@@ -152,50 +260,83 @@ export default function LandingView() {
             variants={heroItem}
             className="mt-4 max-w-xl text-[14.5px] leading-relaxed text-zinc-400 sm:text-[15.5px]"
           >
-            {t("landing.hero.sub")}
+            {t("landing.hero.askSub")}
           </motion.p>
 
-          {/* CTAs */}
-          <motion.div variants={heroItem} className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={() => navigate("report")}
-              className="sasi-btn-sheen sasi-btn-white-glass inline-flex h-10 items-center gap-2 rounded-lg px-5 text-[13.5px] font-medium active:scale-[0.98]"
+          {/* THE PRIMARY INTERACTION — a real SASI AI input (Task 24) */}
+          <motion.div variants={heroItem} className="mt-9 w-full max-w-2xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                askSasi(askDraft);
+              }}
+              className={cn(
+                "sasi-command-focus sasi-search-glow-live rounded-2xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20 focus-within:border-white/25",
+                listening && "border-[#ef5350]/45"
+              )}
             >
-              {t("landing.cta.report")}
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </button>
-            <button
-              onClick={() => navigate("services")}
-              className="sasi-btn-glass inline-flex h-10 items-center gap-2 rounded-lg px-5 text-[13.5px] font-medium text-zinc-200 active:scale-[0.98]"
-            >
-              {t("landing.cta.services")}
-            </button>
-          </motion.div>
+              <div className="flex items-end gap-1.5 px-3 py-2.5">
+                <Sparkles className="mb-3 h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                <textarea
+                  ref={inputRef}
+                  rows={1}
+                  value={askDraft}
+                  onChange={(e) => {
+                    setAskDraft(e.target.value);
+                    autoGrow(e.target);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      askSasi(askDraft);
+                    }
+                  }}
+                  placeholder={t("landing.input.placeholder")}
+                  aria-label="Ask SASI anything about public services"
+                  className="max-h-32 flex-1 resize-none self-center bg-transparent py-1.5 text-left text-[14.5px] leading-relaxed text-white outline-none placeholder:text-zinc-500"
+                />
+                <button
+                  type="button"
+                  onClick={startVoice}
+                  aria-label={listening ? "Stop voice input" : "Start voice input"}
+                  aria-pressed={listening}
+                  className={cn(
+                    "relative mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                    listening
+                      ? "bg-[#ef5350]/15 text-[#ef5350]"
+                      : "text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"
+                  )}
+                >
+                  <Mic className="h-4 w-4" aria-hidden />
+                  {listening && (
+                    <span
+                      aria-hidden
+                      className="sasi-breathe absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#ef5350]"
+                    />
+                  )}
+                </button>
+                <button
+                  type="submit"
+                  disabled={!askDraft.trim()}
+                  aria-label="Send your question to SASI"
+                  className={cn(
+                    "mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-[0.94]",
+                    askDraft.trim()
+                      ? "bg-white text-black hover:bg-zinc-200"
+                      : "cursor-not-allowed bg-white/[0.05] text-zinc-600"
+                  )}
+                >
+                  <ArrowUp className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
+            </form>
 
-          {/* command bar */}
-          <motion.div variants={heroItem} className="mt-10 w-full max-w-xl">
-            <div className="sasi-command-focus sasi-search-glow-live rounded-2xl border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20">
-              <button
-                onClick={() => setCommandOpen(true)}
-                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left"
-                aria-label="Open the SASI command bar to search or ask"
-              >
-                <Search className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-                <span className="flex-1 truncate text-[13.5px] text-zinc-500">
-                  {t("shell.search")}
-                </span>
-                <kbd className="hidden shrink-0 items-center rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 sm:inline-flex">
-                  ⌘K
-                </kbd>
-              </button>
-            </div>
-
-            {/* example prompts */}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {/* example prompts — wired straight into SASI, not the palette */}
+            <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
               {EXAMPLE_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
-                  onClick={() => setCommandOpen(true)}
+                  onClick={() => askSasi(t(prompt))}
                   className="inline-flex items-center gap-2 rounded-full border border-white/8 px-3 py-1.5 text-[12px] text-zinc-500 transition-colors hover:border-white/15 hover:text-zinc-200"
                 >
                   <span
@@ -208,6 +349,53 @@ export default function LandingView() {
             </div>
           </motion.div>
         </motion.div>
+      </section>
+
+      {/* ============================================ ENTRY POINTS (Task 24) */}
+      <section aria-labelledby="entries-heading" className="border-t border-white/5">
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={VIEWPORT}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+          >
+            <h2 id="entries-heading" className="text-lg font-semibold tracking-tight text-white sm:text-xl">
+              {t("landing.entries.title")}
+            </h2>
+
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {ENTRY_POINTS.map((entry) => {
+                const Icon = entry.icon;
+                return (
+                  <button
+                    key={entry.action}
+                    onClick={() => runEntry(entry.action)}
+                    className={cn(
+                      "sasi-card sasi-card-interactive group flex flex-col p-4 text-left",
+                      entry.danger && "border-[#ef5350]/20 hover:border-[#ef5350]/40"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03]",
+                        entry.danger ? "text-[#ef5350]" : "text-zinc-300"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden />
+                    </span>
+                    <p className="mt-3 text-[13px] font-medium leading-snug text-white">
+                      {t(entry.label)}
+                    </p>
+                    <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-500">
+                      {t(entry.sub)}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </div>
       </section>
 
       {/* ================================================== TRUST BAR */}

@@ -24,6 +24,7 @@ import {
   PanelLeftOpen,
   Search,
   Settings,
+  Siren,
   ShieldCheck,
   Sparkles,
   Zap,
@@ -77,6 +78,7 @@ const NAV_SECTIONS: {
     label: "nav.system",
     items: [
       { view: "notifications", label: "nav.notifications", icon: Bell },
+      { view: "emergency", label: "nav.emergency", icon: Siren },
       { view: "settings", label: "nav.settings", icon: Settings },
     ],
   },

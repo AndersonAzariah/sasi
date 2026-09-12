@@ -23,6 +23,7 @@ import SecurityView from "./views/security";
 import PrivacyView from "./views/privacy";
 import TermsView from "./views/terms";
 import GovView from "./views/gov";
+import EmergencyView from "./views/emergency";
 import LoginView from "./views/login";
 import SignupView from "./views/signup";
 import DashboardView from "./views/dashboard";
@@ -52,6 +53,7 @@ const PUBLIC_VIEWS = new Set<View>([
   "privacy",
   "terms",
   "gov",
+  "emergency",
   "login",
   "signup",
 ]);
@@ -274,6 +276,7 @@ const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   privacy: PrivacyView,
   terms: TermsView,
   gov: GovView,
+  emergency: EmergencyView,
   login: LoginView,
   signup: SignupView,
   dashboard: DashboardView,

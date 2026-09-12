@@ -116,7 +116,7 @@ export default function SecurityView() {
         >
           <div className="flex items-center gap-2">
             <Info className="h-4 w-4 shrink-0 text-[#e3c567]" aria-hidden />
-            <h2 id="security-limitations" className="text-[13.5px] font-semibold text-[#efe0a8]">
+            <h2 id="security-limitations" className="text-[13.5px] font-semibold text-white">
               Honest limitations
             </h2>
           </div>
