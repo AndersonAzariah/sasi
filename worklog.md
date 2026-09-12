@@ -980,3 +980,41 @@ Stage Summary:
 - Unresolved/risks: (1) standalone-boot condition verified by API check + action-path reuse (headless cannot emulate display-mode: standalone — needs one manual check on a real installed device); (2) document-explanation intent routes to Ask SASI until the Documents workspace exists (honest); (3) GUIDE routes to services until a journeys view exists.
 - Carried: zu/af native proofing, state-route userId migration, dev.log rotation, map glyph tiles, cluster list mobile parity, OpenRouter key rotation.
 - Next-phase priorities: (1) §4/§5 structured AI answers (Answer / Requirements checklist / Your next step / Official sources / Related + contextual action chips) in ask-sasi; (2) §8 My SASI: saved services + reminders persistence (Prisma profile JSON + state API); (3) §7 journeys view with per-step Ask SASI context; (4) §10 Civic Knowledge Explorer browse page; (5) §19 notification center split.
+---
+Task ID: 27
+Agent: Z.ai Code (main)
+Task: User — "Remove all loading bars and progress bars and implement a fully functional database system with SQL etc. Using SupaBase and please make this database super secure and un breakable and un hackable … CONFIRM EMAIL IS OFF. Use Email only no ID or google etc. PUBLISH LATEST CHANGES TO GITHUB THEN MAKE A SERVER TO HOST WEBSITE USING GITHUB FOR FREE WITH THE NAME SASI … GIVE A FULL DEVELOPMENT REPORT IN ENGLISH."
+
+Work Log:
+- PROGRESS/LOADING BAR PURGE (all bar-style meters removed, information preserved as text/chips):
+  * primitives.tsx ConfidenceBar → ConfidenceChip (labelled chip + confidence dot, no meter); call sites updated (landing.tsx trust band, domain.tsx findings).
+  * CONFIDENCE_META lost its width field, gained dot colours (utils.ts).
+  * investigate.tsx overall-confidence animated meter removed (label + findings count text kept).
+  * report.tsx wizard progress bar removed (step chips above already carry position).
+  * case-detail.tsx case progress bar removed (% + hint text kept).
+  * signup.tsx password-strength 4-segment bar → "Strength: <label>" text + colour dot.
+  * briefing-card.tsx risk meter track removed (risk label stays in header); RISK_METER_FILL deleted.
+  * src/components/ui/progress.tsx (unused shadcn Progress) DELETED. Verified: zero role="progressbar", zero width-percentage meters outside the admin bar chart (a data chart, not a progress bar).
+- SUPABASE INTEGRATION (user-supplied project awcceckvuiarlbnzemsv):
+  * @supabase/supabase-js@2.116 + @supabase/ssr@0.12 installed; env vars in .env (gitignored) + committed .env.example template (fixed .gitignore `.env.*` → now allows `!.env.example`).
+  * src/utils/supabase/{client,server,middleware}.ts created exactly per the user's integration recipe (publishable key only; server helper for RSC/route handlers).
+  * src/proxy.ts (Next 16 "proxy" convention, replaces deprecated middleware.ts): Supabase session refresh + security headers on every response — X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy (camera/mic/geo same-origin), HSTS in production. Verified via curl.
+  * NEW /api/sasi/system-status: honest infrastructure report (provider, primary DB ok, Supabase reachable, schemaApplied, anonLocked). Surfaced live in Settings → App & offline as "Cloud database (Supabase)" StatusRow with truthful states only.
+- POSTGRESQL ON SUPABASE (sandbox cannot reach port 5432 — solved via GitHub Actions):
+  * scripts/gen-pg-schema.mjs derives prisma/schema.postgres.prisma from the single SQLite source of truth (identical models, postgres datasource).
+  * supabase/migrations/0001_init.sql generated offline (prisma migrate diff, 159 lines DDL, committed for inspection/manual SQL-Editor use).
+  * supabase/rls-hardening.sql: RLS ENABLED on every public table (no policies = zero rows) + ALL privileges revoked from anon/authenticated + schema USAGE revoked → the publishable key can do nothing; Prisma (postgres owner) unaffected; idempotent.
+  * .github/workflows/supabase-db.yml: on push/dispatch — derives pg schema, prisma db push, applies hardening, seeds golden-path QA account (repo secrets only; GitHub runners CAN reach 5432).
+  * .github/workflows/ci.yml: lint + tsc quality gate on every push.
+- SECURITY (email-only, defence in depth):
+  * Auth audit: NextAuth credentials provider is the ONLY provider (email+password, no OAuth, no magic links) — matches "Use Email only"; confirm-email is a Supabase Auth dashboard setting (already OFF per user) and unused by our stack.
+  * Login brute-force throttle added: 10 attempts/email/5min inside authorize() (reuses rateLimit; throttled attempts indistinguishable from wrong password).
+  * Secrets discipline: SUPABASE_SECRET_KEY + DB password only in .env/GitHub encrypted secrets/Vercel dashboard — never in client code or the repo (repo is PUBLIC; verified .env gitignored).
+- LIVE VERIFICATION: /api/sasi/system-status returns database{provider:sqlite,ok:true} + supabase{configured:true,restReachable:true,schemaApplied:false,anonLocked:true} — honest pre-sync state; headers verified; dev server healthy; lint PASS; tsc clean for src/.
+- Files: src/utils/supabase/* (NEW), src/proxy.ts (NEW), src/app/api/sasi/system-status/route.ts (NEW), scripts/gen-pg-schema.mjs (NEW), supabase/{migrations/0001_init.sql,rls-hardening.sql} (NEW), .github/workflows/{supabase-db,ci}.yml (NEW), DEPLOY.md (NEW), vercel.json (NEW), .env.example (NEW), plus the 9 edited component/lib files listed above; bun.lock/package.json (+2 deps).
+
+Stage Summary:
+- SASI now has zero loading/progress bars anywhere (confidence/strength/risk/wizard progress are all text+colour), a fully hardened Supabase PostgreSQL pipeline (schema + RLS auto-applied by GitHub Actions), the exact Supabase client/server/middleware integration requested, an honest live database status surface in Settings, a login brute-force throttle, security headers via the Next 16 proxy convention, a CI quality gate, and a complete free-hosting runbook (DEPLOY.md + vercel.json).
+- Unresolved/risks: (1) sandbox cannot reach Supabase:5432 → schema push happens in GitHub Actions (triggered by this push; verify Actions run green + system-status flips to schemaApplied:true); (2) user pasted secret keys in chat → recommend rotation (Supabase → Settings → API) and update of GitHub/Vercel secrets afterwards; (3) Vercel deploy needs the user's 5-minute account connect (steps in DEPLOY.md) — name suggestions sasi-app/getsasi if sasi.vercel.app is taken; (4) in-memory rate limiting is per-process (documented; Redis/Upstash upgrade path).
+- Carried: zu/af native proofing, state-route userId migration, dev.log rotation, map glyph tiles, cluster list mobile parity, OpenRouter key rotation, master-prompt §4/§5 structured AI answers.
+- Next-phase priorities: (1) confirm Actions sync + live Supabase verification; (2) master-prompt §4/§5 structured AI answer sections; (3) §7 journeys view; (4) §8 My SASI persistence upgrade.

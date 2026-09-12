@@ -466,14 +466,6 @@ function ConfidenceSummary({
               {findings.length} finding{findings.length === 1 ? "" : "s"}
             </span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/8">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: meta.width }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="h-full rounded-full bg-white/40"
-            />
-          </div>
           <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
             Highest confidence across AI findings. An inference is not a confirmation.
           </p>

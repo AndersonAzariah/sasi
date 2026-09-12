@@ -153,11 +153,11 @@ export const PRIORITY_META: Record<
 
 export const CONFIDENCE_META: Record<
   Confidence,
-  { label: string; text: string; width: string }
+  { label: string; text: string; dot: string }
 > = {
-  HIGH: { label: "High", text: "text-[#8ee09a]", width: "82%" },
-  MEDIUM: { label: "Medium", text: "text-[#efe0a8]", width: "55%" },
-  LOW: { label: "Low", text: "text-[#d4d4d8]", width: "28%" },
+  HIGH: { label: "High", text: "text-[#8ee09a]", dot: "bg-[#8ee09a]" },
+  MEDIUM: { label: "Medium", text: "text-[#efe0a8]", dot: "bg-[#e3c567]" },
+  LOW: { label: "Low", text: "text-[#d4d4d8]", dot: "bg-zinc-400" },
 };
 
 export const AI_STATE_META: Record<

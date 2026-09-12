@@ -593,19 +593,6 @@ export default function CaseDetailView() {
                         {progress}%
                       </span>
                     </div>
-                    <div
-                      className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/8"
-                      role="progressbar"
-                      aria-valuenow={progress}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label={t("cd.progress-aria")}
-                    >
-                      <div
-                        className="h-full rounded-full bg-white/70 transition-all duration-500"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
                     <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
                       {t(PROGRESS_HINT_KEY[c.status])}
                     </p>

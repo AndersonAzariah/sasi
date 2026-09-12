@@ -87,6 +87,52 @@ const NAV: { id: SectionId; label: string; icon: typeof User }[] = [
 
 const TEXT_SIZES = [14, 15, 16, 17, 18];
 
+/* shape returned by GET /api/sasi/system-status */
+interface SystemStatus {
+  database: { provider: string; ok: boolean };
+  supabase: {
+    configured: boolean;
+    restReachable: boolean;
+    schemaApplied: boolean | null;
+    anonLocked: boolean | null;
+  };
+}
+
+/** honest one-line description of the live database status */
+function dbStatusLine(s: SystemStatus | null): { state: string; tone: "good" | "warn" | "muted" } {
+  if (!s) {
+    return { state: "Checking database status…", tone: "muted" };
+  }
+  if (!s.database.ok) {
+    return { state: "Primary database is not responding — data may be unavailable", tone: "warn" };
+  }
+  const sb = s.supabase;
+  if (!sb.configured) {
+    return {
+      state: `Running on ${s.database.provider === "sqlite" ? "the local SQLite database" : "PostgreSQL"} (Supabase not configured on this deployment)`,
+      tone: "muted",
+    };
+  }
+  if (!sb.restReachable) {
+    return { state: "Supabase cloud database is unreachable right now", tone: "warn" };
+  }
+  if (s.database.provider === "postgres") {
+    return sb.schemaApplied
+      ? { state: "Supabase PostgreSQL — connected and answering queries", tone: "good" }
+      : { state: "Supabase PostgreSQL is reachable but the schema has not been applied yet", tone: "warn" };
+  }
+  if (sb.schemaApplied === false) {
+    return { state: "Local dev database · Supabase reachable · schema not applied yet (run the supabase-db sync)", tone: "warn" };
+  }
+  const locked =
+    sb.anonLocked === true
+      ? "browser access locked"
+      : sb.anonLocked === false
+        ? "browser access NOT locked — hardening pending"
+        : "browser access unknown";
+  return { state: `Local dev database · Supabase reachable · ${locked}`, tone: sb.anonLocked === false ? "warn" : "muted" };
+}
+
 /* ============================================================
    App & offline — live status of the installable offline shell.
    Reads the PWA runtime store (pwa-store.ts) so the section is
@@ -341,6 +387,23 @@ function AppOfflineSection() {
     );
   });
 
+  /* live database status — real probes, no fake "connected" states */
+  const [dbStatus, setDbStatus] = useState<SystemStatus | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/sasi/system-status", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d) setDbStatus(d as SystemStatus);
+      })
+      .catch(() => {
+        /* endpoint unreachable — the row stays honest ("unavailable") */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     void refreshDeviceSnapshot();
   }, [refreshDeviceSnapshot]);
@@ -421,6 +484,12 @@ function AppOfflineSection() {
             label="Offline copy (service worker)"
             state={swState}
             tone={swReady ? "good" : swPhase === "failed" || swPhase === "unsupported" ? "muted" : "warn"}
+          />
+          <StatusRow
+            icon={Database}
+            label="Cloud database (Supabase)"
+            state={dbStatusLine(dbStatus).state}
+            tone={dbStatusLine(dbStatus).tone}
           />
           {installable && !installed && (
             <StatusRow

@@ -1336,17 +1336,6 @@ export default function ReportView() {
               );
             })}
           </div>
-          <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-white transition-all duration-300"
-              style={{ width: `${((step + 1) / STEP_KEYS.length) * 100}%` }}
-              role="progressbar"
-              aria-valuenow={step + 1}
-              aria-valuemin={1}
-              aria-valuemax={STEP_KEYS.length}
-              aria-label={t("rp.completion-aria")}
-            />
-          </div>
         </nav>
 
         {/* step body */}

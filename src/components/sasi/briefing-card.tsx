@@ -73,14 +73,6 @@ const RISK_META: Record<
   },
 };
 
-/* gradient stops per risk for the meter bar fill */
-const RISK_METER_FILL: Record<BriefingRisk, string> = {
-  CALM: "linear-gradient(90deg, rgba(102,187,106,0.25), rgba(102,187,106,0.9))",
-  ELEVATED: "linear-gradient(90deg, rgba(227,197,103,0.2), rgba(227,197,103,0.9))",
-  STRAINED: "linear-gradient(90deg, rgba(227,197,103,0.2), rgba(255,167,38,0.95))",
-  CRITICAL: "linear-gradient(90deg, rgba(255,167,38,0.25), rgba(239,83,80,0.95))",
-};
-
 /* ---------- one briefing body, reused for today + past views ---------- */
 
 function BriefingBody({
@@ -354,19 +346,7 @@ export function CityBriefingCard() {
         </div>
       </div>
 
-      {/* ---------- risk meter (quiet gauge under the header) ---------- */}
-      {shown && risk && !busy && (
-        <div
-          className="sasi-risk-track mt-3 h-[3px] w-full overflow-hidden rounded-full"
-          role="img"
-          aria-label={`Situation level: ${risk.label}`}
-        >
-          <div
-            className="h-full rounded-full transition-[width] duration-700 ease-out"
-            style={{ width: `${risk.meter}%`, background: RISK_METER_FILL[shown.risk] }}
-          />
-        </div>
-      )}
+      {/* ---------- risk level is text + colour only (no meter bars) ---------- */}
 
       {/* ---------- busy: honest national thinking lights (no skeleton bars) ---------- */}
       {busy && !shown && (

@@ -1,0 +1,55 @@
+name: Supabase database sync
+
+# Applies the SASI schema to Supabase PostgreSQL and re-applies the
+# RLS/grant hardening. GitHub-hosted runners can reach Supabase on
+# port 5432 (this is the ONLY place with database credentials, and
+# they live in encrypted repo secrets — never in the repo).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "prisma/schema.prisma"
+      - "supabase/**"
+      - "scripts/gen-pg-schema.mjs"
+      - "scripts/ensure-golden-path.mjs"
+      - ".github/workflows/supabase-db.yml"
+
+concurrency:
+  group: supabase-db
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Derive PostgreSQL schema
+        run: bun scripts/gen-pg-schema.mjs
+
+      - name: Apply schema (prisma db push)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DIRECT_DATABASE_URL }}
+        run: bunx prisma db push --schema prisma/schema.postgres.prisma --accept-data-loss
+
+      - name: Apply RLS / grant hardening
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DIRECT_DATABASE_URL }}
+        run: bunx prisma db execute --schema prisma/schema.postgres.prisma --file supabase/rls-hardening.sql
+
+      - name: Seed QA account (idempotent)
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DIRECT_DATABASE_URL }}
+        run: bun scripts/ensure-golden-path.mjs
+
+      - name: Summary
+        run: echo "SASI schema synced to Supabase PostgreSQL and hardened (RLS deny-by-default, anon/authenticated revoked)."

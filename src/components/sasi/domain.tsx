@@ -44,7 +44,7 @@ import {
   ServiceIcon,
   SERVICE_TINT,
   StatusBadge,
-  ConfidenceBar,
+  ConfidenceChip,
 } from "./primitives";
 
 /* ============================================================
@@ -260,7 +260,7 @@ export function FindingCard({ finding }: { finding: Finding }) {
         {finding.summary}
       </p>
       <div className="mt-3">
-        <ConfidenceBar confidence={finding.confidence} />
+        <ConfidenceChip confidence={finding.confidence} />
       </div>
       <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-2.5 text-[11px] text-zinc-500">
         <span>{finding.sourcesCount} sources</span>

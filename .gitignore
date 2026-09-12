@@ -59,6 +59,7 @@ server.log
 /upload
 /tool-results
 .env.*
+!.env.example
 
 # runtime artifacts (recreated on every dev start)
 .zscripts/dev.pid

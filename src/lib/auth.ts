@@ -3,6 +3,7 @@ import { getServerSession, type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 import { db } from "@/lib/db";
+import { rateLimit } from "@/lib/sasi/api-auth";
 
 /* ============================================================
    SASI — authentication (NextAuth v4, credentials + JWT sessions)
@@ -57,6 +58,14 @@ export const authOptions: NextAuthOptions = {
         if (!email || !password || email.length > 254 || password.length > 128) {
           return null;
         }
+
+        /* Brute-force throttle: max 10 attempts per email per 5 minutes
+           (in-memory, per server process — honest scope). Throttled
+           attempts fail with the same generic outcome as a wrong
+           password, so the throttle is invisible to legitimate users
+           and unhelpful to attackers. */
+        const attempt = rateLimit(`login:${email}`, 10, 5 * 60_000);
+        if (!attempt.ok) return null;
 
         const user = await db.user.findUnique({ where: { email } });
 

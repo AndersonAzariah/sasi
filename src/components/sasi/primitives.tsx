@@ -147,7 +147,9 @@ export function PriorityBadge({
   );
 }
 
-export function ConfidenceBar({
+/* Text-only confidence indicator — SASI carries no progress or
+   loading bars anywhere; confidence is a labelled chip, never a meter. */
+export function ConfidenceChip({
   confidence,
   className,
 }: {
@@ -156,18 +158,17 @@ export function ConfidenceBar({
 }) {
   const meta = CONFIDENCE_META[confidence];
   return (
-    <div className={cn("space-y-1", className)}>
-      <div className="flex items-center justify-between text-[11px]">
-        <span className="text-zinc-500">Confidence</span>
-        <span className={cn("font-medium", meta.text)}>{meta.label}</span>
-      </div>
-      <div className="h-1 w-full overflow-hidden rounded-full bg-white/8">
-        <div
-          className="h-full rounded-full bg-white/40"
-          style={{ width: meta.width }}
-        />
-      </div>
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium",
+        meta.text,
+        className
+      )}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} aria-hidden />
+      <span className="text-zinc-500">Confidence</span>
+      {meta.label}
+    </span>
   );
 }
 

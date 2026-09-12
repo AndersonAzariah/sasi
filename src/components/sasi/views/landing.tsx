@@ -29,7 +29,7 @@ import { SERVICES } from "@/lib/sasi/utils";
 import type { TrustStatus } from "@/lib/sasi/types";
 import {
   CaseStatusBadge,
-  ConfidenceBar,
+  ConfidenceChip,
   SERVICE_TINT,
   ServiceIcon,
   StatusBadge,
@@ -669,7 +669,7 @@ export default function LandingView() {
                   confidence level you can weigh yourself.
                 </p>
                 <div className="mt-4">
-                  <ConfidenceBar confidence="HIGH" />
+                  <ConfidenceChip confidence="HIGH" />
                 </div>
               </div>
 

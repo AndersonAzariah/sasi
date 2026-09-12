@@ -1,0 +1,35 @@
+name: CI
+
+# Quality gate on every push/PR: lint + typecheck.
+# The Supabase schema sync runs separately (supabase-db.yml).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: file:./db/ci.db
+        run: bun run db:generate
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        env:
+          DATABASE_URL: file:./db/ci.db
+        run: bunx tsc --noEmit

@@ -210,28 +210,23 @@ export default function SignupView() {
                   </div>
                 </AuthGlowField>
 
-                {/* strength meter — local estimate, honestly labelled */}
+                {/* strength indicator — text and colour only, no meter bars */}
                 {password.length > 0 && (
                   <div
                     className="mt-2.5"
                     role="status"
                     aria-label={`Password strength: ${STRENGTH_LABELS[score]}`}
                   >
-                    <div className="flex items-center gap-1.5" aria-hidden>
-                      {[0, 1, 2, 3].map((i) => (
-                        <span
-                          key={i}
-                          className="h-1 flex-1 rounded-full transition-colors duration-300"
-                          style={{
-                            background:
-                              i < score
-                                ? STRENGTH_COLORS[Math.min(score - 1, 3)]
-                                : "rgba(255,255,255,0.08)",
-                          }}
-                        />
-                      ))}
-                      <span className="ml-1.5 w-[4.5rem] text-right text-[10.5px] font-medium uppercase tracking-[0.14em] text-zinc-500">
-                        {STRENGTH_LABELS[score]}
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-300"
+                        style={{
+                          background: STRENGTH_COLORS[Math.min(score - 1, 3)],
+                        }}
+                        aria-hidden
+                      />
+                      <span className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+                        Strength: {STRENGTH_LABELS[score]}
                       </span>
                     </div>
                   </div>
