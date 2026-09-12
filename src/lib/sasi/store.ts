@@ -424,6 +424,8 @@ const ALL_VIEWS: readonly View[] = [
   "terms",
   "gov",
   "emergency",
+  "get-app",
+  "verify",
   "login",
   "signup",
   "dashboard",
@@ -476,6 +478,8 @@ const PUBLIC_VIEWS: ReadonlySet<string> = new Set<View>([
   "privacy",
   "terms",
   "emergency",
+  "get-app",
+  "verify",
   "login",
   "signup",
 ]);
@@ -1011,6 +1015,31 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       toast("Restored from this device", {
         description: "You're offline — SASI is showing your saved cases, chat and alerts from the on-device copy.",
       });
+    }
+
+    /* ---------- standalone boot: the installed app IS the dashboard ----------
+       When SASI runs as an installed app (standalone display mode, including
+       iOS navigator.standalone) and the launch carried no explicit view, it
+       boots straight into the product: signed in → dashboard; signed out →
+       the sign in / create account prompt, then straight to the dashboard
+       after auth. The browser-tab experience keeps the full landing page. */
+    try {
+      const launchWanted = new URLSearchParams(window.location.search).get("view");
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      if (!launchWanted && standalone) {
+        applyingPop = true;
+        get().navigate(get().authed ? "dashboard" : "login");
+        applyingPop = false;
+        window.history.replaceState(
+          { sasi: true },
+          "",
+          sasiUrlFor(get().view, get().param)
+        );
+      }
+    } catch {
+      /* standalone detection unavailable — the browser flow continues */
     }
 
     /* ---------- deep link: /?view=report (PWA manifest shortcuts) ----------

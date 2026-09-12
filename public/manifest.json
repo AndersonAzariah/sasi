@@ -1,5 +1,5 @@
 {
-  "name": "SASI — South African Service Intelligence",
+  "name": "SASI \u2014 South African Service Intelligence",
   "short_name": "SASI",
   "description": "Independent service intelligence: understand what is happening, build the evidence, take the next step. Nothing is submitted without your approval.",
   "id": "/",
@@ -13,9 +13,21 @@
   },
   "shortcuts": [
     {
+      "name": "Get the SASI app",
+      "short_name": "Get the app",
+      "description": "Install SASI on this device \u2014 full screen, offline-ready.",
+      "url": "/?view=get-app",
+      "icons": [
+        {
+          "src": "/sasi-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
       "name": "Report an issue",
       "short_name": "Report",
-      "description": "Tell SASI what is happening — water, electricity, roads, sanitation.",
+      "description": "Tell SASI what is happening \u2014 water, electricity, roads, sanitation.",
       "url": "/?view=report",
       "icons": [
         {

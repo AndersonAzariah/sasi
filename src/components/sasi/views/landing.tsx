@@ -22,6 +22,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { POPULAR_SERVICES } from "@/lib/sasi/data";
+import { classifyIntent } from "@/lib/sasi/intent";
 import { useSasiStore } from "@/lib/sasi/store";
 import { useT } from "@/lib/sasi/i18n";
 import { SERVICES } from "@/lib/sasi/utils";
@@ -140,6 +141,25 @@ export default function LandingView() {
     const text = q.trim();
     if (!text) {
       inputRef.current?.focus();
+      return;
+    }
+    /* Task 26 — universal intent routing (master prompt §2/§3): the hero
+       input understands what the resident is trying to do. Confident,
+       transparent rule matches route straight to the right surface; the
+       toast says WHY and Ask SASI remains the honest fallback. */
+    const match = classifyIntent(text);
+    if (match.confident && match.view !== "ask-sasi") {
+      if (match.view === "report" && match.param) {
+        useSasiStore.getState().setReportDraft({ service: match.param });
+      }
+      toast(match.routeLabel, {
+        description: `SASI matched: ${match.signals.join(" · ")}. Ask SASI instead if that isn't what you meant.`,
+      });
+      if (match.view === "service-detail" && match.param) {
+        useSasiStore.getState().openService(match.param);
+        return;
+      }
+      navigate(match.view);
       return;
     }
     setPendingAsk(text);
@@ -344,6 +364,40 @@ export default function LandingView() {
                     style={{ background: "linear-gradient(90deg, #64b5f6, #e3c567)" }}
                   />
                   {t(prompt)}
+                </button>
+              ))}
+            </div>
+            {/* Task 26 — the five SASI actions (master prompt §1): one row,
+                every chip does something real. ASK focuses the composer;
+                the others route to the surface that owns that action. */}
+            <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="SASI actions">
+              {(
+                [
+                  { key: "ASK", label: "Ask SASI", act: "ask" },
+                  { key: "FIND", label: "Find a service", act: "find" },
+                  { key: "EXPLAIN", label: "Explain a document", act: "explain" },
+                  { key: "GUIDE", label: "Guided journeys", act: "guide" },
+                  { key: "VERIFY", label: "Verify info", act: "verify" },
+                ] as const
+              ).map(({ key, label, act }) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    if (act === "ask") {
+                      inputRef.current?.focus();
+                    } else if (act === "explain") {
+                      setAskDraft((d) => (d ? d : "Explain this government letter or document: "));
+                      inputRef.current?.focus();
+                    } else if (act === "verify") {
+                      navigate("verify");
+                    } else {
+                      navigate("services");
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-zinc-500 transition-colors hover:border-white/15 hover:text-zinc-200"
+                >
+                  {key}
+                  <span className="font-medium normal-case tracking-normal text-zinc-600">{label}</span>
                 </button>
               ))}
             </div>

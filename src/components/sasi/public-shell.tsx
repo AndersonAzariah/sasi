@@ -15,6 +15,7 @@ const NAV: { view: View; label: string }[] = [
   { view: "about", label: "landing.nav.about" },
   { view: "gov", label: "landing.nav.gov" },
   { view: "security", label: "landing.nav.security" },
+  { view: "get-app", label: "Get the app" },
 ];
 
 export function PublicShell({ children }: { children: React.ReactNode }) {
@@ -198,6 +199,11 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                   Get started
                 </p>
                 <ul className="space-y-2 text-[13px] text-zinc-500">
+                  <li>
+                    <button onClick={() => navigate("get-app")} className="transition hover:text-zinc-200">
+                      Get the app
+                    </button>
+                  </li>
                   <li>
                     <button onClick={() => navigate("report")} className="transition hover:text-zinc-200">
                       Report an issue

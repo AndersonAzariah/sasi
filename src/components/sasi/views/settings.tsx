@@ -326,6 +326,7 @@ function AppOfflineSection() {
   const installed = usePwaStore((s) => s.installed);
   const updateReady = usePwaStore((s) => s.updateReady);
 
+  const navigate = useSasiStore((s) => s.navigate);
   /* on-device snapshot (IndexedDB) — counts + freshness for the card below */
   const deviceSnapshot = useSasiStore((s) => s.deviceSnapshot);
   const restoredOffline = useSasiStore((s) => s.restoredOffline);
@@ -435,6 +436,14 @@ function AppOfflineSection() {
               }
             />
           )}
+          <p className="pt-1 text-right">
+            <button
+              onClick={() => navigate("get-app")}
+              className="text-[12px] text-zinc-500 underline decoration-white/20 underline-offset-4 transition hover:text-white"
+            >
+              Open the full install page — shareable with anyone
+            </button>
+          </p>
           {updateReady && (
             <StatusRow
               icon={RefreshCw}

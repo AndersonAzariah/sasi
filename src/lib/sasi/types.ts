@@ -334,6 +334,8 @@ export type View =
   | "terms"
   | "gov"
   | "emergency"
+  | "get-app"
+  | "verify"
   | "login"
   | "signup"
   | "dashboard"

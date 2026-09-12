@@ -13,7 +13,9 @@ import {
   Search,
   Settings,
   Siren,
+  Smartphone,
   Sparkles,
+  ShieldCheck,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -172,7 +174,9 @@ export function CommandPalette() {
       { view: "activity" as const, label: "Activity", icon: Zap },
       { view: "notifications" as const, label: "Notifications", icon: Bell },
       { view: "gov" as const, label: "Government", icon: Landmark },
+      { view: "verify" as const, label: "Verify information", icon: ShieldCheck },
       { view: "emergency" as const, label: "Emergency contacts", icon: Siren },
+      { view: "get-app" as const, label: "Get the SASI app", icon: Smartphone },
       { view: "settings" as const, label: "Settings", icon: Settings },
     ];
     navItems.forEach((n) => {

@@ -23,6 +23,7 @@ import {
   Map,
   PanelLeftClose,
   PanelLeftOpen,
+  ScanSearch,
   Search,
   Settings,
   Siren,
@@ -79,6 +80,7 @@ const NAV_SECTIONS: {
     label: "nav.system",
     items: [
       { view: "notifications", label: "nav.notifications", icon: Bell },
+      { view: "verify", label: "Verify information", icon: ScanSearch },
       { view: "emergency", label: "nav.emergency", icon: Siren },
       { view: "settings", label: "nav.settings", icon: Settings },
     ],
