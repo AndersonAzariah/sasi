@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import {
   Activity,
   Bell,
+  BellOff,
   Bot,
   ChevronDown,
   CircleUser,
@@ -647,16 +648,29 @@ function Topbar() {
                   </button>
                 </div>
                 <div className="sasi-scroll max-h-[380px] divide-y divide-white/[0.04] overflow-y-auto">
-                  {notifications.slice(0, 6).map((n) => (
-                    <NotificationRow
-                      key={n.id}
-                      n={n}
-                      onOpen={() => {
-                        setNtfOpen(false);
-                        navigate("notifications");
-                      }}
-                    />
-                  ))}
+                  {notifications.length === 0 ? (
+                    /* honest empty state — SASI never fabricates alerts */
+                    <div className="flex flex-col items-center gap-1.5 px-4 py-8 text-center">
+                      <BellOff className="h-4 w-4 text-zinc-600" aria-hidden />
+                      <p className="text-[12.5px] font-medium text-zinc-400">
+                        {t("ntf.empty.title")}
+                      </p>
+                      <p className="max-w-[260px] text-[11.5px] leading-relaxed text-zinc-600">
+                        {t("ntf.empty.description")}
+                      </p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 6).map((n) => (
+                      <NotificationRow
+                        key={n.id}
+                        n={n}
+                        onOpen={() => {
+                          setNtfOpen(false);
+                          navigate("notifications");
+                        }}
+                      />
+                    ))
+                  )}
                 </div>
                 <button
                   onClick={() => {

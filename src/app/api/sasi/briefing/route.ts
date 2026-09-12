@@ -99,7 +99,7 @@ function compactContext(
         .join(", ") || "not set"
     }, South Africa.`,
     "",
-    `The resident's own SASI cases (the ONLY material you may use — exactly ${allowedRefs.size} case(s), listed verbatim):`,
+    `The resident's own SASI cases (the ONLY material you may use — EXACTLY ${allowedRefs.size} case(s), listed verbatim; nothing else about them exists):`,
     cases,
     "",
     `Service directory keys (for naming services only, not facts): ${services}.`,
@@ -123,9 +123,12 @@ Reply with STRICT JSON only (no markdown fences, no prose):
 RULES
 - 1-4 sections, ordered by relevance to THIS resident.
 - GROUNDING IS ABSOLUTE: every factual statement must be traceable to a line in the material (a case status, a case title, a proposed-action state). Do NOT invent amounts, account numbers, dates, schedules, announcements, statistics, other residents' problems, other cases, or city-wide conditions. If the material only says "[INVESTIGATING] (water) \\"No water since yesterday evening\\"", say exactly that and no more.
-- The material lists EVERY case that exists — there are no other cases. NEVER mention or cite any case ref that is not in the material, not even a plausible-looking one.
+- The material lists EVERY case that exists — there are no other cases. NEVER mention or cite any case ref that is not in the material, not even a plausible-looking one. If the material has ONE case, never write "two open cases" or mention any second issue or service that no case in the material covers.
 - Never present a city-wide picture: you only know what this resident told SASI.
 - Only reference refs (CASE-xxxxxx) that appear in the material lines. Never cite INC- refs: they do not exist in the material.
+- NEVER state or imply official/authority activity (e.g. "Johannesburg Water is investigating", "the municipality responded", "a technician was dispatched"). SASI is not a government channel and the material never contains such facts.
+- NEVER include a year or full date (e.g. "2023-06-05", "5 June", "since June 2023"): the material contains no dates at all, so any date you write is fabrication. Relative time is only allowed when the case title itself says it (e.g. "since yesterday evening").
+- Every section must be about at least one case from the material and cite that case's ref in refs[].
 - South African civic voice: plain, practical, calm. Never claim SASI contacted any authority.
 - risk: CALM = the resident has nothing open; ELEVATED = the resident has open work; STRAINED = multiple active problems or an approval waiting; CRITICAL = reserve for genuine danger described in the material.
 - watchlist items must be concrete and derived from the material (e.g. "Approval on CASE-000001 is waiting for you", not "stay informed").`;
@@ -168,12 +171,19 @@ function refsIn(text: string): string[] {
   return Array.from(new Set(text.match(REF_RE) ?? []).values());
 }
 
+/** year/date-like pattern — city-mode material contains NO dates, so any
+    match is model fabrication (relative time like "yesterday" is fine) */
+const FABRICATED_DATE_RE = /\b(19|20)\d{2}[-/]\d{1,2}[-/]\d{1,2}\b|\b(19|20)\d{2}\b/;
+
 /** HARD GROUNDING VALIDATION — drop anything citing a ref the resident
     does not actually have. The model must never be trusted blindly:
-    a fabricated CASE-xxxxxx in a briefing is a fabricated result. */
+    a fabricated CASE-xxxxxx in a briefing is a fabricated result.
+    strict (city mode): every section must cite ≥1 real ref and no
+    date-like strings may appear anywhere (the material has none). */
 function enforceGrounding(
   briefing: CityBriefing,
-  allowedRefs: Set<string>
+  allowedRefs: Set<string>,
+  strict = false
 ): CityBriefing | null {
   const known = (ref: string) => allowedRefs.has(ref.toUpperCase());
 
@@ -181,8 +191,10 @@ function enforceGrounding(
 
   const sections = briefing.sections.filter((sec) => {
     const cited = [...sec.refs, ...refsIn(sec.body)];
-    /* a section is only kept if every ref it cites is real */
-    return cited.every(known);
+    /* every cited ref must be real; in strict mode the section must
+       actually be anchored to ≥1 of the resident's real cases */
+    if (!cited.every(known)) return false;
+    return strict ? cited.length > 0 : true;
   });
   if (sections.length === 0) return null;
 
@@ -190,7 +202,16 @@ function enforceGrounding(
     (w) => refsIn(w).every(known)
   );
 
-  return { ...briefing, sections, watchlist };
+  const next = { ...briefing, sections, watchlist };
+
+  if (strict) {
+    if (FABRICATED_DATE_RE.test(next.headline)) return null;
+    if (next.sections.some((s) => FABRICATED_DATE_RE.test(`${s.title} ${s.body}`)))
+      return null;
+    if (next.watchlist.some((w) => FABRICATED_DATE_RE.test(w))) return null;
+  }
+
+  return next;
 }
 
 function extractBriefing(
@@ -321,8 +342,9 @@ export async function POST(req: Request) {
       );
     }
     /* drop anything citing refs the resident does not have — fabrication
-       is rejected, never shown */
-    const briefing = enforceGrounding(extracted, allowedRefs);
+       is rejected, never shown. City mode is strict: sections must be
+       anchored to real cases and dates cannot appear (material has none). */
+    const briefing = enforceGrounding(extracted, allowedRefs, !isChat);
     if (!briefing) {
       return NextResponse.json(
         { error: "SASI's draft cited material you don't have, so it was discarded. Please try again." },

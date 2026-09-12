@@ -59,3 +59,7 @@ server.log
 /upload
 /tool-results
 .env.*
+
+# runtime artifacts (recreated on every dev start)
+.zscripts/dev.pid
+.zscripts/dev.log

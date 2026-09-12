@@ -278,6 +278,11 @@ function mergeNotifications(current: AppNotification[], incoming: AppNotificatio
   const byId = new globalThis.Map<string, AppNotification>();
   for (const n of current) byId.set(n.id, n);
   for (const n of incoming) {
+    /* FAKE-NOTIFICATION GATE: only live notifications (raised by real
+       events on the resident's own data) may enter state. Legacy demo
+       seed notifications persisted on devices before the purge carry no
+       live flag — this gate keeps them out on every hydrate, forever. */
+    if (!n.live) continue;
     const existing = byId.get(n.id);
     /* read-state OR-ed so a read stays read across rehydrates */
     byId.set(n.id, existing ? { ...n, read: existing.read || n.read } : n);
@@ -963,6 +968,11 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     } catch {
       /* snapshot unavailable — demo continues from memory */
     }
+    /* FAKE-NOTIFICATION PURGE: the merge gate above drops legacy demo
+       seeds from state — mirror the cleaned list back over the device
+       snapshot so the fakes are physically removed from IndexedDB too
+       (settings device counts and offline restores stay honest). */
+    mirrorNotifications(get().notifications);
     void get().refreshDeviceSnapshot();
 
     const offline = typeof navigator !== "undefined" && !navigator.onLine;
@@ -991,6 +1001,10 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     /* No demo service alerts on hydrate: notifications exist only for
        real events on the resident's own data. Incidents are no longer
        simulated, so there is nothing to digest at startup. */
+
+    /* re-mirror after the server merge too — the device snapshot must
+       always end up identical to the final live-only notification list */
+    mirrorNotifications(get().notifications);
 
     /* an offline restore is worth one honest, quiet announcement */
     if (get().restoredOffline) {
