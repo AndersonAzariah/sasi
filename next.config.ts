@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  images: {
+    /* allow the auth hero photograph's tuned quality tiers (88 blur-up
+       source plate, 80 banner) without dev warnings */
+    qualities: [70, 75, 80, 88],
+  },
   async headers() {
     return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },

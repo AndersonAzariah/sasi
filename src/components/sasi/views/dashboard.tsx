@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { Bell, ChevronRight, Inbox, NotebookPen, Sparkles } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
 import { useT } from "@/lib/sasi/i18n";
-import { DEMO_USER } from "@/lib/sasi/data";
 import { timeAgo } from "@/lib/sasi/utils";
 import type { SasiCase } from "@/lib/sasi/types";
 import { cn } from "@/lib/utils";
@@ -133,7 +132,7 @@ export default function DashboardView() {
       {/* ---------- greeting + the two primary actions ---------- */}
       <header>
         <h1 className="sasi-serif text-[24px] tracking-tight text-white sm:text-[27px]">
-          {t(greetingKeyForNow())}, {accountName?.trim() ? accountName.trim() : DEMO_USER.firstName}.
+          {t(greetingKeyForNow())}, {accountName?.trim() ? accountName.trim() : "You"}.
         </h1>
         <p className="mt-1.5 text-[13.5px] text-zinc-500">{statusLine(cases)}</p>
         <div className="mt-6 flex flex-wrap items-center gap-2.5">

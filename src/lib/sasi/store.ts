@@ -287,39 +287,6 @@ function mergeNotifications(current: AppNotification[], incoming: AppNotificatio
     .slice(0, 30);
 }
 
-/* ------------------------------------------------------------------
-   Seed-notification read memory. Demo seed notifications are static,
-   so their read state lives in localStorage (`sasi.ntfRead`) — this
-   makes "mark all read" sticky across reloads for the baseline items,
-   while live notifications persist read state in SQLite.
-   ------------------------------------------------------------------ */
-function getSeedReadIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = window.localStorage.getItem("sasi.ntfRead");
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function rememberSeedRead(ids: string[]) {
-  if (typeof window === "undefined") return;
-  try {
-    const set = getSeedReadIds();
-    for (const id of ids) set.add(id);
-    window.localStorage.setItem("sasi.ntfRead", JSON.stringify(Array.from(set)));
-  } catch {
-    /* storage blocked — read state stays session-only */
-  }
-}
-
-function applySeedReads(items: AppNotification[]): AppNotification[] {
-  const read = getSeedReadIds();
-  if (read.size === 0) return items;
-  return items.map((n) => (read.has(n.id) ? { ...n, read: true } : n));
-}
-
 /** merge a briefing into the history (newest first, deduped, capped) */
 function pushBriefingHistory(history: CityBriefing[], b: CityBriefing): CityBriefing[] {
   const next = [b, ...history.filter((h) => h.generatedAt !== b.generatedAt)];
@@ -385,7 +352,7 @@ function mergeRemote(
     savedLocation: remote.location ?? s.savedLocation,
     briefingHistory: history,
     ...(liveBriefing && !s.briefing ? { briefing: liveBriefing } : {}),
-    notifications: mergeNotifications(applySeedReads(s.notifications), remote.notifications ?? []),
+    notifications: mergeNotifications(s.notifications, remote.notifications ?? []),
   };
 }
 
@@ -751,18 +718,13 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     }));
     const n = get().notifications.find((x) => x.id === id);
     if (n?.live) persistNotificationRead({ notificationId: id });
-    else rememberSeedRead([id]);
     mirrorNotifications(get().notifications);
   },
   markAllNotificationsRead: () => {
-    const seedIds = get()
-      .notifications.filter((n) => !n.live && !n.read)
-      .map((n) => n.id);
     set((s) => ({
       notifications: s.notifications.map((n) => ({ ...n, read: true })),
     }));
     persistNotificationRead({ all: true });
-    if (seedIds.length) rememberSeedRead(seedIds);
     mirrorNotifications(get().notifications);
   },
   /* ---------- notification preferences ---------- */
@@ -1059,7 +1021,6 @@ export const useSasiStore = create<SasiState>((set, get) => ({
       updatedAt: nowIso,
       aiState: "IDLE",
       impact: draft.impact,
-      isDemo: true,
       events: [
         {
           id: `ev-${eventCounter++}`,
@@ -1301,6 +1262,19 @@ export const useSasiStore = create<SasiState>((set, get) => ({
             .slice(-10)
             .map((m) => ({ role: m.role, content: m.content })),
           location: get().savedLocation,
+          /* the resident's LIVE cases — Ask SASI grounds its answers in
+             real data only (no demo dataset exists anywhere) */
+          cases: get()
+            .cases
+            .slice(0, 12)
+            .map((c) => ({
+              ref: c.ref,
+              title: c.title,
+              status: c.status,
+              service: c.service,
+              city: c.location?.city,
+              aiState: c.aiState,
+            })),
           sessionId: getSessionId(),
           stream: true,
         }),

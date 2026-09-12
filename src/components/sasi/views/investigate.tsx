@@ -31,7 +31,6 @@ import { CONFIDENCE_META, locationLabel, timeAgo } from "@/lib/sasi/utils";
 import {
   AIStateChip,
   CaseStatusBadge,
-  DemoBadge,
   EmptyState,
   GhostButton,
   PrimaryButton,
@@ -190,7 +189,6 @@ const SCRIPT: ScriptStep[] = [
           nextStep:
             "Review the prepared service report and approve submission to the utility.",
           createdAt: new Date().toISOString(),
-          isDemo: true,
         });
       }
     },
@@ -953,7 +951,6 @@ export default function InvestigateView() {
           <div className="flex flex-wrap items-center gap-1.5">
             <CaseStatusBadge status={c.status} />
             <PriorityBadge priority={c.priority} />
-            <DemoBadge label="DEMO" />
           </div>
           <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-3">
             <div className="flex items-center gap-2">{runControls}</div>
@@ -1007,7 +1004,6 @@ export default function InvestigateView() {
               <p className="font-mono text-[11px] tracking-[0.14em] text-zinc-500">
                 {c.ref}
               </p>
-              <DemoBadge label="DEMO" />
             </div>
             <div>
               <div className="flex items-start gap-2.5">
@@ -1063,7 +1059,6 @@ export default function InvestigateView() {
             <SectionLabel>Investigation timeline</SectionLabel>
             <div className="flex items-center gap-2">
               {runControls}
-              <DemoBadge label="DEMO" />
             </div>
           </div>
           <div className="mt-4">{timelineBlock}</div>

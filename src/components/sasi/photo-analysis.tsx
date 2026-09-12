@@ -128,7 +128,6 @@ export function PhotoAnalysisPanel({ item }: { item: EvidenceItem }) {
       location: item.location,
       caseId: item.caseId,
       verification: "INFERRED",
-      isDemo: true,
     });
     toast.success("Analysis filed as evidence", {
       description: "A note is now in your Evidence Vault — labelled AI-inferred, not proof.",

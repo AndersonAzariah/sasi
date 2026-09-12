@@ -27,7 +27,6 @@ import { POPULAR_SERVICES, SERVICE_REPORT_OPTIONS } from "@/lib/sasi/data";
 import { SERVICES, formatDate } from "@/lib/sasi/utils";
 import type { EvidenceAnalysis, ServiceKey } from "@/lib/sasi/types";
 import {
-  DemoBadge,
   GhostButton,
   PrimaryButton,
   SectionLabel,
@@ -498,7 +497,6 @@ export default function ReportView() {
       createdAt: new Date().toISOString(),
       location: location.trim() || undefined,
       verification: "UNVERIFIED",
-      isDemo: true,
     });
     toast.success(t("rp.toast.photo-title"), {
       description: t("rp.toast.photo-desc"),
@@ -1296,7 +1294,6 @@ export default function ReportView() {
               {t("rp.subtitle")}
             </p>
           </div>
-          <DemoBadge label="DEMO" className="mt-1 shrink-0" />
         </header>
 
         {/* stepper */}

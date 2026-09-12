@@ -29,26 +29,6 @@ const NOW = Date.now();
 
 export const DEMO_NOW = new Date(NOW).toISOString();
 
-/** Neutral session identity placeholder — no fabricated persona.
- *  Real account identity is user-generated; until the resident
- *  provides one, the app refers to them plainly as "You".
- *  memberSince anchors to the session start (honest for an
- *  anonymous, browser-local session). */
-export const DEMO_USER = {
-  name: "You",
-  firstName: "You",
-  email: "",
-  memberSince: new Date(NOW).toISOString().slice(0, 10),
-  location: {
-    province: "Gauteng",
-    municipality: "City of Johannesburg",
-    city: "Johannesburg",
-    suburb: "",
-    ward: "",
-  },
-  isDemo: true as const,
-};
-
 /* ---------- SOURCES (user-generated only) ---------- */
 
 /** Public-source records attached to cases. No feed, publisher,

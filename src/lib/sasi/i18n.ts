@@ -1033,11 +1033,6 @@ const DICT: Dict = {
     af: "Nog geen openbare bronne gekoppel nie — verslae van inwoners hou hierdie voorval gemerk.",
   },
   "id.location": { en: "Location", zu: "Indawo", af: "Ligging" },
-  "id.coords": {
-    en: "STYLISED POSITION · DEMO COORDINATES",
-    zu: "INDAWO YE-STAYILI · IZIXHUMANO ZEDEMO",
-    af: "GESTILISEERDE POSISIE · DEMOKOÖRDINATE",
-  },
   "id.actions.title": {
     en: "Related actions",
     zu: "Izenzo ezihlobene",

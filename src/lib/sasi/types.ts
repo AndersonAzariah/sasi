@@ -96,7 +96,6 @@ export interface SasiSource {
   confidence: Confidence;
   url?: string;
   snippet?: string;
-  isDemo: true;
 }
 
 export interface EvidenceItem {
@@ -111,7 +110,6 @@ export interface EvidenceItem {
   /** for PHOTO — key of bundled demo image, rendered as gradient placeholder if absent */
   imageKey?: "burst-pipe" | "dry-tap" | "leak-street" | "reservoir";
   url?: string;
-  isDemo: true;
 }
 
 export interface Finding {
@@ -124,7 +122,6 @@ export interface Finding {
   summary: string;
   nextStep?: string;
   createdAt: string;
-  isDemo: true;
 }
 
 export type TimelineKind =
@@ -176,7 +173,6 @@ export interface SasiCase {
   updatedAt: string;
   aiState: AIState;
   events: TimelineEvent[];
-  isDemo: true;
   proposedAction?: ProposedAction;
   verification?: VerificationState;
   impact?: string;
@@ -195,7 +191,6 @@ export interface Incident {
   updatedAt: string;
   sourceIds: string[];
   affectedArea?: string;
-  isDemo: true;
 }
 
 export type NotificationKind =

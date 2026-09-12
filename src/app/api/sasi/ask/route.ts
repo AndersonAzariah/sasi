@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import ZAI from "z-ai-web-dev-sdk";
 import { db } from "@/lib/db";
-import { CASES, INCIDENTS } from "@/lib/sasi/data";
 import { SERVICES } from "@/lib/sasi/utils";
 import type { ChatRole } from "@/lib/sasi/types";
 
@@ -9,8 +8,9 @@ import type { ChatRole } from "@/lib/sasi/types";
    POST /api/sasi/ask
    Free-text "Ask SASI" assistant. Backend-only — the z-ai SDK
    is never imported from client code. The system prompt injects
-   the user's live demo context (cases, incidents, location) so
-   answers stay grounded in what SASI actually knows.
+   the user's live session context (their REAL cases sent from the
+   client + saved location) so answers stay grounded in what
+   SASI actually knows.
 
    Streaming: when body.stream is true the reply is delivered as
    Server-Sent Events (text/event-stream):
@@ -24,9 +24,20 @@ import type { ChatRole } from "@/lib/sasi/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+interface AskCase {
+  ref?: string;
+  title?: string;
+  status?: string;
+  service?: string;
+  city?: string;
+  aiState?: string;
+}
+
 interface AskBody {
   messages?: { role: ChatRole; content: string }[];
   location?: { province?: string; city?: string; suburb?: string };
+  /** the resident's REAL live cases, sent from the client store */
+  cases?: AskCase[];
   sessionId?: string;
   stream?: boolean;
 }
@@ -43,17 +54,27 @@ function suggestsReport(reply: string): boolean {
   return reportish && actionable;
 }
 
-function compactContext(location: AskBody["location"]): string {
-  const cases = CASES.slice(0, 6)
-    .map(
-      (c) =>
-        `- ${c.ref} [${c.status}] "${c.title}" — ${c.service}, ${c.location.city}${
-          c.proposedAction ? ` (proposed action: ${c.proposedAction.state})` : ""
-        }`
-    )
-    .join("\n");
-  const incidents = INCIDENTS.slice(0, 6)
-    .map((i) => `- ${i.ref} [${i.status}] "${i.title}" — ${i.service}, ${i.location.city}`)
+const str = (v: unknown, cap: number): string =>
+  typeof v === "string" ? v.trim().slice(0, cap) : "";
+
+function compactContext(rawCases: AskCase[], location: AskBody["location"]): string {
+  /* server-sanitized projection of the resident's live cases — no static
+     dataset exists, so the context holds only what the resident created */
+  const cases = (Array.isArray(rawCases) ? rawCases : [])
+    .slice(0, 12)
+    .map((c) => {
+      const ref = str(c?.ref, 16);
+      const title = str(c?.title, 90);
+      if (!ref || !title) return null;
+      const status = str(c?.status, 32) || "UNKNOWN";
+      const service = str(c?.service, 24);
+      const city = str(c?.city, 48);
+      const ai = str(c?.aiState, 32);
+      return `- ${ref} [${status}] "${title}"${service ? ` — ${service}` : ""}${
+        city ? `, ${city}` : ""
+      }${ai ? ` (AI: ${ai})` : ""}`;
+    })
+    .filter((line): line is string => line !== null)
     .join("\n");
   const services = Object.entries(SERVICES)
     .map(([key, s]) => `${key}: ${s.label}`)
@@ -62,11 +83,10 @@ function compactContext(location: AskBody["location"]): string {
   return [
     `User location: ${location?.suburb ?? "Melrose"}, ${location?.city ?? "Johannesburg"}, ${location?.province ?? "Gauteng"}, South Africa.`,
     "",
-    "The user's SASI cases (demo data):",
-    cases,
-    "",
-    "Current incidents SASI is tracking (demo data):",
-    incidents,
+    cases
+      ? "The resident's real SASI cases (live data, created by them — reference only these refs):"
+      : "The resident has not created any cases yet — never invent case references.",
+    cases || "(none yet)",
     "",
     `Service directory keys: ${services}.`,
   ].join("\n");
@@ -85,7 +105,7 @@ INDEPENDENCE AND TRUST RULES (non-negotiable)
 - Never fabricate official confirmations, reference numbers, or outcomes. If you reference the user's cases below, use only the refs and statuses listed. Any claim you cannot verify from the context or general public knowledge should be labelled as something SASI would verify (e.g. "worth confirming with the utility").
 - When a user's message reads like a new service problem, offer to start a structured report ("Report an issue") or an investigation — those flows exist in this app.
 
-USER CONTEXT (demo data — you may reference these refs naturally)
+USER CONTEXT (the resident's real, live data — reference only the refs listed)
 ${context}
 
 If the user asks what you can do: investigate civic problems across official + public sources, correlate with the user's own evidence and photos, draft findings with confidence levels, and prepare an approved-only service report to the relevant authority.`;
@@ -177,7 +197,7 @@ export async function POST(req: Request) {
     const zai = await ZAI.create();
     const payload = {
       messages: [
-        { role: "assistant" as const, content: SYSTEM_PROMPT(compactContext(body.location)) },
+        { role: "assistant" as const, content: SYSTEM_PROMPT(compactContext(body.cases ?? [], body.location)) },
         ...msgs,
       ],
       thinking: { type: "disabled" as const },

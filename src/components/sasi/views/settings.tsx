@@ -36,7 +36,7 @@ import { useSasiStore } from "@/lib/sasi/store";
 import { usePwaStore } from "@/lib/sasi/pwa-store";
 import { readDataSaver, writeDataSaver } from "@/lib/sasi/data-saver";
 import { applyPwaUpdate, promptPwaInstall } from "@/components/sasi/pwa";
-import { DEMO_USER, GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
+import { GAUTENG_MUNICIPALITIES } from "@/lib/sasi/data";
 import { LANGUAGES, PLANNED_LANGUAGES, useT } from "@/lib/sasi/i18n";
 import type { Lang } from "@/lib/sasi/types";
 import { locationLabel, timeAgo } from "@/lib/sasi/utils";
@@ -677,8 +677,28 @@ export default function SettingsView() {
   const setNtfPref = useSasiStore((s) => s.setNtfPref);
   const ntfOnCount = Object.values(ntfPrefs).filter(Boolean).length;
 
+  /* --- real account identity (server session; null when anonymous) --- */
+  const [me, setMe] = useState<{
+    name?: string | null;
+    email?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/sasi/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.user) setMe(d.user);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const accountName = useSasiStore((s) => s.accountName);
+
   /* --- location --- */
-  const [municipality, setMunicipality] = useState(DEMO_USER.location.municipality);
+  const [municipality, setMunicipality] = useState("City of Johannesburg");
   const [city, setCity] = useState(savedLocation.city);
 
   /* --- language (real i18n — see lib/sasi/i18n.ts) --- */
@@ -782,18 +802,18 @@ export default function SettingsView() {
                 <label htmlFor="account-name" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
                   Full name
                 </label>
-                <Input id="account-name" value={DEMO_USER.name} readOnly disabled aria-readonly="true" className="text-[13px]" />
+                <Input id="account-name" value={me?.name?.trim() || accountName?.trim() || "You"} readOnly disabled aria-readonly="true" className="text-[13px]" />
               </div>
               <div>
                 <label htmlFor="account-email" className="mb-1.5 block text-[12px] font-medium text-zinc-400">
                   Email
                 </label>
-                <Input id="account-email" type="email" value={DEMO_USER.email} readOnly disabled aria-readonly="true" className="text-[13px]" />
+                <Input id="account-email" type="email" value={me?.email?.trim() ?? ""} readOnly disabled aria-readonly="true" className="text-[13px]" />
               </div>
             </div>
             <p className="mt-4 flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.02] p-3 text-[12px] text-zinc-400">
               <Info className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
-              Demo account — editing is disabled in demo.
+              Editing account details is coming soon — your name and email come from your signed-in account.
             </p>
           </section>
         )}
@@ -1106,7 +1126,6 @@ export default function SettingsView() {
                   <SectionLabel>AI permissions</SectionLabel>
                   <h2 id="settings-ai" className="mt-1 text-[15px] font-semibold text-white">What SASI may do</h2>
                 </div>
-                <DemoBadge label="DEMO SETTINGS" />
               </div>
 
               <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">

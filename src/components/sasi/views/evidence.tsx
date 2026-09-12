@@ -22,7 +22,6 @@ import type { EvidenceItem, EvidenceType, TrustStatus } from "@/lib/sasi/types";
 import { TRUST_STATUS_META, formatDate } from "@/lib/sasi/utils";
 import { toast } from "@/hooks/use-toast";
 import {
-  DemoBadge,
   EmptyState,
   GhostButton,
   PrimaryButton,
@@ -182,7 +181,6 @@ export default function EvidenceView() {
       location: `${savedLocation.suburb}, ${savedLocation.city}`,
       caseId: addCaseId === "none" ? undefined : addCaseId,
       verification: "USER_PROVIDED" as TrustStatus,
-      isDemo: true,
     };
     addEvidence(item);
     setAddOpen(false);
@@ -211,7 +209,6 @@ export default function EvidenceView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <DemoBadge label="DEMO DATA" />
           <PrimaryButton
             onClick={() => {
               resetAddForm();
@@ -443,7 +440,6 @@ export default function EvidenceView() {
                   <DialogTitle className="text-[15px] font-semibold leading-snug text-white">
                     {preview.title}
                   </DialogTitle>
-                  <DemoBadge label="DEMO" />
                 </div>
                 {preview.description && (
                   <DialogDescription className="text-[12.5px] leading-relaxed text-zinc-400">

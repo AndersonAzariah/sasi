@@ -29,11 +29,17 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSasiStore } from "@/lib/sasi/store";
-import { DEMO_USER } from "@/lib/sasi/data";
 import { useT } from "@/lib/sasi/i18n";
 import type { View } from "@/lib/sasi/types";
 import { SasiLogo } from "./primitives";
 import { NotificationRow } from "./domain";
+
+/* Neutral identity fallback — no fabricated persona: the app says "You"
+   until the real account name is available. */
+function identityInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return `${parts[0]?.[0] ?? "Y"}${parts[1]?.[0] ?? ""}`.toUpperCase();
+}
 
 /* ============================================================
    NAV MODEL — labels are i18n keys (see lib/sasi/i18n.ts)
@@ -379,12 +385,15 @@ function RailToggleButton({
 
 function ProfileButton({ collapsed, active }: { collapsed: boolean; active: boolean }) {
   const navigate = useSasiStore((s) => s.navigate);
+  const accountName = useSasiStore((s) => s.accountName);
+  const savedLocation = useSasiStore((s) => s.savedLocation);
   const { bind, tip } = useRailTip(collapsed);
-  const initials = `${DEMO_USER.firstName[0]}${DEMO_USER.name.split(" ")[1]?.[0] ?? ""}`;
+  const displayName = accountName?.trim() || "You";
+  const initials = identityInitials(displayName);
   return (
     <button
       onClick={() => navigate("profile")}
-      aria-label={collapsed ? `Profile — ${DEMO_USER.name}` : undefined}
+      aria-label={collapsed ? `Profile — ${displayName}` : undefined}
       {...bind}
       className={cn(
         "flex w-full items-center rounded-lg text-left transition-colors",
@@ -398,15 +407,15 @@ function ProfileButton({ collapsed, active }: { collapsed: boolean; active: bool
       {!collapsed && (
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[12.5px] font-medium text-zinc-200">
-            {DEMO_USER.name}
+            {displayName}
           </span>
           <span className="block truncate text-[10.5px] text-zinc-600">
-            {DEMO_USER.location.city}
+            {savedLocation.city}
           </span>
         </span>
       )}
       {!collapsed && <CircleUser className="h-4 w-4 text-zinc-700" aria-hidden />}
-      {collapsed && <RailTip open={tip.open} anchor={tip.rect} label={DEMO_USER.name} />}
+      {collapsed && <RailTip open={tip.open} anchor={tip.rect} label={displayName} />}
     </button>
   );
 }
@@ -450,6 +459,7 @@ function Topbar() {
   const navigate = useSasiStore((s) => s.navigate);
   const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
   const savedLocation = useSasiStore((s) => s.savedLocation);
+  const accountName = useSasiStore((s) => s.accountName);
   const [ntfOpen, setNtfOpen] = useState(false);
   const notifications = useSasiStore((s) => s.notifications);
   const markAll = useSasiStore((s) => s.markAllNotificationsRead);
@@ -564,8 +574,7 @@ function Topbar() {
           className="ml-1 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-[11px] font-semibold text-zinc-300 transition hover:border-white/25 lg:h-8 lg:w-8 lg:text-[10.5px]"
           aria-label="Profile"
         >
-          {DEMO_USER.firstName[0]}
-          {DEMO_USER.name.split(" ")[1]?.[0]}
+          {identityInitials(accountName?.trim() || "You")}
         </button>
       </div>
     </header>

@@ -15,7 +15,6 @@ import { POPULAR_SERVICES } from "@/lib/sasi/data";
 import { SERVICES } from "@/lib/sasi/utils";
 import type { ServiceKey } from "@/lib/sasi/types";
 import {
-  DemoBadge,
   GhostButton,
   PrimaryButton,
   SectionLabel,
@@ -109,7 +108,6 @@ export default function StartInvestigationView() {
             Tell SASI the essentials — it asks only what it needs.
           </p>
         </div>
-        <DemoBadge label="DEMO" className="mt-1 shrink-0" />
       </header>
 
       {/* mode toggle */}

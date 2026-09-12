@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Bell,
@@ -12,11 +12,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useSasiStore } from "@/lib/sasi/store";
-import { DEMO_USER } from "@/lib/sasi/data";
 import { signOut as nextAuthSignOut } from "next-auth/react";
 import { formatDate, initials } from "@/lib/sasi/utils";
 import {
-  DemoBadge,
   GhostButton,
   SectionLabel,
   StatTile,
@@ -42,6 +40,32 @@ export default function ProfileView() {
   const openCase = useSasiStore((s) => s.openCase);
   const navigate = useSasiStore((s) => s.navigate);
   const signOut = useSasiStore((s) => s.signOut);
+  const accountName = useSasiStore((s) => s.accountName);
+
+  /* Real account identity — /api/sasi/me returns the signed-in user's
+     actual name, email and member-since date. Falls back to the neutral
+     "You" label for anonymous sessions. Nothing is fabricated. */
+  const [me, setMe] = useState<{
+    name?: string | null;
+    email?: string | null;
+    createdAt?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/sasi/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.user) setMe(d.user);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const displayName = me?.name?.trim() || accountName?.trim() || "You";
+  const displayEmail = me?.email?.trim() ?? "";
 
   const activeInvestigations = useMemo(
     () => cases.filter((c) => ACTIVE_AI_STATES.has(c.aiState)).length,
@@ -64,19 +88,22 @@ export default function ProfileView() {
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[20px] font-semibold tracking-wide text-white"
             aria-hidden
           >
-            {initials(DEMO_USER.name)}
+            {initials(displayName)}
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 id="profile-heading" className="text-lg font-semibold tracking-tight text-white">
-                {DEMO_USER.name}
+                {displayName}
               </h1>
-              <DemoBadge label="DEMO ACCOUNT" />
             </div>
-            <p className="mt-0.5 truncate text-[13px] text-zinc-400">{DEMO_USER.email}</p>
-            <p className="mt-1 text-[12px] text-zinc-600">
-              Member since {formatDate(DEMO_USER.memberSince)}
-            </p>
+            {displayEmail && (
+              <p className="mt-0.5 truncate text-[13px] text-zinc-400">{displayEmail}</p>
+            )}
+            {me?.createdAt && (
+              <p className="mt-1 text-[12px] text-zinc-600">
+                Member since {formatDate(me.createdAt)}
+              </p>
+            )}
           </div>
           <p className="flex items-center gap-1.5 self-start rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-[12px] text-zinc-300 sm:self-center">
             <MapPin className="h-3.5 w-3.5 shrink-0 text-[#ef5350]" aria-hidden />
@@ -168,8 +195,8 @@ export default function ProfileView() {
             <div>
               <p className="text-[13.5px] font-medium text-white">Sign out of SASI</p>
               <p className="mt-0.5 max-w-md text-[12px] leading-relaxed text-zinc-500">
-                Ends this demo session on this browser. Your cases, evidence and chat
-                history stay saved here and will be waiting when you return.
+                Signs you out of SASI on this browser. Your cases, evidence and chat
+                history stay saved here and will be waiting when you sign back in.
               </p>
             </div>
           </div>
