@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -452,6 +453,96 @@ function AdminButton({
 }
 
 /* ============================================================
+   KEYBOARD NAV (Task 23) — ⌘K palette + "g" prefix jumps + "?"
+   help overlay. Skips while typing in any field.
+   ============================================================ */
+
+const G_KEYS: Record<string, View> = {
+  d: "dashboard",
+  c: "cases",
+  m: "map",
+  i: "investigate",
+  e: "evidence",
+  a: "ask-sasi",
+  n: "notifications",
+  s: "settings",
+  h: "landing",
+  r: "report",
+};
+
+const SHORTCUT_ROWS: { keys: string; action: string }[] = [
+  { keys: "⌘K / Ctrl K", action: "Command palette" },
+  { keys: "G then D", action: "Dashboard" },
+  { keys: "G then C", action: "Cases" },
+  { keys: "G then M", action: "Map" },
+  { keys: "G then I", action: "Investigation workspace" },
+  { keys: "G then E", action: "Evidence vault" },
+  { keys: "G then A", action: "Ask SASI" },
+  { keys: "G then R", action: "File a report" },
+  { keys: "G then N", action: "Notifications" },
+  { keys: "G then S", action: "Settings" },
+  { keys: "G then H", action: "SASI home" },
+  { keys: "?", action: "This shortcut sheet" },
+  { keys: "Esc", action: "Close panels and overlays" },
+];
+
+function isTypingTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  return (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.tagName === "SELECT" ||
+    el.isContentEditable
+  );
+}
+
+function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
+      onClick={onClose}
+    >
+      <div
+        className="sasi-card sasi-pop w-full max-w-md overflow-hidden bg-[#0b0b0c] shadow-2xl shadow-black/70"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-white/6 px-5 py-3.5">
+          <p className="text-[13px] font-semibold tracking-wide text-white">
+            KEYBOARD SHORTCUTS
+          </p>
+          <button
+            onClick={onClose}
+            aria-label="Close shortcuts"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.05] hover:text-white"
+          >
+            <PanelLeftClose className="h-4 w-4 rotate-90" aria-hidden />
+          </button>
+        </div>
+        <div className="sasi-scroll max-h-[60vh] overflow-y-auto px-5 py-3">
+          {SHORTCUT_ROWS.map((row) => (
+            <div
+              key={row.keys}
+              className="flex items-center justify-between gap-4 border-b border-white/[0.04] py-2 last:border-0"
+            >
+              <span className="text-[12.5px] text-zinc-300">{row.action}</span>
+              <kbd className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10.5px] text-zinc-400">
+                {row.keys}
+              </kbd>
+            </div>
+          ))}
+        </div>
+        <p className="border-t border-white/6 px-5 py-2.5 text-[10.5px] text-zinc-600">
+          Works everywhere except while typing in a field.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    TOPBAR
    ============================================================ */
 
@@ -467,7 +558,7 @@ function Topbar() {
   const unread = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-white/6 bg-[#050505]/85 px-4 backdrop-blur-md lg:px-6">
+    <header className="sticky top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-3 border-b border-white/6 bg-[#050505]/85 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md lg:px-6">
       {/* mobile logo */}
       <button className="lg:hidden" onClick={() => navigate("landing")} aria-label="SASI home">
         <SasiLogo size={24} withWordmark={false} />
@@ -489,6 +580,16 @@ function Topbar() {
       </button>
 
       <div className="ml-auto flex items-center gap-1.5 md:ml-0">
+        {/* mobile command-palette access — the palette was desktop-only before Task 23 */
+        }
+        <button
+          onClick={() => setCommandOpen(true)}
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.04] hover:text-white md:hidden"
+          aria-label="Search and commands"
+        >
+          <Search className="h-[17px] w-[17px]" />
+        </button>
+
         <button
           onClick={() => navigate("ask-sasi")}
           className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.04] hover:text-white md:hidden"
@@ -599,7 +700,7 @@ function MobileNav() {
   const t = useT();
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#070708]/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+      className="sasi-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#070708]/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
       aria-label="Mobile navigation"
     >
       <div className="grid grid-cols-5">
@@ -612,7 +713,7 @@ function MobileNav() {
             <button
               key={item.view}
               onClick={() => navigate(item.view)}
-              className="relative flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2.5 transition-transform active:scale-95"
+              className="sasi-bottom-nav-btn relative flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2.5 transition-transform active:scale-95"
               aria-current={active ? "page" : undefined}
             >
               <span
@@ -632,7 +733,7 @@ function MobileNav() {
               />
               <span
                 className={cn(
-                  "text-[10px] font-semibold",
+                  "text-[10px] font-semibold sasi-bottom-nav-label",
                   active ? "text-white" : "text-zinc-600"
                 )}
               >
@@ -658,7 +759,7 @@ function FloatingAskButton() {
   return (
     <button
       onClick={() => navigate("ask-sasi")}
-      className="sasi-glow-multi fixed bottom-[72px] right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-white pl-3.5 pr-4 text-[13px] font-semibold text-black transition-transform active:scale-95 lg:hidden"
+      className="sasi-glow-multi fixed bottom-[calc(72px+env(safe-area-inset-bottom))] right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-white pl-3.5 pr-4 text-[13px] font-semibold text-black transition-transform active:scale-95 lg:hidden"
       aria-label={t("shell.floating-ask")}
     >
       <Sparkles className="h-4 w-4" aria-hidden />
@@ -673,7 +774,10 @@ function FloatingAskButton() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const setCommandOpen = useSasiStore((s) => s.setCommandOpen);
+  const navigate = useSasiStore((s) => s.navigate);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const gArmedAt = useRef(0);
   useSyncExternalStore(
     () => () => {},
     () => true,
@@ -692,12 +796,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setShortcutsOpen(false);
         setCommandOpen(true);
+        return;
+      }
+      if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsOpen((o) => !o);
+        return;
+      }
+      if (e.key === "Escape") {
+        setShortcutsOpen(false);
+        return;
+      }
+      /* "g" prefix jumps: G D → dashboard, G C → cases, … (1.2s window) */
+      const key = e.key.toLowerCase();
+      if (key === "g") {
+        gArmedAt.current = Date.now();
+        return;
+      }
+      if (gArmedAt.current && Date.now() - gArmedAt.current < 1200) {
+        gArmedAt.current = 0;
+        const target = G_KEYS[key];
+        if (target) {
+          e.preventDefault();
+          setShortcutsOpen(false);
+          navigate(target);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setCommandOpen]);
+  }, [setCommandOpen, navigate]);
 
   return (
     <div className="min-h-screen bg-[#050505]">
@@ -709,10 +840,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <Topbar />
-        <main className="min-h-[calc(100vh-3.5rem)] pb-24 lg:pb-8">{children}</main>
+        <main className="sasi-shell-main min-h-[calc(100vh-3.5rem)] pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-8">
+          {children}
+        </main>
       </div>
       <MobileNav />
       <FloatingAskButton />
+      {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
     </div>
   );
 }

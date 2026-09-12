@@ -451,6 +451,79 @@ function persistLocation(loc: SasiState["savedLocation"]) {
   }, 600);
 }
 
+/* ==================================================================
+   BROWSER HISTORY BRIDGE (Task 23) — the state router becomes a real
+   router: every view change pushes /?view=x(&p=y) so the browser Back
+   button, the Android back gesture and the PWA back control all work;
+   popstate parses the URL back into the store (auth-gated, honest
+   fallbacks for stale/unknown detail params).
+   ================================================================== */
+
+/** views reachable without a session (mirrors the old PUBLIC_VIEW_SET) */
+const PUBLIC_VIEWS: ReadonlySet<string> = new Set<View>([
+  "landing",
+  "about",
+  "how-it-works",
+  "services",
+  "service-detail",
+  "security",
+  "privacy",
+  "terms",
+  "login",
+  "signup",
+]);
+
+let applyingPop = false; /* suppresses the push subscriber during URL→store sync */
+
+function sasiUrlFor(view: View, param: string | null): string {
+  if (typeof window === "undefined") return "/";
+  if (view === "landing") return window.location.pathname;
+  const q = new URLSearchParams();
+  q.set("view", view);
+  if (param) q.set("p", param);
+  return `${window.location.pathname}?${q.toString()}`;
+}
+
+/** URL → store (no push). Stale/unknown detail params fall back to the
+    honest list view instead of a broken detail screen. */
+function applySasiUrl(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    const rawView = url.searchParams.get("view");
+    const rawParam = url.searchParams.get("p");
+    const view: View =
+      rawView && (ALL_VIEWS as readonly string[]).includes(rawView)
+        ? (rawView as View)
+        : "landing";
+    const s = useSasiStore.getState();
+    let target = view;
+    let targetParam = rawParam;
+    if (!PUBLIC_VIEWS.has(view)) {
+      /* app views need a session — signed-out back-navigation lands on login */
+      if (!s.authed) {
+        target = "login";
+        targetParam = null;
+      }
+    } else if (s.authed && (view === "login" || view === "signup")) {
+      /* already signed in — no reason to deep-link into the auth forms */
+      target = "dashboard";
+      targetParam = null;
+    }
+    if (targetParam !== null) targetParam = targetParam.trim() || null;
+    applyingPop = true;
+    useSasiStore.setState({
+      view: target,
+      param: targetParam,
+      commandOpen: false,
+    });
+    applyingPop = false;
+    window.scrollTo(0, 0);
+  } catch {
+    /* history API blocked — the app keeps its current view */
+  }
+}
+
 export const useSasiStore = create<SasiState>((set, get) => ({
   view: "landing",
   param: null,
@@ -931,31 +1004,29 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     try {
       const wanted = new URLSearchParams(window.location.search).get("view");
       if (wanted) {
-        const PUBLIC_VIEW_SET = new Set<View>([
-          "landing",
-          "about",
-          "how-it-works",
-          "services",
-          "service-detail",
-          "security",
-          "privacy",
-          "terms",
-          "login",
-          "signup",
-        ]);
-        const valid = (PUBLIC_VIEW_SET as Set<string>).has(wanted)
-          ? null /* public views are already the default experience — nothing to jump to */
-          : ((ALL_VIEWS as readonly string[]).includes(wanted) ? (wanted as View) : null);
-        if (valid) {
+        const known = (ALL_VIEWS as readonly string[]).includes(wanted);
+        if (known) {
           const authed = get().authed;
-          if (!authed) {
+          const isPublic = PUBLIC_VIEWS.has(wanted);
+          if (!authed && !isPublic) {
+            /* an app shortcut while signed out lands on login — honest */
+            applyingPop = true;
             get().navigate("login");
+            applyingPop = false;
           } else {
-            get().navigate(valid);
+            /* full URL sync handles ?p= for detail views; the push
+               subscriber stays suppressed so boot doesn't double-stack
+               history entries */
+            applySasiUrl();
           }
         }
-        /* clean the query so a later refresh doesn't re-trigger the jump */
-        window.history.replaceState({}, "", window.location.pathname);
+        /* the boot entry BECOMES the app URL: one Back step leaves the
+           app instead of replaying the deep link */
+        window.history.replaceState(
+          { sasi: true },
+          "",
+          sasiUrlFor(get().view, get().param)
+        );
       }
     } catch {
       /* history API blocked — the deep link simply keeps its query */
@@ -1428,6 +1499,22 @@ export const useSasiStore = create<SasiState>((set, get) => ({
     }
   },
 }));
+
+/* The bridge itself: push a history entry on every real view change,
+   and let popstate (Back/Forward/gestures) drive the store. Attached
+   once, on the client only. */
+if (typeof window !== "undefined") {
+  useSasiStore.subscribe((s, prev) => {
+    if (applyingPop) return;
+    if (s.view === prev.view && s.param === prev.param) return;
+    try {
+      window.history.pushState({ sasi: true }, "", sasiUrlFor(s.view, s.param));
+    } catch {
+      /* history blocked — in-app navigation still works */
+    }
+  });
+  window.addEventListener("popstate", applySasiUrl);
+}
 
 /* Dev/QA hook — lets browser automation drive the store directly
    (agent-browser eval). Stripped from production builds. */

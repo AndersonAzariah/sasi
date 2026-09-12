@@ -2406,3 +2406,41 @@ strong {
     transition: none;
   }
 }
+
+/* ==================================================================
+   TASK 23 — DEVICE SUPPORT LAYER
+   ================================================================== */
+
+/* true dynamic viewport height where supported (mobile URL bars no
+   longer make short pages leave a gap or tall pages overflow) */
+@supports (height: 100dvh) {
+  .sasi-shell-main {
+    min-height: calc(100dvh - 3.5rem - env(safe-area-inset-top, 0px));
+  }
+}
+
+/* landscape / short viewports: bottom nav goes icon-only to hand the
+   vertical space back to the content */
+@media (max-height: 500px) and (orientation: landscape) {
+  .sasi-bottom-nav .sasi-bottom-nav-label {
+    display: none;
+  }
+  .sasi-bottom-nav .sasi-bottom-nav-btn {
+    min-height: 48px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+
+/* iOS Safari auto-zooms any focused input smaller than 16px — on
+   iPhone-sized screens every editable surface reads at the no-zoom
+   size (desktop unaffected; the mono aesthetic survives there) */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 1023px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    textarea,
+    select {
+      font-size: max(16px, 1em) !important;
+    }
+  }
+}

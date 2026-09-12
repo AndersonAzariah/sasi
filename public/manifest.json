@@ -5,7 +5,7 @@
   "id": "/",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#050505",
   "theme_color": "#050505",
   "launch_handler": {
@@ -17,24 +17,43 @@
       "short_name": "Report",
       "description": "Tell SASI what is happening — water, electricity, roads, sanitation.",
       "url": "/?view=report",
-      "icons": [{ "src": "/sasi-icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/sasi-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "City briefing",
       "short_name": "Briefing",
       "description": "Today's grounded city briefing on your dashboard.",
       "url": "/?view=dashboard",
-      "icons": [{ "src": "/sasi-icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/sasi-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Ask SASI",
       "short_name": "Ask",
       "description": "Ask SASI about civic issues in plain language.",
       "url": "/?view=ask-sasi",
-      "icons": [{ "src": "/sasi-icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/sasi-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ],
-  "categories": ["government", "productivity", "utilities"],
+  "categories": [
+    "government",
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/sasi-icon-192.png",

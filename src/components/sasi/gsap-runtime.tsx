@@ -286,8 +286,14 @@ export function SasiGsapRuntime() {
         if (host && !host.contains(e.relatedTarget as Node)) stopCgo(host);
       };
 
-      document.addEventListener("pointerover", onPointerOver, { passive: true });
-      document.addEventListener("pointerout", onPointerOut, { passive: true });
+      /* Hover-driven CGO only exists where hover exists — on touch-only
+         devices pointerover fires on every tap and would leave "hot"
+         glow rings stuck to whatever was last pressed (Task 23). */
+      const canHover = window.matchMedia("(hover: hover)").matches;
+      if (canHover) {
+        document.addEventListener("pointerover", onPointerOver, { passive: true });
+        document.addEventListener("pointerout", onPointerOut, { passive: true });
+      }
       document.addEventListener("focusin", onFocusIn, true);
       document.addEventListener("focusout", onFocusOut, true);
 
