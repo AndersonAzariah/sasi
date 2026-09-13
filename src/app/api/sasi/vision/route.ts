@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import ZAI from "z-ai-web-dev-sdk";
+import {
+  clientIp,
+  rateLimitService,
+  tooManyRequests,
+} from "@/lib/sasi/api-auth";
 import type { EvidenceAnalysis } from "@/lib/sasi/types";
 
 /* ============================================================
@@ -30,6 +35,9 @@ interface VisionBody {
 }
 
 const MAX_BASE64_CHARS = 5_000_000; // ~3.7MB binary
+/* JSON adds escaping overhead around the base64 blob — reject oversized
+   requests from the Content-Length header BEFORE the body is buffered. */
+const MAX_BODY_BYTES = 7_500_000;
 const ALLOWED_MIME = /^data:(image\/(png|jpe?g|webp));base64,/;
 
 const SYSTEM_PROMPT = `You are SASI's evidence analyst — part of South African Service Intelligence. A resident is reporting an everyday civic service problem (water, electricity, roads, waste, healthcare, education, housing, documents, safety, local government) and attached a photo.
@@ -83,6 +91,28 @@ function extractJson(raw: string): EvidenceAnalysis | null {
 }
 
 export async function POST(req: Request) {
+  /* AI vision calls are the most expensive endpoint per byte — 12/min
+     per caller still allows a full multi-photo report, and blunts
+     unauthenticated abuse of the model budget. */
+  const limit = await rateLimitService.limit(
+    `vision:${clientIp(req)}`,
+    12,
+    60_000
+  );
+  if (!limit.allowed) {
+    return tooManyRequests(
+      limit.retryAfterMs,
+      "Too many photo analyses in a minute. Please wait a moment."
+    );
+  }
+  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      { error: "That photo is too large. Try one under about 3 MB." },
+      { status: 413 }
+    );
+  }
+
   let body: VisionBody;
   try {
     body = (await req.json()) as VisionBody;

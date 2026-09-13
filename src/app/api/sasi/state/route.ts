@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+
+import { getAuthSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { rateLimitService, tooManyRequests } from "@/lib/sasi/api-auth";
 import type {
   AppNotification,
   CityBriefing,
@@ -19,10 +22,37 @@ import type {
    POST   { type:"notification-read" } → mark one (notificationId) or all live notifications read
    DELETE ?sessionId=&scope=chat     → clear chat history for the session
    DELETE ?sessionId=&scope=notifications → clear live notifications for the session
+
+   OWNERSHIP MODEL (schema is frozen — honest scope):
+   - Every query is scoped by the caller's sessionId (a 122-bit random
+     UUID kept in the browser; it is the bearer secret for session data).
+   - When the caller ALSO has a NextAuth session, CaseRecord rows are
+     additionally bound to the account: writes stamp/claim userId, a
+     row claimed by one account can never be read or rewritten by
+     another account, and reads include only unclaimed rows or the
+     caller's own.
+   - ChatMessage / EvidenceRecord / BriefingRecord / NotificationRecord
+     / Profile have NO userId column, so they are sessionId-scoped
+     only — a future migration should add userId to bind them too.
+   - The shared fallback id "sasi-anon" (emitted by the client when
+     localStorage is blocked) is REJECTED: it would otherwise be one
+     public bucket every storage-blocked browser reads and writes.
    ============================================================ */
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** The client's storage-blocked fallback (src/lib/sasi/utils.ts) is a
+    SHARED constant — accepting it would make every storage-blocked
+    browser read and write one public bucket. */
+const SHARED_FALLBACK_SESSION_ID = "sasi-anon";
+
+/** Payload caps — a JSON body may be huge even when the object shape
+    is small; stringify first, then bound what reaches PostgreSQL. */
+const MAX_CASE_PAYLOAD_CHARS = 200_000;
+const MAX_EVIDENCE_PAYLOAD_CHARS = 200_000;
+const MAX_BRIEFING_PAYLOAD_CHARS = 100_000;
+const MAX_NOTIFICATION_PAYLOAD_CHARS = 20_000;
 
 interface SavedLocation {
   province: string;
@@ -36,19 +66,45 @@ function cleanSession(raw: string | null | undefined): string | null {
   return s.length > 0 && s.length <= 128 ? s : null;
 }
 
+/** Validated, private session id — null when absent or shared. */
+function privateSession(raw: string | null | undefined): string | null {
+  const sessionId = cleanSession(raw);
+  if (!sessionId || sessionId === SHARED_FALLBACK_SESSION_ID) return null;
+  return sessionId;
+}
+
+function badSession(): NextResponse {
+  return NextResponse.json(
+    {
+      error:
+        "A private session id is required. SASI will not store data in a shared browser session.",
+    },
+    { status: 400 }
+  );
+}
+
+async function callerUserId(): Promise<string | null> {
+  const session = await getAuthSession();
+  return session?.user?.id ?? null;
+}
+
 /* ---------------- GET — hydrate ---------------- */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const sessionId = cleanSession(url.searchParams.get("sessionId"));
-  if (!sessionId) {
-    return NextResponse.json({ error: "sessionId required." }, { status: 400 });
-  }
+  const sessionId = privateSession(url.searchParams.get("sessionId"));
+  if (!sessionId) return badSession();
+  const userId = await callerUserId();
 
   try {
     const [caseRows, chatRows, profile, evidenceRows, briefingRows, notificationRows] =
       await Promise.all([
         db.caseRecord.findMany({
-          where: { sessionId },
+          where: {
+            sessionId,
+            /* unclaimed rows (created before sign-in) plus the caller's
+               own — never another account's claimed rows */
+            ...(userId ? { OR: [{ userId: null }, { userId }] } : {}),
+          },
           orderBy: { createdAt: "desc" },
           take: 50,
         }),
@@ -177,10 +233,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const sessionId = cleanSession(body.sessionId);
-  if (!sessionId) {
-    return NextResponse.json({ error: "sessionId required." }, { status: 400 });
+  const sessionId = privateSession(body.sessionId);
+  if (!sessionId) return badSession();
+
+  /* Light throttle: the client persists on every meaningful action
+     (report, evidence, briefing, notification). 120/min per session
+     absorbs normal use and blunts scripted flooding. */
+  const limit = await rateLimitService.limit(`state-post:${sessionId}`, 120, 60_000);
+  if (!limit.allowed) {
+    return tooManyRequests(limit.retryAfterMs, "Too many saves in a minute. Try again shortly.");
   }
+
+  const userId = await callerUserId();
 
   try {
     if (body.type === "case" && body.case) {
@@ -188,17 +252,38 @@ export async function POST(req: Request) {
       if (!c.id || !c.ref) {
         return NextResponse.json({ error: "case.id and case.ref required." }, { status: 400 });
       }
+      const payload = JSON.stringify(c);
+      if (payload.length > MAX_CASE_PAYLOAD_CHARS) {
+        return NextResponse.json({ error: "That case is too large to save." }, { status: 413 });
+      }
       /* refs are unique per session — two browsers may both have CASE-000124 */
+      const existing = await db.caseRecord.findUnique({
+        where: { sessionId_ref: { sessionId, ref: c.ref } },
+        select: { userId: true },
+      });
+      if (existing && existing.userId && existing.userId !== userId) {
+        /* claimed by a different account — never readable or rewritable here */
+        return NextResponse.json(
+          { error: "This case belongs to a different account." },
+          { status: 403 }
+        );
+      }
       await db.caseRecord.upsert({
         where: { sessionId_ref: { sessionId, ref: c.ref } },
         create: {
           ref: c.ref,
           sessionId,
+          userId, // null for anonymous callers; stamped once they sign in
           service: c.service ?? "other",
           title: (c.title ?? "Report").slice(0, 200),
-          payload: JSON.stringify(c),
+          payload,
         },
-        update: { payload: JSON.stringify(c), title: (c.title ?? "Report").slice(0, 200) },
+        update: {
+          payload,
+          title: (c.title ?? "Report").slice(0, 200),
+          /* claim unclaimed rows on the first authenticated save */
+          ...(userId ? { userId } : {}),
+        },
       });
       return NextResponse.json({ ok: true, ref: c.ref });
     }
@@ -208,14 +293,24 @@ export async function POST(req: Request) {
       if (!ev.id) {
         return NextResponse.json({ error: "evidence.id required." }, { status: 400 });
       }
+      const payload = JSON.stringify(ev);
+      if (payload.length > MAX_EVIDENCE_PAYLOAD_CHARS) {
+        return NextResponse.json({ error: "That evidence item is too large to save." }, { status: 413 });
+      }
+      const existing = await db.evidenceRecord.findUnique({
+        where: { evidenceId: ev.id },
+        select: { sessionId: true },
+      });
+      if (existing && existing.sessionId !== sessionId) {
+        return NextResponse.json(
+          { error: "This evidence item belongs to a different session." },
+          { status: 403 }
+        );
+      }
       await db.evidenceRecord.upsert({
         where: { evidenceId: ev.id },
-        create: {
-          evidenceId: ev.id,
-          sessionId,
-          payload: JSON.stringify(ev),
-        },
-        update: { payload: JSON.stringify(ev) },
+        create: { evidenceId: ev.id, sessionId, payload },
+        update: { payload },
       });
       return NextResponse.json({ ok: true, id: ev.id });
     }
@@ -228,13 +323,17 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      const payload = JSON.stringify(b);
+      if (payload.length > MAX_BRIEFING_PAYLOAD_CHARS) {
+        return NextResponse.json({ error: "That briefing is too large to save." }, { status: 413 });
+      }
       /* append-only history — the client caps what it keeps (8) */
       const row = await db.briefingRecord.create({
         data: {
           sessionId,
           risk: String(b.risk ?? "ELEVATED").slice(0, 12),
           headline: b.headline.slice(0, 200),
-          payload: JSON.stringify(b),
+          payload,
         },
       });
       return NextResponse.json({ ok: true, id: row.id });
@@ -248,6 +347,20 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      const payload = JSON.stringify(n);
+      if (payload.length > MAX_NOTIFICATION_PAYLOAD_CHARS) {
+        return NextResponse.json({ error: "That notification is too large to save." }, { status: 413 });
+      }
+      const existing = await db.notificationRecord.findUnique({
+        where: { notificationId: n.id },
+        select: { sessionId: true },
+      });
+      if (existing && existing.sessionId !== sessionId) {
+        return NextResponse.json(
+          { error: "This notification belongs to a different session." },
+          { status: 403 }
+        );
+      }
       /* idempotent by client id — a re-push never duplicates a row */
       await db.notificationRecord.upsert({
         where: { notificationId: n.id },
@@ -255,9 +368,9 @@ export async function POST(req: Request) {
           notificationId: n.id,
           sessionId,
           read: Boolean(n.read),
-          payload: JSON.stringify(n),
+          payload,
         },
-        update: { payload: JSON.stringify(n) },
+        update: { payload },
       });
       return NextResponse.json({ ok: true, id: n.id });
     }
@@ -307,11 +420,9 @@ export async function POST(req: Request) {
 /* ---------------- DELETE — clear chat ---------------- */
 export async function DELETE(req: Request) {
   const url = new URL(req.url);
-  const sessionId = cleanSession(url.searchParams.get("sessionId"));
+  const sessionId = privateSession(url.searchParams.get("sessionId"));
   const scope = url.searchParams.get("scope") ?? "chat";
-  if (!sessionId) {
-    return NextResponse.json({ error: "sessionId required." }, { status: 400 });
-  }
+  if (!sessionId) return badSession();
   if (scope !== "chat" && scope !== "notifications") {
     return NextResponse.json({ error: "Unsupported scope." }, { status: 400 });
   }

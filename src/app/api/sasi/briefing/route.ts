@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import ZAI from "z-ai-web-dev-sdk";
 import { SERVICES } from "@/lib/sasi/utils";
+import {
+  clientIp,
+  rateLimitService,
+  tooManyRequests,
+} from "@/lib/sasi/api-auth";
 import type { BriefingRisk, BriefingSection, CityBriefing } from "@/lib/sasi/types";
 
 /* ============================================================
@@ -276,6 +281,29 @@ function extractBriefing(
 }
 
 export async function POST(req: Request) {
+  /* AI cost bound: each call spends LLM tokens. 20/min per caller is
+     far above any legitimate dashboard/chat cadence. */
+  const limit = await rateLimitService.limit(
+    `briefing:${clientIp(req)}`,
+    20,
+    60_000
+  );
+  if (!limit.allowed) {
+    return tooManyRequests(
+      limit.retryAfterMs,
+      "Too many briefing requests in a minute. Please wait a moment."
+    );
+  }
+  /* The transcript/cases arrive as JSON — refuse absurd bodies before
+     they are parsed and processed. */
+  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > 500_000) {
+    return NextResponse.json(
+      { error: "That briefing request is too large." },
+      { status: 413 }
+    );
+  }
+
   let body: BriefingBody;
   try {
     body = (await req.json()) as BriefingBody;

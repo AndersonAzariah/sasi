@@ -10,10 +10,24 @@ import {
   MapPin,
   ShieldAlert,
   Sparkles,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
 import { signOut as nextAuthSignOut } from "next-auth/react";
 import { formatDate, initials } from "@/lib/sasi/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import {
   GhostButton,
   SectionLabel,
@@ -66,6 +80,52 @@ export default function ProfileView() {
 
   const displayName = me?.name?.trim() || accountName?.trim() || "You";
   const displayEmail = me?.email?.trim() ?? "";
+
+  /* ---------- Delete account (danger zone) ---------- */
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const confirmMatches =
+    !!displayEmail &&
+    confirmEmail.trim().toLowerCase() === displayEmail.toLowerCase();
+
+  const handleDeleteAccount = async () => {
+    if (!confirmMatches || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/sasi/auth/account", { method: "DELETE" });
+      const data = (await res.json().catch(() => null)) as {
+        deleted?: boolean;
+        error?: string;
+      } | null;
+      if (res.ok && data?.deleted) {
+        toast("Account deleted", {
+          description:
+            "Your SASI account, audit trail and submission records are gone. Data saved in this browser stays on this device.",
+        });
+        /* clear BOTH the NextAuth JWT cookie session and the UI flag —
+           the account no longer exists, so no session may survive it */
+        await nextAuthSignOut({ redirect: false });
+        signOut();
+        navigate("landing");
+      } else {
+        toast("Could not delete account", {
+          description:
+            data?.error ??
+            `SASI couldn't delete the account (HTTP ${res.status}). Nothing was changed.`,
+        });
+      }
+    } catch {
+      toast("Could not delete account", {
+        description:
+          "SASI couldn't reach the server. Nothing was changed — try again when you're online.",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteOpen(false);
+      setConfirmEmail("");
+    }
+  };
 
   const activeInvestigations = useMemo(
     () => cases.filter((c) => ACTIVE_AI_STATES.has(c.aiState)).length,
@@ -215,6 +275,90 @@ export default function ProfileView() {
           </button>
         </div>
       </section>
+
+      {/* ---------- Danger zone: delete account (signed-in only) ---------- */}
+      {displayEmail && (
+        <section aria-labelledby="profile-danger" className="mt-8 pb-4">
+          <SectionLabel className="mb-3">Danger zone</SectionLabel>
+          <h2 id="profile-danger" className="sr-only">
+            Danger zone
+          </h2>
+          <div className="sasi-card border-[#ef5350]/15 flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#ef5350]/25 bg-[#ef5350]/[0.06]">
+                <Trash2 className="h-4 w-4 text-[#fda4a0]" aria-hidden />
+              </span>
+              <div>
+                <p className="text-[13.5px] font-medium text-[#fda4a0]">
+                  Delete your SASI account
+                </p>
+                <p className="mt-0.5 max-w-md text-[12px] leading-relaxed text-zinc-500">
+                  Permanently removes your account, audit trail and submission
+                  records. Cases, evidence and chat history saved in this
+                  browser stay on this device, no longer tied to any account.
+                </p>
+              </div>
+            </div>
+            <AlertDialog
+              open={deleteOpen}
+              onOpenChange={(open) => {
+                if (!deleting) {
+                  setDeleteOpen(open);
+                  if (!open) setConfirmEmail("");
+                }
+              }}
+            >
+              <AlertDialogTrigger asChild>
+                <button
+                  className="group inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[#ef5350]/25 bg-[#ef5350]/[0.06] px-3.5 text-[12.5px] font-medium text-[#fda4a0] transition-colors hover:border-[#ef5350]/40 hover:bg-[#ef5350]/[0.1] active:scale-[0.98]"
+                  aria-label="Delete your SASI account"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                  Delete account
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes your SASI account — your sign-in,
+                    audit trail and submission records. It cannot be undone.
+                    Cases, evidence and chat history saved in this browser stay
+                    on this device. Type{" "}
+                    <span className="font-medium text-zinc-200">
+                      {displayEmail}
+                    </span>{" "}
+                    to confirm.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Input
+                  value={confirmEmail}
+                  onChange={(e) => setConfirmEmail(e.target.value)}
+                  placeholder={displayEmail}
+                  autoComplete="off"
+                  aria-label="Type your email to confirm account deletion"
+                  disabled={deleting}
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={!confirmMatches || deleting}
+                    onClick={(e) => {
+                      /* keep the dialog open while the request runs —
+                         it closes in the handler's finally block */
+                      e.preventDefault();
+                      void handleDeleteAccount();
+                    }}
+                    className="bg-[#ef5350] text-white hover:bg-[#e57373]"
+                  >
+                    {deleting ? "Deleting…" : "Yes, delete my account"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </section>
+      )}
 
       {/* ---------- Preferences ---------- */}
       <section aria-labelledby="profile-preferences" className="mt-8 pb-4">

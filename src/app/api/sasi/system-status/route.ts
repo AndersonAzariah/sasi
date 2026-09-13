@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
+import {
+  clientIp,
+  rateLimitService,
+  tooManyRequests,
+} from "@/lib/sasi/api-auth";
 
 /* ============================================================
    SASI — honest system status.
@@ -44,7 +49,21 @@ async function probeRest(key: string, label: string): Promise<RestProbe> {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  /* Every call fires 2–3 outbound probes (Prisma + Supabase REST) —
+     keep the honest diagnostics from becoming an amplifier. */
+  const limit = await rateLimitService.limit(
+    `system-status:${clientIp(req)}`,
+    10,
+    60_000
+  );
+  if (!limit.allowed) {
+    return tooManyRequests(
+      limit.retryAfterMs,
+      "Too many status checks in a minute. Please wait a moment."
+    );
+  }
+
   /* 1 — primary database (the one Prisma talks to) */
   const databaseUrl = process.env.DATABASE_URL ?? "";
   const provider = databaseUrl.startsWith("file:") ? "sqlite" : "postgres";

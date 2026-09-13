@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { rateLimit } from "@/lib/sasi/api-auth";
+import {
+  clientIp,
+  rateLimitService,
+  tooManyRequests,
+} from "@/lib/sasi/api-auth";
 
 /* ============================================================
    POST /api/sasi/auth/signup — the only account-creation path.
@@ -24,17 +28,20 @@ const SignupSchema = z.object({
     .max(128, "Passwords this long are not supported."),
 });
 
-function clientKey(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  return (fwd ? fwd.split(",")[0].trim() : null) ?? "local";
-}
-
 export async function POST(req: Request) {
-  const limit = rateLimit(`signup:${clientKey(req)}`, 5, 60 * 60 * 1000);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: "Too many signup attempts from this device. Try again in an hour." },
-      { status: 429 }
+  /* Two independent throttles through the RateLimitService:
+     - per device/IP (5/hour) blunts scripted account creation;
+     - per email (5/hour) stops targeted flooding of ONE address even
+       when the attacker rotates spoofable forwarded-for headers. */
+  const ipLimit = await rateLimitService.limit(
+    `signup:ip:${clientIp(req)}`,
+    5,
+    60 * 60 * 1000
+  );
+  if (!ipLimit.allowed) {
+    return tooManyRequests(
+      ipLimit.retryAfterMs,
+      "Too many signup attempts from this device. Try again in an hour."
     );
   }
 
@@ -52,6 +59,18 @@ export async function POST(req: Request) {
   }
 
   const { name, email, password } = parsed.data;
+
+  const emailLimit = await rateLimitService.limit(
+    `signup:email:${email}`,
+    5,
+    60 * 60 * 1000
+  );
+  if (!emailLimit.allowed) {
+    return tooManyRequests(
+      emailLimit.retryAfterMs,
+      "Too many signup attempts for this email. Try again in an hour."
+    );
+  }
 
   try {
     const existing = await db.user.findUnique({ where: { email } });

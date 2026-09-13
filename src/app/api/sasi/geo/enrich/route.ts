@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  clientIp,
+  rateLimitService,
+  tooManyRequests,
+} from "@/lib/sasi/api-auth";
+
 /* ============================================================
    SASI GEO ENRICH (Task 21)
    Super-accurate report locations = device GPS + two free
@@ -218,6 +224,20 @@ function dms(value: number, pos: string, neg: string): string {
 /* ---------- route ---------- */
 
 export async function POST(req: NextRequest) {
+  /* Nominatim's usage policy requires lightweight clients — 30/min per
+     caller protects that relationship and the OSM/OpenRouter spend. */
+  const limit = await rateLimitService.limit(
+    `geo-enrich:${clientIp(req)}`,
+    30,
+    60_000
+  );
+  if (!limit.allowed) {
+    return tooManyRequests(
+      limit.retryAfterMs,
+      "Too many location lookups in a minute. Please wait a moment."
+    );
+  }
+
   let body: GeoBody;
   try {
     body = (await req.json()) as GeoBody;

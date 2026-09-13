@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { requireUserId, serverError } from "@/lib/sasi/api-auth";
+import {
+  rateLimitService,
+  requireUserId,
+  serverError,
+  tooManyRequests,
+} from "@/lib/sasi/api-auth";
 
 /* ============================================================
    GET  /api/sasi/audit?ref=CASE-000123  — the user's audit trail.
@@ -62,6 +67,20 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const auth = await requireUserId();
   if (!auth.ok) return auth.response;
+
+  /* Audit rows are written to the database — keep them event-sized:
+     60/min per user covers batch evidence reviews, not floods. */
+  const limit = await rateLimitService.limit(
+    `audit-write:${auth.userId}`,
+    60,
+    60_000
+  );
+  if (!limit.allowed) {
+    return tooManyRequests(
+      limit.retryAfterMs,
+      "Too many events recorded in a minute. Please wait a moment."
+    );
+  }
 
   let raw: unknown;
   try {
