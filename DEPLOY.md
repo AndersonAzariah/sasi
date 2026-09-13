@@ -20,15 +20,15 @@ gives HTTPS + global CDN out of the box. Total time: ~5 minutes.
 
    | Name | Value | Notes |
    |---|---|---|
-   | `DATABASE_URL` | `postgresql://postgres.<ref>:<PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require` | **Supabase POOLER (session pooler, port 5432) or transaction pooler (6543) — copy from Supabase dashboard → Connect.** Vercel serverless CANNOT reach the direct `db.…supabase.co:5432` host (it is IPv6-only). This is the single most common cause of "authentication not working" — every login must query the database. |
+   | `DATABASE_URL` | **THIS PROJECT (ref `awcceckvuiarlbnzemsv`, region eu-west-1):** `postgresql://postgres.awcceckvuiarlbnzemsv:<DB-PASSWORD>@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require` — replace only `<DB-PASSWORD>` | **USE EXACTLY THIS HOST.** The direct URL (`…@db.awcceckvuiarlbnzemsv.supabase.co:5432/…`) is IPv6-only and WILL FAIL on Vercel — if your Supabase dashboard shows `db.awcceckvuiarlbnzemsv.supabase.co` in the URI, that is the WRONG one. Use **Supabase dashboard → Connect → Session pooler** (port 5432), or the transaction pooler (port 6543) from the same panel. Every login requires this query path. |
    | `NEXTAUTH_SECRET` | a long random string | generate: `openssl rand -base64 32` |
    | `NEXTAUTH_URL` | `https://<your-app>.vercel.app` | OPTIONAL now — SASI auto-derives it from Vercel's own `VERCEL_PROJECT_PRODUCTION_URL`/`VERCEL_URL` when unset; set it explicitly only when using a custom domain |
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://awcceckvuiarlbnzemsv.supabase.co` | safe to expose |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | your `sb_publishable_…` key | safe to expose (RLS denies it everything) |
    | `SUPABASE_SECRET_KEY` | your `sb_secret_…` key | SERVER ONLY — used for read-only health probes. Never prefix with `NEXT_PUBLIC_`. |
    | `OPENROUTER_API_KEY` | your `sk-or-…` key | SERVER ONLY — the real AI provider (Ask SASI, briefings, document and photo analysis, address refinement). Never prefix with `NEXT_PUBLIC_`, never commit it. |
-   | `OPENROUTER_MODEL` | e.g. `openai/gpt-4o-mini` | OPTIONAL — server-side default exists; change it here to switch models without a code edit |
-   | `OPENROUTER_VISION_MODEL` | e.g. `openai/gpt-4o-mini` | OPTIONAL — used for photo/document-image analysis; defaults to `OPENROUTER_MODEL` |
+   | `OPENROUTER_MODEL` | e.g. `nvidia/nemotron-3-super-120b-a12b:free` | OPTIONAL — the built-in default is already a FREE-tier model verified for SASI's structured output; set this only to switch models. A free-tier key cannot call paid models (402). |
+   | `OPENROUTER_VISION_MODEL` | e.g. `inclusionai/ling-3.0-flash-vl:free` | OPTIONAL — used for photo/document-image analysis; defaults to `OPENROUTER_MODEL`. Use a `:free` vision-capable model with a free-tier key. |
 
    When `OPENROUTER_API_KEY` is absent the app stays fully functional
    (services, journeys, search, Explore, My SASI, documents storage)
