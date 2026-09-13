@@ -6,8 +6,14 @@ import type { ChatRole } from "@/lib/sasi/types";
 import { aiHttpStatus, getAIProvider } from "@/lib/ai";
 import { buildAskSystemPrompt } from "@/lib/ai/prompts";
 import {
+  clientIp,
+  rateLimitService,
+  tooManyRequests,
+} from "@/lib/sasi/api-auth";
+import {
   corroborateStructured,
   extractJsonBlock,
+  journeyFocusBlock,
   registryGroundingBlock,
   serviceDetailBlock,
   validateStructuredAnswer,
@@ -323,6 +329,22 @@ export async function POST(req: Request) {
     userId = (await getAuthSession())?.user?.id ?? null;
   } catch { userId = null; }
 
+  /* COST CONTROL (Task 30) — tiered rate limit on the primary AI spend
+     vector. Signed-in residents get a wider budget than anonymous
+     callers (identified only by their best-effort IP); both are
+     bounded so one user cannot run up the provider bill. */
+  const askLimit = await rateLimitService.limit(
+    `ask:${userId ?? `anon:${clientIp(req)}`}`,
+    userId ? 20 : 8,
+    60_000
+  );
+  if (!askLimit.allowed) {
+    return tooManyRequests(
+      askLimit.retryAfterMs,
+      "SASI is receiving too many requests right now. Please try again."
+    );
+  }
+
   /* Phase 10 — the resident's current view context. An explicit
      body.context wins (future store versions); today the Ask SASI view
      publishes the same data in a short-lived sasi_ctx cookie that the
@@ -330,10 +352,16 @@ export async function POST(req: Request) {
   const context =
     sanitizeViewContext(body.context) ?? readContextFromCookieHeader(req.headers.get("cookie"));
   const contextBlock = buildContextBlock(context);
+  /* Contextual grounding (Task 30): the resident's CURRENT page decides
+     which registry data is injected in full — the passport service page
+     grounds "what documents do I need?", the passport journey grounds
+     "what do I do now?". Unknown params return null honestly. */
   const focusBlock =
     context?.view === "service-detail" && context.param
       ? serviceDetailBlock(context.param)
-      : null;
+      : context?.view === "journey" && context.param
+        ? journeyFocusBlock(context.param)
+        : null;
 
   /* Persist the user's message before answering (best-effort). */
   if (sessionId) {
