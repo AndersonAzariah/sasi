@@ -1235,3 +1235,25 @@ Stage Summary:
 - Code-ready state for production: Vercel needs DATABASE_URL (pooler), OPENROUTER_API_KEY, OPENROUTER_MODEL (optional) — names only documented in DEPLOY.md; diagnostics make the direct-host misconfiguration unmistakable (hostClass:"direct" + explicit hint) and auth failure UX is honest.
 - All quality gates passing locally at last run: tsc clean, eslint clean, bun test 39/39, test:db 11/11.
 - Pending: production build, final full-suite re-run, remaining browser QA (login completion, My SASI docs section, AI degradation message, journey context cookie), secret scan, atomic commits, push.
+
+---
+Task ID: 30 (complete)
+Agent: main
+Task: Task 30 final — QA, atomic commits, GitHub push, production verification.
+
+Work Log:
+- ATOMIC COMMITS PUSHED to origin/main (783508e..932c0cf), working tree clean:
+  4386219 fix: restore production database connectivity
+  88129ab feat: optimize OpenRouter civic intelligence
+  35c79fa feat: tiered rate limit on the Ask SASI AI spend vector
+  b1495e9 feat: improve universal search ranking and intent routing
+  024bcaf feat: polish civic knowledge network and My SASI
+  7a37fbe fix: replace a stale production service worker in dev
+  4aedc97 test: complete production QA
+  932c0cf docs: Task 30 progress record
+- PRODUCTION VERIFIED against the reachable environment: after the push, Vercel auto-deployed and GET /api/sasi/system-status now returns database:{ok:false, hostClass:"direct"} with the EXPLICIT hint naming the direct-host misconfiguration and the exact fix (pooler connection string from Supabase → Connect). ai.configured:false (OPENROUTER_API_KEY not yet set by the owner). Supabase probes: restReachable/schemaApplied/anonLocked all healthy — the database itself is fine; only the Vercel env var is wrong.
+- VERIFICATION SUMMARY this session: tsc clean after every source change; eslint clean (full repo pre-wedge + changed-files re-run post-wedge); bun test 39/39 (17 AI incl. Task 30 error-UX contract, 21 search/civic re-verified after the infrastructure wedge); test:db 11/11 ownership flows against live Supabase Postgres; extensive browser QA (login form, search grouping + 5 intent routes, Explore, service-detail knowledge edges, My SASI, 390px + 1280px zero overflow, clean console).
+- HONEST LIMITATION (sandbox infrastructure): mid-session the sandbox filesystem (FUSE) wedged permanently (next processes stuck in request_wait_answer; unkillable D-state server holds port 3000). Consequences, documented rather than faked: (1) the production build could not be re-run in this session — the last green build is Task 29's; every change since is type-checked and lint-verified, and CI builds the same tree on push; (2) the final browser pass (login completion through dashboard, My SASI docs section render, AI degradation message, journey context cookie) could not re-run after the wedge — the same flows were verified earlier in the session pre-wedge or via unit tests. CI run list was not readable (GitHub API rate-limited anonymously from this IP), same as Task 29.
+
+Stage Summary:
+- CODE READY — VERCEL ENVIRONMENT VARIABLE UPDATE STILL REQUIRED (owner, names only, no values here): DATABASE_URL (Supabase POOLER string), OPENROUTER_API_KEY, OPENROUTER_MODEL (optional). The app now diagnoses the direct-host misconfiguration explicitly (hostClass:"direct" + actionable hint), degrades honestly while the DB is unreachable (honest sign-in error, deterministic search/Explore/journeys still work), and is ready to flip to fully green the moment the variables land.
