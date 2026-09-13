@@ -17,6 +17,7 @@ import {
   ChevronDown,
   CircleUser,
   Command as CommandIcon,
+  Compass,
   FolderLock,
   Landmark,
   LayoutDashboard,
@@ -60,6 +61,7 @@ const NAV_SECTIONS: {
     items: [
       { view: "dashboard", label: "nav.dashboard", icon: LayoutDashboard },
       { view: "ask-sasi", label: "nav.ask-sasi", icon: Bot },
+      { view: "explore", label: "nav.explore", icon: Compass },
     ],
   },
   {

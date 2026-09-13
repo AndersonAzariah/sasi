@@ -332,6 +332,7 @@ export type View =
   | "how-it-works"
   | "services"
   | "service-detail"
+  | "explore"
   | "security"
   | "privacy"
   | "terms"

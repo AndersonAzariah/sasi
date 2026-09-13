@@ -84,6 +84,7 @@ const DICT: Dict = {
   "nav.cases": { en: "Cases", zu: "Amacala", af: "Sake" },
   "nav.incidents": { en: "Incidents", zu: "Izigameko", af: "Voorvalle" },
   "nav.map": { en: "Map", zu: "Imephu", af: "Kaart" },
+  "nav.explore": { en: "Explore", zu: "Hlolola", af: "Verken" },
   "nav.journeys": { en: "Journeys", zu: "Izinhlelo zokuqhubeka", af: "Trajekte" },
   "nav.documents": { en: "Documents", zu: "Amadokhumenti", af: "Dokumente" },
   "nav.evidence.item": { en: "Evidence", zu: "Ubufakazi", af: "Bewys" },

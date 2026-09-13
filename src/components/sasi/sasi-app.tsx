@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
@@ -9,16 +9,16 @@ import { initDataSaver } from "@/lib/sasi/data-saver";
 import type { View } from "@/lib/sasi/types";
 import { AppShell } from "./app-shell";
 import { PublicShell } from "./public-shell";
-import { CommandPalette } from "./command-palette";
+import { UniversalSearch } from "./universal-search";
 import { PwaRuntime, applyPwaUpdate } from "./pwa";
 import { SasiGsapRuntime } from "./gsap-runtime";
-import { SasiLogo } from "./primitives";
 
 import LandingView from "./views/landing";
 import AboutView from "./views/about";
 import HowItWorksView from "./views/how-it-works";
 import ServicesView from "./views/services";
 import ServiceDetailView from "./views/service-detail";
+import ExploreView from "./views/explore";
 import SecurityView from "./views/security";
 import PrivacyView from "./views/privacy";
 import TermsView from "./views/terms";
@@ -54,6 +54,7 @@ const PUBLIC_VIEWS = new Set<View>([
   "how-it-works",
   "services",
   "service-detail",
+  "explore",
   "security",
   "privacy",
   "terms",
@@ -68,210 +69,11 @@ const PUBLIC_VIEWS = new Set<View>([
 /* Views that are public for visitors but live INSIDE the app shell for a
    signed-in user — opening Services from the sidebar must not feel like a
    logout (no shell swap, no "Sign in" header). */
-const APP_ELIGIBLE_PUBLIC = new Set<View>(["services", "service-detail"]);
-
-/* ============================================================
-   SPLASH — the boot experience: the mark, big, centered, with
-   the national light circulating around it. Below it the
-   wordmark assembles itself, then four national lights ignite
-   one by one while REAL boot phases complete (session restore,
-   sync, map calibration — wired to hydrate(), not a timer
-   lie). No loading bars: progress is four dots and one honest
-   line. Lasts ~5 seconds; a tap or any key skips it honestly.
-   ============================================================ */
-
-const BOOT_MS = 5200;
-
-const BOOT_PHASES = [
-  "Restoring your session",
-  "Syncing reports & evidence",
-  "Calibrating the service map",
-  "Ready",
-] as const;
-
-const BOOT_DOT_COLORS = ["#ef5350", "#64b5f6", "#66bb6a", "#e3c567"];
-const BOOT_PHASE_MS = 850;
-
-function SplashScreen({ onSkip, ready }: { onSkip: () => void; ready: boolean }) {
-  const [phase, setPhase] = useState(0);
-
-  /* phases advance on a rhythm, but never claim a stage the app
-     hasn't reached — the last one waits for real hydration */
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setPhase((p) => {
-        const cap = ready ? BOOT_PHASES.length - 1 : BOOT_PHASES.length - 2;
-        return p < cap ? p + 1 : p;
-      });
-    }, BOOT_PHASE_MS);
-    return () => window.clearInterval(id);
-  }, [ready]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") onSkip();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onSkip]);
-
-  return (
-    <motion.div
-      key="sasi-boot"
-      className="fixed inset-0 z-[80] flex cursor-pointer flex-col items-center justify-center overflow-hidden bg-[#050505]"
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.06, filter: "blur(8px)" }}
-      transition={{ duration: 0.55, ease: [0.32, 0, 0.2, 1] }}
-      onClick={onSkip}
-      role="status"
-      aria-label="SASI is starting — tap anywhere to skip"
-    >
-      {/* dot matrix — melts toward the edges */}
-      <div aria-hidden className="sasi-dot-veil absolute inset-0" />
-
-      {/* breathing national ambience */}
-      <div
-        aria-hidden
-        className="sasi-ambient -left-40 -top-40 h-[520px] w-[520px]"
-        style={{ background: "radial-gradient(closest-side, rgba(229,57,53,0.14), transparent)" }}
-      />
-      <div
-        aria-hidden
-        className="sasi-ambient -bottom-48 -right-32 h-[560px] w-[560px]"
-        style={{ background: "radial-gradient(closest-side, rgba(66,165,245,0.12), transparent)" }}
-      />
-      <div
-        aria-hidden
-        className="sasi-ambient left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2"
-        style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.12), transparent)" }}
-      />
-
-      {/* ------- the mark, scaled big, circulating national light ------- */}
-      <motion.div
-        className="relative flex items-center justify-center"
-        initial={{ opacity: 0, scale: 0.86 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
-      >
-        <div aria-hidden className="sasi-boot-orbit -inset-7" />
-        <div aria-hidden className="sasi-boot-ring -inset-7" />
-        <div
-          aria-hidden
-          className="sasi-ambient left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2"
-          style={{ background: "radial-gradient(closest-side, rgba(212,175,55,0.2), transparent)" }}
-        />
-        <div
-          className="sasi-principle-tile !h-[132px] !w-[132px] !rounded-[34px] sm:!h-[152px] sm:!w-[152px]"
-          aria-hidden
-        >
-          <SasiLogo size={96} withWordmark={false} />
-        </div>
-      </motion.div>
-
-      {/* ------- the wordmark assembles itself under the mark ------- */}
-      <motion.div
-        className="mt-7 flex flex-col items-center"
-        initial="hidden"
-        animate="show"
-        aria-hidden
-      >
-        <div className="flex overflow-hidden">
-          {("SASI" as const).split("").map((ch, i) => (
-            <motion.span
-              key={i}
-              variants={{
-                hidden: { y: 16, opacity: 0, filter: "blur(6px)" },
-                show: { y: 0, opacity: 1, filter: "blur(0px)" },
-              }}
-              transition={{ delay: 0.3 + i * 0.09, duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
-              className="sasi-serif pr-[0.42em] text-[26px] leading-none tracking-[0.1em] text-white last:pr-0"
-            >
-              {ch}
-            </motion.span>
-          ))}
-        </div>
-        {/* national rule sweeping out under the wordmark */}
-        <motion.span
-          className="mt-3 h-px w-24 origin-center rounded-full"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent, #ef5350 18%, #64b5f6 42%, #66bb6a 62%, #e3c567 82%, transparent)",
-          }}
-          initial={{ scaleX: 0, opacity: 0 }}
-          animate={{ scaleX: 1, opacity: 1 }}
-          transition={{ delay: 0.75, duration: 0.9, ease: [0.23, 1, 0.32, 1] }}
-        />
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 0.6 }}
-          className="mt-3 font-mono text-[9px] font-medium uppercase tracking-[0.34em] text-zinc-600"
-        >
-          South African Service Intelligence
-        </motion.p>
-      </motion.div>
-
-      {/* ------- national-light boot phases: four dots, one honest
-              line — the old sweeping bar is gone ------- */}
-      <motion.div
-        className="mt-12 flex w-56 flex-col items-center gap-3"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-      >
-        <div className="flex items-center gap-2.5" aria-hidden>
-          {BOOT_DOT_COLORS.map((c, i) => (
-            <span
-              key={c}
-              className="sasi-boot-dot"
-              data-lit={i <= phase}
-              style={
-                i <= phase
-                  ? { background: c, boxShadow: `0 0 9px ${c}59` }
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-        <div className="h-4" aria-live="polite">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={phase}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.26, ease: "easeOut" }}
-              className="text-center font-mono text-[10.5px] tracking-[0.18em] text-zinc-500"
-            >
-              {BOOT_PHASES[phase].toUpperCase()}
-            </motion.p>
-          </AnimatePresence>
-        </div>
-        <p className="text-center text-[11px] tracking-wide text-zinc-600">
-          Tap anywhere to skip{" "}
-          <kbd className="rounded border border-white/10 bg-white/5 px-1 py-px font-mono text-[9px] text-zinc-500">
-            ESC
-          </kbd>
-        </p>
-      </motion.div>
-
-      {/* honesty line pinned to the boot floor */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="absolute bottom-6 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.24em] text-zinc-700"
-      >
-        <span
-          aria-hidden
-          className="h-1 w-1 rounded-full"
-          style={{ background: "linear-gradient(90deg, #ef5350, #64b5f6, #66bb6a, #e3c567)" }}
-        />
-        Not a government website
-      </motion.p>
-    </motion.div>
-  );
-}
+const APP_ELIGIBLE_PUBLIC = new Set<View>([
+  "services",
+  "service-detail",
+  "explore",
+]);
 
 const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   landing: LandingView,
@@ -279,6 +81,7 @@ const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   "how-it-works": HowItWorksView,
   services: ServicesView,
   "service-detail": ServiceDetailView,
+  explore: ExploreView,
   security: SecurityView,
   privacy: PrivacyView,
   terms: TermsView,
@@ -333,22 +136,14 @@ export function SasiApp() {
   const hydrate = useSasiStore((s) => s.hydrate);
   const updateReady = usePwaStore((s) => s.updateReady);
   const clearUpdateReady = usePwaStore((s) => s.clearUpdateReady);
-  const [mounted, setMounted] = useState(false);
-  const [bootReady, setBootReady] = useState(false);
 
   useEffect(() => {
-    // pull persisted chat / cases / location while the splash is up —
-    // the splash's last boot phase waits for this for real
-    hydrate()
-      .catch(() => undefined)
-      .finally(() => setBootReady(true));
+    // restore persisted chat / cases / location in the background —
+    // the app renders immediately, hydration lands when it lands
+    hydrate().catch(() => undefined);
     // restore the Data Saver choice before anything paints
     initDataSaver();
-    const t = setTimeout(() => setMounted(true), BOOT_MS);
-    return () => clearTimeout(t);
   }, [hydrate]);
-
-  const skipBoot = useCallback(() => setMounted(true), []);
 
   /* a new service worker finished installing in the background → offer the swap */
   useEffect(() => {
@@ -373,24 +168,20 @@ export function SasiApp() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
-      {/* the app mounts beneath the splash so the boot exit reveals it */}
-      {!mounted ? null : (
-        <>
-          {isPublic ? (
-            <PublicShell>
-              <ViewRenderer />
-            </PublicShell>
-          ) : (
-            <AppShell>
-              <ViewRenderer />
-            </AppShell>
-          )}
-          <CommandPalette />
-          <PwaRuntime />
-          <SasiGsapRuntime />
-        </>
-      )}
-      <AnimatePresence>{!mounted && <SplashScreen onSkip={skipBoot} ready={bootReady} />}</AnimatePresence>
+      <>
+        {isPublic ? (
+          <PublicShell>
+            <ViewRenderer />
+          </PublicShell>
+        ) : (
+          <AppShell>
+            <ViewRenderer />
+          </AppShell>
+        )}
+        <UniversalSearch />
+        <PwaRuntime />
+        <SasiGsapRuntime />
+      </>
       <Toaster
         position="bottom-right"
         theme="dark"

@@ -1386,122 +1386,10 @@
 }
 
 /* ============================================================
-   SPLASH + AUTH FASHION LAYER (Task 14)
-   Boot experience + auth screens in the phase-3 language:
-   dot matrix, liquid glass, circulating national light.
+   AUTH FASHION LAYER (Task 14)
+   Auth screens in the phase-3 language: liquid glass,
+   circulating national light. (Boot splash removed in Task 29.)
    ============================================================ */
-
-/* ---------- Dot veil — dots that melt toward the edges ---------- */
-.sasi-dot-veil {
-  background-image: radial-gradient(
-    rgba(255, 255, 255, 0.07) 1px,
-    transparent 1.1px
-  );
-  background-size: 22px 22px;
-  background-position: -1px -1px;
-  -webkit-mask-image: radial-gradient(
-    115% 85% at 50% 42%,
-    #000 28%,
-    rgba(0, 0, 0, 0.45) 62%,
-    transparent 88%
-  );
-  mask-image: radial-gradient(
-    115% 85% at 50% 42%,
-    #000 28%,
-    rgba(0, 0, 0, 0.45) 62%,
-    transparent 88%
-  );
-}
-
-/* ---------- Boot orbit — circulating national light ring ---------- */
-.sasi-boot-ring {
-  position: absolute;
-  border-radius: 9999px;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--sasi-glow-angle),
-    rgba(255, 255, 255, 0.05) 0deg,
-    rgba(229, 57, 53, 0.78) 40deg,
-    rgba(255, 255, 255, 0.04) 92deg,
-    rgba(66, 165, 245, 0.68) 150deg,
-    rgba(255, 255, 255, 0.04) 206deg,
-    rgba(67, 160, 71, 0.62) 258deg,
-    rgba(255, 255, 255, 0.04) 300deg,
-    rgba(212, 175, 55, 0.82) 338deg,
-    rgba(255, 255, 255, 0.05) 360deg
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  animation: sasi-glow-rotate 3.4s linear infinite;
-  filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.16));
-  pointer-events: none;
-}
-
-/* faint static orbit the animated ring travels along */
-.sasi-boot-orbit {
-  position: absolute;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.055);
-  pointer-events: none;
-}
-
-/* ---------- Boot plate — liquid glass slab ---------- */
-.sasi-boot-plate {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 28px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.07),
-    rgba(255, 255, 255, 0.015) 55%,
-    rgba(255, 255, 255, 0.03)
-  );
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.02),
-    0 30px 80px -30px rgba(0, 0, 0, 0.9),
-    0 0 70px -32px rgba(66, 165, 245, 0.22);
-}
-.sasi-boot-plate::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(
-    120% 55% at 50% -10%,
-    rgba(255, 255, 255, 0.12),
-    transparent 60%
-  );
-  pointer-events: none;
-}
-
-/* ---------- Boot phase dots — four national stages (Task 20,
-   replaces the old sweeping boot BAR: progress is now four
-   national lights that ignite one by one, tied to real boot
-   phases, ending in the honest "Ready.") ---------- */
-.sasi-boot-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: none;
-  transition:
-    background 0.45s ease,
-    box-shadow 0.45s ease,
-    transform 0.45s cubic-bezier(0.23, 1, 0.32, 1);
-}
-.sasi-boot-dot[data-lit="true"] {
-  transform: scale(1.25);
-}
 
 /* ---------- Auth glass card — the form's liquid slab ---------- */
 .sasi-auth-card {
@@ -1568,7 +1456,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sasi-boot-ring {
+  .sasi-btn-ring::before {
     animation: none;
   }
 }
@@ -2091,10 +1979,6 @@ strong {
   opacity: min(1, calc(0.88 * var(--sasi-glow-boost, 1)));
 }
 
-/* boot ring rides the same thicker standard */
-.sasi-boot-ring {
-  padding: 2.5px;
-}
 
 /* ============================================================
    TASK 16 — DATA SAVER
@@ -2113,10 +1997,6 @@ strong {
   opacity: 0.08;
   filter: none;
 }
-.sasi-data-saver .sasi-dot-veil {
-  display: none;
-}
-.sasi-data-saver .sasi-boot-ring,
 .sasi-data-saver .sasi-breathe,
 .sasi-data-saver .sasi-shimmer-text,
 .sasi-data-saver .sasi-glow-multi {
