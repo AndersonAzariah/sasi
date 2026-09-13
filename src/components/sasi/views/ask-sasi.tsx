@@ -29,6 +29,8 @@ import { useSasiStore } from "@/lib/sasi/store";
 import { toast } from "sonner";
 import type { ChatMessage } from "@/lib/sasi/types";
 import { RichText } from "../rich-text";
+import { StructuredAnswerView } from "../ai/structured-answer";
+import { writeContextCookie } from "@/lib/sasi/context-metadata";
 import { SasiLogo } from "../primitives";
 
 /* ============================================================
@@ -241,11 +243,17 @@ function AssistantMessage({
   onRef,
   onDraftReport,
   onRetry,
+  questionText,
+  onAsk,
 }: {
   msg: ChatMessage;
   onRef: (ref: string) => void;
   onDraftReport: (id: string) => void;
   onRetry: (id: string) => void;
+  /** the resident's question that produced this answer (drives actions) */
+  questionText: string;
+  /** send a follow-up in this thread (AI actions / related chips) */
+  onAsk: (question: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
@@ -309,6 +317,15 @@ function AssistantMessage({
             </div>
           )}
         </div>
+
+        {msg.state === "done" && !isError && msg.structured && (
+          <StructuredAnswerView
+            structured={msg.structured}
+            msgId={msg.id}
+            questionText={questionText}
+            onAsk={onAsk}
+          />
+        )}
 
         {msg.state === "done" && !isError && msg.actions?.report && (
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -394,6 +411,18 @@ function AssistantMessage({
    VIEW
    ============================================================ */
 
+/** The resident's question that produced assistant message `id` —
+    used to title AI actions (Save / Create Reminder). Empty when the
+    thread has no preceding user message. */
+function questionBefore(messages: ChatMessage[], id: string): string {
+  const idx = messages.findIndex((m) => m.id === id);
+  for (let i = idx - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role === "user" && m.content.trim()) return m.content.trim();
+  }
+  return "";
+}
+
 export default function AskSasiView() {
   const chatMessages = useSasiStore((s) => s.chatMessages);
   const chatBusy = useSasiStore((s) => s.chatBusy);
@@ -409,12 +438,45 @@ export default function AskSasiView() {
   const draftReportFromChat = useSasiStore((s) => s.draftReportFromChat);
   const briefingBusy = useSasiStore((s) => s.briefingBusy);
   const briefingFromChat = useSasiStore((s) => s.briefingFromChat);
+  const view = useSasiStore((s) => s.view);
+  const param = useSasiStore((s) => s.param);
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const consumedPending = useRef(false);
   const [showJump, setShowJump] = useState(false);
+
+  /* ---------- Phase 10 — contextual AI ----------
+     Publish the resident's current view context in a short-lived
+     cookie so the /api/sasi/ask fetch attaches it automatically
+     ("What documents do I need?" while viewing a service resolves
+     "I" to THAT service). Sanitised again server-side. */
+  useEffect(() => {
+    writeContextCookie({ view, param: param ?? null });
+  }, [view, param]);
+
+  /* ---------- document intelligence hand-off (Task 28-d) ----------
+     Documents view asks a question about a specific document: it
+     navigates here with the question as param AND dispatches the
+     sasi:prefill-question event. Both paths land in the composer —
+     never auto-sent, the resident stays in control. */
+  useEffect(() => {
+    const prefill = (q: string) => {
+      const text = q.trim().slice(0, MAX_INPUT);
+      if (!text) return;
+      setInput(text);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    };
+    const onEvent = (e: Event) => {
+      const q = (e as CustomEvent<{ question?: string }>).detail?.question;
+      if (typeof q === "string") prefill(q);
+    };
+    window.addEventListener("sasi:prefill-question", onEvent);
+    /* param-based prefill (deep link with ?p=<question>) */
+    if (param && param !== pendingAsk) prefill(param);
+    return () => window.removeEventListener("sasi:prefill-question", onEvent);
+  }, [param]);
 
   /* consume a question queued from the command palette */
   useEffect(() => {
@@ -699,6 +761,8 @@ export default function AskSasiView() {
                       onRef={onRef}
                       onDraftReport={draftReportFromChat}
                       onRetry={retry}
+                      questionText={questionBefore(chatMessages, m.id)}
+                      onAsk={send}
                     />
                   )
                 )}

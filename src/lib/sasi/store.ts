@@ -1419,6 +1419,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
               text?: string;
               refs?: string[];
               suggestReport?: boolean;
+              structured?: unknown;
               message?: string;
             };
             if (evt.type === "delta" && typeof evt.text === "string") {
@@ -1431,6 +1432,9 @@ export const useSasiStore = create<SasiState>((set, get) => ({
                 state: "done",
                 refs: evt.refs,
                 actions: evt.suggestReport ? { report: true } : undefined,
+                /* Task 28-b — the server already validated + corroborated
+                   this structured answer before emitting it */
+                structured: (evt.structured ?? undefined) as ChatMessage["structured"],
               });
             } else if (evt.type === "error") {
               finished = true;
@@ -1478,6 +1482,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         reply?: string;
         refs?: string[];
         suggestReport?: boolean;
+        structured?: unknown;
         error?: string;
       };
       if (!res.ok || !data.reply) throw new Error(data.error ?? "SASI could not answer right now.");
@@ -1485,6 +1490,7 @@ export const useSasiStore = create<SasiState>((set, get) => ({
         content: data.reply,
         refs: data.refs,
         actions: data.suggestReport ? { report: true } : undefined,
+        structured: (data.structured ?? undefined) as ChatMessage["structured"],
         state: "done",
       });
       set({ chatBusy: false });
