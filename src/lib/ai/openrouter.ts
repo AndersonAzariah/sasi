@@ -27,8 +27,14 @@ import {
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 /** Sensible default so the app works out of the box; deployments
-    override with OPENROUTER_MODEL in the environment. */
-const DEFAULT_MODEL = "openai/gpt-4o-mini";
+    override with OPENROUTER_MODEL in the environment.
+    Task 31: the owner's OpenRouter key is FREE-TIER ONLY, so the
+    default must be a free model — verified live against the real
+    provider for strict-JSON structured output (answer/whatYouNeed/
+    nextStep/service/officialSource all emitted and parseable).
+    The previous default (openai/gpt-4o-mini) is a paid model and
+    failed with 402-class errors on a free-only key. */
+const DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_MAX_TOKENS = 1200;
 const DEFAULT_TEMPERATURE = 0.4;
@@ -130,7 +136,12 @@ export class OpenRouterProvider implements AIProvider {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
           "HTTP-Referer": appBaseUrl(),
-          "X-Title": "SASI — South African Service Intelligence",
+          /* ByteString-safe: HTTP header values must be latin1 (0-255).
+             The previous title contained an em dash (U+2014), which made
+             Node's fetch throw synchronously — every provider call failed
+             before it left the server while Bun's dev tooling tolerated
+             it, so the bug only surfaced in the real Node runtime. */
+          "X-Title": "SASI - South African Service Intelligence",
         },
         body: JSON.stringify({
           model,
@@ -146,6 +157,14 @@ export class OpenRouterProvider implements AIProvider {
       if (err instanceof Error && err.name === "AbortError") {
         throw new AIProviderError("timeout", `The AI provider did not answer within ${timeoutMs}ms.`);
       }
+      /* Server log carries the real cause (message/cause codes only —
+         never headers or the key) so a production outage is diagnosable
+         from the platform logs; the client still gets a generic error. */
+      console.error(
+        "[openrouter] fetch failed:",
+        err instanceof Error ? err.message : err,
+        err instanceof Error && err.cause ? `| cause: ${String(err.cause)}` : ""
+      );
       throw new AIProviderError("upstream", "The AI provider could not be reached.");
     }
     clearTimeout(timer);
