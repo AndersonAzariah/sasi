@@ -33,6 +33,18 @@ describe("detectIntent", () => {
     expect(i.nearby).toBe(false);
     expect(i.verify).toBe(false);
   });
+
+  test("rights questions route to Explore (Task 30)", () => {
+    expect(detectIntent("What are my rights?").rights).toBe(true);
+    expect(detectIntent("know my rights as a tenant").rights).toBe(true);
+    expect(detectIntent("passport").rights).toBe(false);
+  });
+
+  test("document-explanation requests route to Documents (Task 30)", () => {
+    expect(detectIntent("Explain this document").documents).toBe(true);
+    expect(detectIntent("what does this letter mean").documents).toBe(true);
+    expect(detectIntent("passport").documents).toBe(false);
+  });
 });
 
 describe("searchSASI", () => {

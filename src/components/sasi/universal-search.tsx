@@ -337,6 +337,26 @@ export function UniversalSearch() {
         perform: () => navigate("report"),
       });
     }
+    if (result.intent.rights) {
+      out.push({
+        id: "intent-rights",
+        group: "actions",
+        icon: BookOpen,
+        title: "Explore your rights",
+        subtitle: "Civic topics and public information",
+        perform: () => navigate("explore"),
+      });
+    }
+    if (result.intent.documents) {
+      out.push({
+        id: "intent-documents",
+        group: "actions",
+        icon: FileText,
+        title: "Open your documents",
+        subtitle: "Upload or explain a document",
+        perform: () => navigate("documents"),
+      });
+    }
 
     return out;
   }, [query, result, navigate, openService, setPendingAsk]);
@@ -361,7 +381,9 @@ export function UniversalSearch() {
     result.total === 0 &&
     !result.intent.nearby &&
     !result.intent.verify &&
-    !result.intent.report;
+    !result.intent.report &&
+    !result.intent.rights &&
+    !result.intent.documents;
 
   /* ---------- keyboard selection ---------- */
   const scrollOptionIntoView = (index: number) => {

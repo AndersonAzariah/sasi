@@ -54,6 +54,10 @@ export interface SearchIntent {
   verify: boolean;
   /** "water leaking in my street" → offer the report flow */
   report: boolean;
+  /** "what are my rights?" → route to Explore's civic topics (Task 30) */
+  rights: boolean;
+  /** "explain this document" → route to the documents workspace (Task 30) */
+  documents: boolean;
 }
 
 export interface SearchResult {
@@ -78,6 +82,13 @@ const VERIFY_RE =
   /\b(fake|scam|phishing|legit(imate)?|verify|verification|suspicious|hoax|real or fake|is this (real|true|genuine)|check (this )?(message|sms|number|link|sender))\b/i;
 const REPORT_RE =
   /\b(report|leak(ing|age)?|burst|outage|no water|no electricity|pothole|broken|blocked|overflowing|not working|power cut|water cut)\b/i;
+/* Task 30 — intent routing checks: rights questions belong to Explore's
+   civic topics; document-explanation requests belong to the documents
+   workspace (never to the AI as a first resort). */
+const RIGHTS_RE =
+  /\b(my rights|your rights|consumer rights|patient rights|tenant rights|human rights|what rights|rights (do i|am i|when)|know my rights|entitled to)\b/i;
+const DOCUMENTS_RE =
+  /\b(explain (this|my|the) (document|doc|letter|notice|bill|statement|affidavit)|what does this (document|letter|notice|bill|statement) mean|read my (document|letter|bill)|document (help|meaning))\b/i;
 
 export function detectIntent(query: string): SearchIntent {
   const q = query.trim();
@@ -85,6 +96,8 @@ export function detectIntent(query: string): SearchIntent {
     nearby: NEARBY_RE.test(q),
     verify: VERIFY_RE.test(q),
     report: REPORT_RE.test(q) && !VERIFY_RE.test(q),
+    rights: RIGHTS_RE.test(q),
+    documents: DOCUMENTS_RE.test(q),
   };
 }
 
@@ -96,8 +109,24 @@ function normalise(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/* Question words add noise, not signal: "what are my rights" would
+   otherwise score services on "what"/"are"/"my" and drown the real
+   matches (Task 30 — ranking polish). Intent routing still sees the
+   full query, so only SCORING filters these. */
+const STOPWORDS = new Set([
+  "what", "who", "why", "how", "when", "where", "which",
+  "are", "is", "was", "were", "be", "been", "do", "does", "did",
+  "a", "an", "the", "of", "to", "for", "in", "on", "at", "by", "with",
+  "and", "or", "but", "can", "could", "should", "would", "will",
+  "i", "my", "me", "we", "you", "your", "it", "its", "this", "that",
+  "get", "got", "need", "want", "some", "any", "about",
+]);
+
 function tokenise(s: string): string[] {
-  return normalise(s).split(" ").filter(Boolean);
+  return normalise(s)
+    .split(" ")
+    .filter(Boolean)
+    .filter((t) => !STOPWORDS.has(t));
 }
 
 /** score = how strongly a field matches the query tokens */
@@ -173,7 +202,7 @@ export function searchSASI(
   const query = rawQuery.trim().slice(0, 120);
   const empty: SearchResult = {
     query,
-    intent: { nearby: false, verify: false, report: false },
+    intent: { nearby: false, verify: false, report: false, rights: false, documents: false },
     services: [],
     journeys: [],
     organisations: [],
