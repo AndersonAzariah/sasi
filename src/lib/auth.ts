@@ -22,6 +22,18 @@ import { rateLimitService } from "@/lib/sasi/api-auth";
    canonical Vercel URL (VERCEL_PROJECT_PRODUCTION_URL / VERCEL_URL)
    is used so a fresh deployment works before any custom env var is
    configured. Setting NEXTAUTH_URL explicitly always wins.
+
+  STABLE DEV SECRET (Task 30): NextAuth v4's no-secret dev fallback
+  derives the signing key from a hash of the runtime options, and
+  under Next 16 / Turbopack on-demand compilation that derivation is
+  NOT stable between the request that issues a CSRF cookie or JWT
+  and the request that validates it — the first sign-in after a
+  server start fails CSRF validation ("signin?csrf=true") and later
+  requests log JWT_SESSION_ERROR "decryption operation failed".
+  Production is unaffected: NextAuth v4 refuses to run in production
+  without NEXTAUTH_SECRET (the owner must set it in Vercel — name
+  only, never a committed value), so this fallback is guarded to
+  non-production and is a public, non-secret constant by design.
    ============================================================ */
 
 /** Trusted origin resolution — explicit env first, Vercel's automatic
@@ -60,6 +72,13 @@ declare module "next-auth" {
 }
 
 export const authOptions: NextAuthOptions = {
+  /* Dev-only stable signing key — see the STABLE DEV SECRET note above.
+     Production must set NEXTAUTH_SECRET; v4 hard-fails without it. */
+  secret:
+    process.env.NEXTAUTH_SECRET ??
+    (process.env.NODE_ENV !== "production"
+      ? "sasi-dev-only-stable-secret"
+      : undefined),
   session: {
     strategy: "jwt",
     /* 30 days — a resident's phone should stay signed in like an app. */
@@ -122,7 +141,6 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
 };
 
 /** Server-side session accessor for API routes. */
