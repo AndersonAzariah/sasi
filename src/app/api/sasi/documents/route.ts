@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
 import { db } from "@/lib/db";
 import { getAuthSession } from "@/lib/auth";
+import { AIProviderError, aiHttpStatus, getAIProvider } from "@/lib/ai";
+import { DOCUMENT_ANALYST_PROMPT as DOC_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { rateLimitService, tooManyRequests } from "@/lib/sasi/api-auth";
 
 /* ============================================================
@@ -180,63 +181,40 @@ function extractAnalysis(raw: string): { summary: string; keyInfo: DocKeyInfo } 
   }
 }
 
-const DOC_SYSTEM_PROMPT = `You are SASI's document analyst — part of South African Service Intelligence. A resident uploaded one personal document (for example an ID document, affidavit, utility bill, municipal notice, medical letter, payslip, lease agreement, bank or school letter). Explain what it means for THEM, in plain South African civic English.
-
-Reply with STRICT JSON only (no markdown fences, no prose):
-{
-  "summary": "2-4 plain sentences: what this document is and what it says (max ~400 chars)",
-  "importantInfo": ["short facts present in the document: names, account or reference numbers, amounts, statuses, addresses, meter numbers, contact details..."],
-  "dates": [{ "label": "what the date is (e.g. 'Due date', 'Valid until', 'Statement period')", "value": "the date exactly as written in the document", "iso": "YYYY-MM-DD only when the document states the date unambiguously, otherwise omit" }],
-  "actions": ["concrete things the document itself asks or requires of the resident (e.g. 'Pay R342.10 by 30 June 2025', 'Bring the letter to the Home Affairs office')"]
-}
-
-ABSOLUTE HONESTY RULES
-- Use ONLY information present in the document. NEVER invent dates, amounts, reference numbers, requirements, deadlines or advice. If a section has no content in the document, return an empty array ([]) — never a guess.
-- Add a dates entry only when a date actually appears in the document, and copy the value as written.
-- Do not add legal or financial advice of your own; frame actions as what the document asks or requires.
-- If the text is garbled, mostly unreadable, or does not look like a real document, say exactly that honestly in summary and return empty arrays for the rest.
-- South African civic context (municipalities, SARS, Home Affairs, Eskom, Joburg Water, rands, dates often written DD/MM/YYYY).`;
-
 async function analyseText(name: string, mime: string, text: string) {
-  const zai = await ZAI.create();
-  const completion = (await zai.chat.completions.create({
+  const provider = getAIProvider();
+  const completion = await provider.complete({
     messages: [
-      { role: "assistant", content: DOC_SYSTEM_PROMPT },
+      { role: "system", content: DOC_SYSTEM_PROMPT },
       {
         role: "user",
         content: `DOCUMENT FILE: "${name}" (${mime})\n\nDOCUMENT TEXT:\n<<<\n${text}\n>>>\n\nExtract the document analysis JSON now. Reply with the JSON object only.`,
       },
     ],
-    thinking: { type: "disabled" },
-  })) as { choices?: { message?: { content?: string } }[] };
-  const raw = completion.choices?.[0]?.message?.content ?? "";
-  return extractAnalysis(raw);
+  });
+  return extractAnalysis(completion.text);
 }
 
-/** Images follow the /api/sasi/vision pattern: one createVision call with
- *  the strict JSON contract. The model may only report what is legible. */
+/** Images follow the vision route pattern: one multimodal completion
+ *  with the strict JSON contract. The model may only report what is
+ *  legible — the provider picks the vision model for image parts. */
 async function analyseImage(name: string, dataUrl: string) {
-  const zai = await ZAI.create();
-  const visionBody = {
+  const provider = getAIProvider();
+  const completion = await provider.complete({
     messages: [
       {
-        role: "user" as const,
+        role: "user",
         content: [
           {
-            type: "text" as const,
+            type: "text",
             text: `${DOC_SYSTEM_PROMPT}\n\nThe "document" is a photo or scan the resident uploaded of "${name}". Read ONLY what is legible in the image. If parts are cut off or unreadable, say so honestly and do not fill the gaps. Analyse this document image now. Reply with the JSON object only.`,
           },
-          { type: "image_url" as const, image_url: { url: dataUrl } },
+          { type: "image_url", image_url: { url: dataUrl } },
         ],
       },
     ],
-    thinking: { type: "disabled" as const },
-  };
-  const completion = (await zai.chat.completions.createVision(
-    visionBody as unknown as Parameters<typeof zai.chat.completions.createVision>[0]
-  )) as { choices?: { message?: { content?: string } }[] };
-  const raw = completion.choices?.[0]?.message?.content ?? "";
-  return extractAnalysis(raw);
+  });
+  return extractAnalysis(completion.text);
 }
 
 /** Serialize a DB row for the client: keyInfo parsed for convenience,
@@ -381,9 +359,14 @@ export async function POST(req: Request) {
         "SASI read the file but could not structure a reliable analysis, so it saved none rather than guess. You can delete this document and try again.";
     }
   } catch (err) {
-    console.error("[/api/sasi/documents POST] analysis failed:", err);
+    console.error(
+      "[/api/sasi/documents POST] analysis failed:",
+      err instanceof Error ? err.message : err
+    );
     analysisError =
-      "SASI could not analyse this document just now. The file is saved below without an analysis — you can delete it or try again.";
+      err instanceof AIProviderError && err.code === "not_configured"
+        ? "SASI AI is temporarily unavailable. The platform's AI provider is not configured."
+        : "SASI could not analyse this document just now. The file is saved below without an analysis — you can delete it or try again.";
   }
 
   /* Persist metadata + validated analysis ONLY. Raw file bytes are

@@ -16,7 +16,32 @@ import { rateLimitService } from "@/lib/sasi/api-auth";
      account-creation path (POST /api/sasi/auth/signup).
    - The SPA renders its own sign-in surface (/ ?view=login), so
      NextAuth's built-in pages are never shown.
+
+   PRODUCTION RESILIENCE (Task 29): NextAuth v4 requires a trusted
+   origin in production. When NEXTAUTH_URL is not set explicitly, the
+   canonical Vercel URL (VERCEL_PROJECT_PRODUCTION_URL / VERCEL_URL)
+   is used so a fresh deployment works before any custom env var is
+   configured. Setting NEXTAUTH_URL explicitly always wins.
    ============================================================ */
+
+/** Trusted origin resolution — explicit env first, Vercel's automatic
+    deployment variables next, localhost as the dev fallback. */
+function resolveAuthUrl(): string {
+  const explicit = process.env.NEXTAUTH_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercelProduction = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProduction) return `https://${vercelProduction.replace(/\/$/, "")}`;
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) return `https://${vercelUrl.replace(/\/$/, "")}`;
+  return "http://localhost:3000";
+}
+
+/* NextAuth v4 reads NEXTAUTH_URL from the environment at request time —
+   seed it with the derived value when it is not configured so a fresh
+   Vercel deployment trusts its own production URL without extra setup. */
+if (!process.env.NEXTAUTH_URL?.trim()) {
+  process.env.NEXTAUTH_URL = resolveAuthUrl();
+}
 
 /* Module augmentation: every session carries the real database id. */
 declare module "next-auth" {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
+import { aiHttpStatus, getAIProvider } from "@/lib/ai";
 import {
   clientIp,
   rateLimitService,
@@ -40,24 +40,7 @@ const MAX_BASE64_CHARS = 5_000_000; // ~3.7MB binary
 const MAX_BODY_BYTES = 7_500_000;
 const ALLOWED_MIME = /^data:(image\/(png|jpe?g|webp));base64,/;
 
-const SYSTEM_PROMPT = `You are SASI's evidence analyst — part of South African Service Intelligence. A resident is reporting an everyday civic service problem (water, electricity, roads, waste, healthcare, education, housing, documents, safety, local government) and attached a photo.
-
-Analyse the photo and reply with STRICT JSON only (no markdown fences, no prose):
-{
-  "what_i_see": "1-2 plain sentences describing the scene factually",
-  "service_guess": "water|electricity|roads|waste|healthcare|education|housing|documents|safety|local-government|other",
-  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
-  "useful_for": ["2-4 short phrases: what this photo helps prove or document"],
-  "notable": ["0-3 short observations: hazards, landmarks, timestamps, visible infrastructure, anything identifying (do NOT repeat people's faces or number plates)"],
-  "suggested_caption": "one factual caption ≤ 90 chars, suitable as an evidence note",
-  "quality_tip": "one short tip to make the photo more useful as evidence (angle, scale reference, timestamp)"
-}
-
-RULES
-- South African civic context (municipal infrastructure, Joburg Water, Eskom, COJ, taxis, robots=traffic lights,thag terms like "burst pipe", "padmount transformer").
-- If the photo does not show a civic problem, say so honestly in what_i_see and set severity LOW.
-- NEVER identify or name people. Never guess exact addresses. No fabrication: only describe what is visible.
-- Severity: LOW = cosmetic/old issue; MEDIUM = inconvenience; HIGH = property/damage/health risk; CRITICAL = immediate danger to life.`;
+import { EVIDENCE_VISION_PROMPT as SYSTEM_PROMPT } from "@/lib/ai/prompts";
 
 function extractJson(raw: string): EvidenceAnalysis | null {
   let text = raw.trim();
@@ -144,30 +127,26 @@ export async function POST(req: Request) {
     .join(" ");
 
   try {
-    const zai = await ZAI.create();
-    /* model is intentionally omitted — the backend assigns its default
-       vision model (currently glm-5v-turbo). The SDK type marks `model`
-       as required, so the body is passed through a loose cast. */
-    const visionBody = {
+    const provider = getAIProvider();
+    /* multimodal content parts — the provider picks the vision model
+       automatically when an image part is present (OPENROUTER_VISION_MODEL
+       overrides it; otherwise the main model is used) */
+    const completion = await provider.complete({
       messages: [
         {
-          role: "user" as const,
+          role: "user",
           content: [
             {
-              type: "text" as const,
+              type: "text",
               text: `${SYSTEM_PROMPT}\n\n${contextLine || "No extra context."}\n\nAnalyse this photo now. Reply with the JSON object only.`,
             },
-            { type: "image_url" as const, image_url: { url: image } },
+            { type: "image_url", image_url: { url: image } },
           ],
         },
       ],
-      thinking: { type: "disabled" as const },
-    };
-    const completion = (await zai.chat.completions.createVision(
-      visionBody as unknown as Parameters<typeof zai.chat.completions.createVision>[0]
-    )) as { choices?: { message?: { content?: string } }[] };
+    });
 
-    const raw = completion.choices?.[0]?.message?.content ?? "";
+    const raw = completion.text;
     const analysis = extractJson(raw);
     if (!analysis) {
       return NextResponse.json(
@@ -177,10 +156,11 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ analysis });
   } catch (err) {
-    console.error("[/api/sasi/vision] analysis failed:", err);
+    console.error("[/api/sasi/vision] analysis failed:", err instanceof Error ? err.message : err);
+    const http = aiHttpStatus(err, "SASI could not analyse that photo just now. Please try again in a moment.");
     return NextResponse.json(
-      { error: "SASI could not analyse that photo just now. Please try again in a moment." },
-      { status: 502 }
+      { error: http.message, code: http.code },
+      { status: http.status }
     );
   }
 }

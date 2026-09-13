@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
 import { db } from "@/lib/db";
+import { getAuthSession } from "@/lib/auth";
 import { SERVICES } from "@/lib/sasi/utils";
 import type { ChatRole } from "@/lib/sasi/types";
+import { aiHttpStatus, getAIProvider } from "@/lib/ai";
+import { buildAskSystemPrompt } from "@/lib/ai/prompts";
 import {
   corroborateStructured,
   extractJsonBlock,
@@ -146,53 +148,17 @@ function compactContext(rawCases: AskCase[], location: AskBody["location"]): str
   ].join("\n");
 }
 
-const TRUST_RULES = `VOICE
-- Warm, practical, direct. Plain English with South African context (municipalities, wards, Eskom, Joburg Water, COJ, load-shedding, water-shedding).
-- Short paragraphs or tight bullet lists. Bold the key phrase of each bullet. Never exceed ~160 words unless the user asks for detail.
-- Never lecture. Never repeat the question back.
-
-INDEPENDENCE AND TRUST RULES (non-negotiable)
-- You are an independent platform, NOT a government body and NOT an emergency service. For life-threatening emergencies, tell the user to call 10111 (police) or 10177 (ambulance) immediately.
-- You never claim to have contacted, notified, or filed anything with any authority. SASI only drafts actions and the user explicitly approves each one before it is submitted.
-- Never fabricate official confirmations, reference numbers, or outcomes. If you reference the user's cases below, use only the refs and statuses listed. Any claim you cannot verify from the context or general public knowledge should be labelled as something SASI would verify (e.g. "worth confirming with the utility").
-- SASI's own reminders, saved items and cases are NOT official government communications — never describe them as official notices, and never imply a government body sent them.
-- When a user's message reads like a new service problem, offer to start a structured report ("Report an issue") or an investigation — those flows exist in this app.
-
-HONESTY RULES FOR STRUCTURED FIELDS (non-negotiable)
-- Only reference services or journeys that exist in the SERVICE REGISTRY / FOCUS SERVICE blocks below. Never invent slugs, journeyIds or titles.
-- Never invent dates, deadlines, fees, reference numbers, or requirements. Requirements you give must be general public knowledge or come from the registry/context — if you are not sure, say so in answer.
-- officialSource: include it ONLY when you are certain of the real official URL (a gov.za domain you know). When unsure, OMIT the whole field — a missing source is honest, a wrong one is fabrication.
-- If you are unsure about anything material, say so plainly inside answer. Honesty beats completeness.`;
-
-const OUTPUT_CONTRACT = `OUTPUT FORMAT (strict — this is a machine contract)
-Reply with ONE JSON object and nothing else: no markdown fences, no prose before or after it. Shape:
-{
-  "answer": "your full reply in the SASI voice (markdown-lite: **bold**, '- ' bullets, '## ' headings). The resident only ever reads this field.",
-  "whatYouNeed": ["optional — documents/info the resident must have, one short item each; omit when not applicable"],
-  "nextStep": "optional — the single most useful next action, one sentence; omit when not applicable",
-  "service": { "slug": "<slug from the SERVICE REGISTRY below>", "title": "<its exact registry title>" },
-  "journey": { "journeyId": "<journeyId from the registry>", "title": "<the registry title>" },
-  "officialSource": { "org": "publishing organisation", "url": "https://…" },
-  "related": ["optional — up to 3 short related topics worth asking next"]
+/* the prompt text lives in src/lib/ai/prompts.ts — centralized for
+   every AI feature (Task 29 §9); the builders here only fold in the
+   per-request registry/context blocks */
+function makeSystemPrompt(
+  context: string,
+  registryBlock: string,
+  contextBlock: string,
+  focusBlock: string | null
+): string {
+  return buildAskSystemPrompt({ context, registryBlock, contextBlock, focusBlock });
 }
-- Omit optional fields entirely when they do not apply (small talk, case-status chats, vague questions → answer only).
-- The JSON must be valid: escape quotes and newlines inside strings.`;
-
-const SYSTEM_PROMPT = (context: string, registryBlock: string, contextBlock: string, focusBlock: string | null) =>
-  `You are SASI — the South African Service Intelligence assistant. You help South African residents understand and resolve everyday civic service problems (water, electricity, roads, waste, healthcare, education, housing, documents, safety, local government).
-
-${TRUST_RULES}
-
-${OUTPUT_CONTRACT}
-
-${registryBlock}
-
-${focusBlock ? `${focusBlock}\n\n` : ""}USER CONTEXT (the resident's real, live data — reference only the refs listed)
-${context}
-
-If the user asks what you can do: investigate civic problems across official + public sources, correlate with the user's own evidence and photos, draft findings with confidence levels, and prepare an approved-only service report to the relevant authority.${
-    contextBlock ? `\n\n${contextBlock}` : ""
-  }`;
 
 function cleanSession(raw: string | undefined | null): string | null {
   if (!raw) return null;
@@ -291,17 +257,20 @@ interface AskResult {
 }
 
 async function runAsk(
-  zai: Awaited<ReturnType<typeof ZAI.create>>,
   systemPrompt: string,
   msgs: { role: ChatRole; content: string }[]
 ): Promise<AskResult> {
-  const completion = (await zai.chat.completions.create({
-    messages: [{ role: "assistant" as const, content: systemPrompt }, ...msgs],
-    thinking: { type: "disabled" as const },
-  })) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const modelRaw = completion.choices?.[0]?.message?.content?.trim() ?? "";
+  const provider = getAIProvider();
+  /* the provider abstraction speaks proper roles — the system prompt
+     goes in as "system" (the z-ai quirk that mapped it to "assistant"
+     retired with the SDK swap) */
+  const completion = await provider.complete({
+    messages: [
+      { role: "system", content: systemPrompt },
+      ...msgs.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+    ],
+  });
+  const modelRaw = completion.text.trim();
 
   const parsed = extractJsonBlock(modelRaw);
   const validated = parsed ? validateStructuredAnswer(parsed) : null;
@@ -347,6 +316,13 @@ export async function POST(req: Request) {
   const sessionId = cleanSession(body.sessionId);
   const lastUser = msgs[msgs.length - 1];
 
+  /* ownership: the account identity comes from the authenticated
+     session server-side — never from anything the client sends */
+  let userId: string | null = null;
+  try {
+    userId = (await getAuthSession())?.user?.id ?? null;
+  } catch { userId = null; }
+
   /* Phase 10 — the resident's current view context. An explicit
      body.context wins (future store versions); today the Ask SASI view
      publishes the same data in a short-lived sasi_ctx cookie that the
@@ -363,7 +339,7 @@ export async function POST(req: Request) {
   if (sessionId) {
     try {
       await db.chatMessage.create({
-        data: { sessionId, role: "user", content: lastUser.content.slice(0, 4000) },
+        data: { sessionId, userId, role: "user", content: lastUser.content.slice(0, 4000) },
       });
     } catch (err) {
       console.error("[/api/sasi/ask] user message persist failed:", err);
@@ -373,15 +349,14 @@ export async function POST(req: Request) {
   const wantStream = body.stream !== false;
 
   try {
-    const zai = await ZAI.create();
-    const systemPrompt = SYSTEM_PROMPT(
+    const systemPrompt = makeSystemPrompt(
       compactContext(body.cases ?? [], body.location),
       registryGroundingBlock(),
       contextBlock,
       focusBlock
     );
 
-    const { reply, structured } = await runAsk(zai, systemPrompt, msgs);
+    const { reply, structured } = await runAsk(systemPrompt, msgs);
     if (!reply) {
       return NextResponse.json(
         { error: "SASI could not answer right now. Please try again." },
@@ -399,6 +374,7 @@ export async function POST(req: Request) {
           await db.chatMessage.create({
             data: {
               sessionId,
+              userId,
               role: "assistant",
               content: reply.slice(0, 8000),
               refs: refs.length ? JSON.stringify(refs) : null,
@@ -457,6 +433,7 @@ export async function POST(req: Request) {
               await db.chatMessage.create({
                 data: {
                   sessionId,
+                  userId,
                   role: "assistant",
                   content: reply.slice(0, 8000),
                   refs: refs.length ? JSON.stringify(refs) : null,
@@ -491,10 +468,11 @@ export async function POST(req: Request) {
       },
     });
   } catch (err) {
-    console.error("[/api/sasi/ask] assistant failed:", err);
+    console.error("[/api/sasi/ask] assistant failed:", err instanceof Error ? err.message : err);
+    const http = aiHttpStatus(err, "SASI could not reach the assistant service. Please try again in a moment.");
     return NextResponse.json(
-      { error: "SASI could not reach the assistant service. Please try again in a moment." },
-      { status: 502 }
+      { error: http.message, code: http.code },
+      { status: http.status }
     );
   }
 }

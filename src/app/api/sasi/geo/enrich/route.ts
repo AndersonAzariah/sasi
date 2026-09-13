@@ -5,6 +5,8 @@ import {
   rateLimitService,
   tooManyRequests,
 } from "@/lib/sasi/api-auth";
+import { getAIProvider } from "@/lib/ai";
+import { ADDRESS_REFINEMENT_PROMPT as SYSTEM_PROMPT } from "@/lib/ai/prompts";
 
 /* ============================================================
    SASI GEO ENRICH (Task 21)
@@ -24,17 +26,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-/** Free-tier model chain — tried in order, first usable JSON wins.
- *  Slugs verified against the live OpenRouter catalogue (the free
- *  pool rotates; each fallback keeps the feature alive). */
-const FREE_MODELS = [
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "google/gemma-4-31b-it:free",
-  "nex-agi/nex-n2.5-pro:free",
-  "thinkingmachines/inkling-small:free",
-];
 
 /** tiny TTL cache keyed by ~11 m grid cells (4 decimals) */
 const CACHE = new Map<string, { at: number; payload: unknown }>();
@@ -89,27 +80,6 @@ async function nominatimReverse(lat: number, lng: number) {
 }
 
 /* ---------- layer 2: OpenRouter free models ---------- */
-
-const SYSTEM_PROMPT = `You are SASI's South African address-intelligence engine.
-You receive device GPS coordinates and an OpenStreetMap reverse-geocode result.
-Your job: verify, correct and normalise them into ONE precise address.
-
-Hard rules:
-- OSM data is ground truth for what exists. NEVER invent or upgrade a street
-  number/name that OSM did not report. If OSM has no street, say so in notes
-  and use the suburb/city level instead.
-- You MAY correct spelling, suburb aliases (e.g. South African townships and
-  suburbs with dual names), and city/province misassignments using your
-  knowledge of South African geography.
-- province must be one of: Eastern Cape, Free State, Gauteng, KwaZulu-Natal,
-  Limpopo, Mpumalanga, Northern Cape, North West, Western Cape.
-- confidence: "high" if street-level address is present and plausible;
-  "medium" if only suburb-level; "low" if the area is uncertain.
-- notes: one short sentence in plain English, honest about any uncertainty.
-- landmark: a nearby well-known place if you are confident, else "".
-
-Reply with ONLY minified JSON, no markdown, exactly:
-{"streetAddress":string,"suburb":string,"city":string,"province":string,"postalCode":string,"oneLine":string,"landmark":string,"confidence":"high"|"medium"|"low","notes":string}`;
 
 interface AiAddress {
   streetAddress?: string;
@@ -168,46 +138,24 @@ async function openRouterRefine(
   osm: NominatimResult,
   hint?: string
 ): Promise<AiAddress | null> {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return null;
+  const provider = getAIProvider();
+  if (!provider.isConfigured()) return null;
 
-  for (const model of FREE_MODELS) {
-    try {
-      const data = (await fetchJson(
-        OPENROUTER_URL,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${key}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:3000",
-            "X-Title": "SASI civic intelligence",
-          },
-          body: JSON.stringify({
-            model,
-            temperature: 0.1,
-            max_tokens: 500,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              {
-                role: "user",
-                content: buildUserPrompt(lat, lng, accuracyM, osm, hint),
-              },
-            ],
-          }),
-        },
-        14000
-      )) as {
-        choices?: { message?: { content?: string } }[];
-      };
-      const content = data?.choices?.[0]?.message?.content ?? "";
-      const parsed = extractJson(content);
-      if (parsed) return parsed;
-    } catch {
-      /* try the next free model */
-    }
+  try {
+    const completion = await provider.complete({
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: buildUserPrompt(lat, lng, accuracyM, osm, hint) },
+      ],
+      temperature: 0.1,
+      maxTokens: 500,
+      timeoutMs: 14_000,
+    });
+    return extractJson(completion.text);
+  } catch {
+    /* AI refinement unavailable — the route degrades to OSM-only honestly */
+    return null;
   }
-  return null;
 }
 
 /* ---------- layer 3: coords-only fallback ---------- */

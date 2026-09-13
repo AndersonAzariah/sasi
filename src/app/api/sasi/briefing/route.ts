@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import ZAI from "z-ai-web-dev-sdk";
 import { SERVICES } from "@/lib/sasi/utils";
 import {
   clientIp,
   rateLimitService,
   tooManyRequests,
 } from "@/lib/sasi/api-auth";
+import { aiHttpStatus, getAIProvider } from "@/lib/ai";
+import {
+  buildBriefingCityPrompt,
+  buildBriefingChatPrompt,
+} from "@/lib/ai/prompts";
 import type { BriefingRisk, BriefingSection, CityBriefing } from "@/lib/sasi/types";
 
 /* ============================================================
@@ -113,30 +117,7 @@ function compactContext(
   return { context, allowedRefs };
 }
 
-const SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. Write a short "City briefing" digest for one resident, grounded ONLY in that resident's own material below — the cases they reported through SASI and the state those cases are in. SASI has no other data source: there is no city feed, no sensor data, no third-party reports. If the material doesn't say it, SASI doesn't say it.
-
-Reply with STRICT JSON only (no markdown fences, no prose):
-{
-  "headline": "one sharp sentence (≤ 110 chars) summarising the state of the resident's own cases",
-  "risk": "CALM|ELEVATED|STRAINED|CRITICAL",
-  "sections": [
-    { "title": "Service name (e.g. Water)", "body": "2-3 short lines. Use '- ' bullets and **bold** key phrases. Mention specific refs where relevant.", "refs": ["CASE-000001"] }
-  ],
-  "watchlist": ["1-3 short forward-looking items (≤ 90 chars each) drawn ONLY from the resident's own case states"]
-}
-
-RULES
-- 1-4 sections, ordered by relevance to THIS resident.
-- GROUNDING IS ABSOLUTE: every factual statement must be traceable to a line in the material (a case status, a case title, a proposed-action state). Do NOT invent amounts, account numbers, dates, schedules, announcements, statistics, other residents' problems, other cases, or city-wide conditions. If the material only says "[INVESTIGATING] (water) \\"No water since yesterday evening\\"", say exactly that and no more.
-- The material lists EVERY case that exists — there are no other cases. NEVER mention or cite any case ref that is not in the material, not even a plausible-looking one. If the material has ONE case, never write "two open cases" or mention any second issue or service that no case in the material covers.
-- Never present a city-wide picture: you only know what this resident told SASI.
-- Only reference refs (CASE-xxxxxx) that appear in the material lines. Never cite INC- refs: they do not exist in the material.
-- NEVER state or imply official/authority activity (e.g. "Johannesburg Water is investigating", "the municipality responded", "a technician was dispatched"). SASI is not a government channel and the material never contains such facts.
-- NEVER include a year or full date (e.g. "2023-06-05", "5 June", "since June 2023"): the material contains no dates at all, so any date you write is fabrication. Relative time is only allowed when the case title itself says it (e.g. "since yesterday evening").
-- Every section must be about at least one case from the material and cite that case's ref in refs[].
-- South African civic voice: plain, practical, calm. Never claim SASI contacted any authority.
-- risk: CALM = the resident has nothing open; ELEVATED = the resident has open work; STRAINED = multiple active problems or an approval waiting; CRITICAL = reserve for genuine danger described in the material.
-- watchlist items must be concrete and derived from the material (e.g. "Approval on CASE-000001 is waiting for you", not "stay informed").`;
+const SYSTEM_PROMPT = buildBriefingCityPrompt;
 
 /* ---------- chat-digest mode: the conversation is the source material ---------- */
 
@@ -149,27 +130,7 @@ function transcriptBlock(
     .join("\n\n");
 }
 
-const CHAT_SYSTEM_PROMPT = (context: string) => `You are SASI's briefing editor — South African Service Intelligence. The resident just had an assistance conversation with SASI's chat. Distil THAT CONVERSATION into a short "City briefing" card so the resident can pin a summary of it on their dashboard. The transcript is the ONLY source material — there is no dataset behind SASI.
-
-Reply with STRICT JSON only (no markdown fences, no prose):
-{
-  "headline": "one sharp sentence (≤ 110 chars) capturing what the conversation established for the resident",
-  "risk": "CALM|ELEVATED|STRAINED|CRITICAL",
-  "sections": [
-    { "title": "Topic (e.g. Water)", "body": "2-3 short lines. Use '- ' bullets and **bold** key phrases. Mention specific refs where relevant.", "refs": ["CASE-000001"] }
-  ],
-  "watchlist": ["1-3 short forward-looking items (≤ 90 chars each) drawn from the conversation's advice"]
-}
-
-RULES
-- GROUNDING IS ABSOLUTE: every statement must come from the conversation transcript. Do NOT invent schedules, amounts, dates, announcements, or city-wide conditions.
-- Only reference refs (CASE-xxxxxx) that actually appear in the transcript.
-- If the chat was about one issue, write 1-2 focused sections — do not pad to four.
-- South African civic voice: plain, practical, calm. SASI never claims to have contacted any authority.
-- If the conversation was vague, say what is known and what the resident still needs to confirm — honestly.
-
-CONVERSATION TRANSCRIPT:
-${context}`;
+const CHAT_SYSTEM_PROMPT = buildBriefingChatPrompt;
 
 /** refs mentioned anywhere in a text blob */
 function refsIn(text: string): string[] {
@@ -317,7 +278,7 @@ export async function POST(req: Request) {
     .join(", ");
 
   try {
-    const zai = await ZAI.create();
+    const provider = getAIProvider();
 
     /* HONESTY GATE — no user material, no briefing. The route never
        invents a digest from a dataset, because no dataset exists. */
@@ -343,10 +304,10 @@ export async function POST(req: Request) {
       return noMaterialResponse("city");
     }
 
-    const completion = (await zai.chat.completions.create({
+    const completion = await provider.complete({
       messages: [
         {
-          role: "assistant",
+          role: "system",
           content: isChat
             ? CHAT_SYSTEM_PROMPT(transcriptBlock(body.transcript ?? []))
             : SYSTEM_PROMPT(compactContext(loc, residentCases).context),
@@ -358,10 +319,9 @@ export async function POST(req: Request) {
             : `RESIDENT LOCATION: ${locationLabel || "not set"}\n\nWrite the resident's briefing from their own cases now. Reply with the JSON object only.`,
         },
       ],
-      thinking: { type: "disabled" },
-    })) as { choices?: { message?: { content?: string } }[] };
+    });
 
-    const raw = completion.choices?.[0]?.message?.content ?? "";
+    const raw = completion.text;
     const extracted = extractBriefing(raw, locationLabel);
     if (!extracted) {
       return NextResponse.json(
@@ -382,10 +342,11 @@ export async function POST(req: Request) {
     if (isChat) briefing.origin = "chat";
     return NextResponse.json({ briefing });
   } catch (err) {
-    console.error("[/api/sasi/briefing] failed:", err);
+    console.error("[/api/sasi/briefing] failed:", err instanceof Error ? err.message : err);
+    const http = aiHttpStatus(err, "SASI could not write the briefing just now. Please try again in a moment.");
     return NextResponse.json(
-      { error: "SASI could not write the briefing just now. Please try again in a moment." },
-      { status: 502 }
+      { error: http.message, code: http.code },
+      { status: http.status }
     );
   }
 }
