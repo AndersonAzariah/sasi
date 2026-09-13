@@ -18,10 +18,11 @@ import {
    happens or nothing does):
    1. DELETE the user's AuditEvent rows and SubmissionRecord rows
       (both hold a real FK to User, so they must go before the User).
-   2. DETACH the user's CaseRecord, JourneyRun, SavedItem, Reminder
-      and DocumentRecord rows by setting userId = null. Those rows
-      belong to the browser session and stay with it — only the
-      account identity is removed.
+   2. DETACH every other user-owned row by setting userId = null:
+      CaseRecord, ChatMessage, EvidenceRecord, BriefingRecord,
+      NotificationRecord, Profile, JourneyRun, SavedItem, Reminder and
+      DocumentRecord. Those rows belong to the browser session and stay
+      with it — only the account identity is removed.
    3. DELETE the User row.
 
    No data is invented: the response is { deleted: true } on success
@@ -68,8 +69,29 @@ export async function DELETE() {
       /* FK-constrained rows first */
       db.auditEvent.deleteMany({ where: { userId: auth.userId } }),
       db.submissionRecord.deleteMany({ where: { userId: auth.userId } }),
-      /* then detach the browser-session-owned rows */
+      /* then detach every browser-session-owned row (Task 29: all
+         user-owned tables are now covered) */
       db.caseRecord.updateMany({
+        where: { userId: auth.userId },
+        data: { userId: null },
+      }),
+      db.chatMessage.updateMany({
+        where: { userId: auth.userId },
+        data: { userId: null },
+      }),
+      db.evidenceRecord.updateMany({
+        where: { userId: auth.userId },
+        data: { userId: null },
+      }),
+      db.briefingRecord.updateMany({
+        where: { userId: auth.userId },
+        data: { userId: null },
+      }),
+      db.notificationRecord.updateMany({
+        where: { userId: auth.userId },
+        data: { userId: null },
+      }),
+      db.profile.updateMany({
         where: { userId: auth.userId },
         data: { userId: null },
       }),

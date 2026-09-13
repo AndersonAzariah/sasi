@@ -23,17 +23,24 @@ import type {
    DELETE ?sessionId=&scope=chat     → clear chat history for the session
    DELETE ?sessionId=&scope=notifications → clear live notifications for the session
 
-   OWNERSHIP MODEL (schema is frozen — honest scope):
+   OWNERSHIP MODEL (Task 29 — explicit row ownership):
    - Every query is scoped by the caller's sessionId (a 122-bit random
      UUID kept in the browser; it is the bearer secret for session data).
-   - When the caller ALSO has a NextAuth session, CaseRecord rows are
-     additionally bound to the account: writes stamp/claim userId, a
-     row claimed by one account can never be read or rewritten by
+   - EVERY user-owned table (CaseRecord, ChatMessage, EvidenceRecord,
+     BriefingRecord, NotificationRecord, Profile, JourneyRun, SavedItem,
+     Reminder, DocumentRecord) carries userId with a foreign key to User.
+     The userId is stamped SERVER-SIDE from the authenticated session —
+     never from anything the client sends.
+   - When the caller has a NextAuth session: writes stamp/claim userId,
+     a row claimed by one account can never be read or rewritten by
      another account, and reads include only unclaimed rows or the
      caller's own.
-   - ChatMessage / EvidenceRecord / BriefingRecord / NotificationRecord
-     / Profile have NO userId column, so they are sessionId-scoped
-     only — a future migration should add userId to bind them too.
+   - EXISTING DATA MIGRATION DECISION (Task 29 §16): rows created before
+     this change keep userId = NULL and stay scoped to their sessionId.
+     They are NOT bulk-assigned to any account — silently handing a
+     user's history to a guessed account would be a privacy violation.
+     Unclaimed rows become claimable by whichever authenticated session
+     first saves them.
    - The shared fallback id "sasi-anon" (emitted by the client when
      localStorage is blocked) is REJECTED: it would otherwise be one
      public bucket every storage-blocked browser reads and writes.
@@ -109,23 +116,43 @@ export async function GET(req: Request) {
           take: 50,
         }),
         db.chatMessage.findMany({
-          where: { sessionId },
+          where: {
+            sessionId,
+            /* signed in: claimed rows are visible to their account only;
+               anonymous: bearer-session semantics (same as cases) — a
+               logged-out browser still sees its own session's rows */
+            ...(userId ? { OR: [{ userId: null }, { userId }] } : {}),
+          },
           orderBy: { createdAt: "asc" },
           take: 100,
         }),
-        db.profile.findUnique({ where: { sessionId } }),
+        db.profile.findFirst({
+          where: {
+            sessionId,
+            ...(userId ? { OR: [{ userId: null }, { userId }] } : {}),
+          },
+        }),
         db.evidenceRecord.findMany({
-          where: { sessionId },
+          where: {
+            sessionId,
+            ...(userId ? { OR: [{ userId: null }, { userId }] } : {}),
+          },
           orderBy: { createdAt: "desc" },
           take: 60,
         }),
         db.briefingRecord.findMany({
-          where: { sessionId },
+          where: {
+            sessionId,
+            ...(userId ? { OR: [{ userId: null }, { userId }] } : {}),
+          },
           orderBy: { createdAt: "desc" },
           take: 8,
         }),
         db.notificationRecord.findMany({
-          where: { sessionId },
+          where: {
+            sessionId,
+            ...(userId ? { OR: [{ userId: null }, { userId }] } : {}),
+          },
           orderBy: { createdAt: "desc" },
           take: 40,
         }),
@@ -299,8 +326,15 @@ export async function POST(req: Request) {
       }
       const existing = await db.evidenceRecord.findUnique({
         where: { evidenceId: ev.id },
-        select: { sessionId: true },
+        select: { sessionId: true, userId: true },
       });
+      if (existing && existing.userId && existing.userId !== userId) {
+        /* claimed by a different account — never readable or rewritable here */
+        return NextResponse.json(
+          { error: "This evidence item belongs to a different account." },
+          { status: 403 }
+        );
+      }
       if (existing && existing.sessionId !== sessionId) {
         return NextResponse.json(
           { error: "This evidence item belongs to a different session." },
@@ -309,8 +343,12 @@ export async function POST(req: Request) {
       }
       await db.evidenceRecord.upsert({
         where: { evidenceId: ev.id },
-        create: { evidenceId: ev.id, sessionId, payload },
-        update: { payload },
+        create: { evidenceId: ev.id, sessionId, userId, payload },
+        update: {
+          payload,
+          /* claim unclaimed rows on the first authenticated save */
+          ...(userId ? { userId } : {}),
+        },
       });
       return NextResponse.json({ ok: true, id: ev.id });
     }
@@ -331,6 +369,7 @@ export async function POST(req: Request) {
       const row = await db.briefingRecord.create({
         data: {
           sessionId,
+          userId,
           risk: String(b.risk ?? "ELEVATED").slice(0, 12),
           headline: b.headline.slice(0, 200),
           payload,
@@ -353,8 +392,14 @@ export async function POST(req: Request) {
       }
       const existing = await db.notificationRecord.findUnique({
         where: { notificationId: n.id },
-        select: { sessionId: true },
+        select: { sessionId: true, userId: true },
       });
+      if (existing && existing.userId && existing.userId !== userId) {
+        return NextResponse.json(
+          { error: "This notification belongs to a different account." },
+          { status: 403 }
+        );
+      }
       if (existing && existing.sessionId !== sessionId) {
         return NextResponse.json(
           { error: "This notification belongs to a different session." },
@@ -367,23 +412,32 @@ export async function POST(req: Request) {
         create: {
           notificationId: n.id,
           sessionId,
+          userId,
           read: Boolean(n.read),
           payload,
         },
-        update: { payload },
+        update: {
+          payload,
+          ...(userId ? { userId } : {}),
+        },
       });
       return NextResponse.json({ ok: true, id: n.id });
     }
 
     if (body.type === "notification-read") {
+      /* read-marking respects ownership: a signed-in caller marks
+         unclaimed + own rows only */
+      const readScope = userId
+        ? { sessionId, OR: [{ userId: null }, { userId }] }
+        : { sessionId };
       if (body.all) {
         await db.notificationRecord.updateMany({
-          where: { sessionId },
+          where: readScope,
           data: { read: true },
         });
       } else if (body.notificationId) {
         await db.notificationRecord.updateMany({
-          where: { sessionId, notificationId: body.notificationId },
+          where: { ...readScope, notificationId: body.notificationId },
           data: { read: true },
         });
       } else {
@@ -404,8 +458,11 @@ export async function POST(req: Request) {
       });
       await db.profile.upsert({
         where: { sessionId },
-        create: { sessionId, location: data },
-        update: { location: data },
+        create: { sessionId, userId, location: data },
+        update: {
+          location: data,
+          ...(userId ? { userId } : {}),
+        },
       });
       return NextResponse.json({ ok: true });
     }
@@ -426,12 +483,18 @@ export async function DELETE(req: Request) {
   if (scope !== "chat" && scope !== "notifications") {
     return NextResponse.json({ error: "Unsupported scope." }, { status: 400 });
   }
+  const userId = await callerUserId();
 
   try {
+    /* deletion respects ownership too — a signed-in caller can clear
+       unclaimed + own rows; anonymous callers act on bearer-session rows */
+    const deleteScope = userId
+      ? { sessionId, OR: [{ userId: null }, { userId }] }
+      : { sessionId };
     const res =
       scope === "chat"
-        ? await db.chatMessage.deleteMany({ where: { sessionId } })
-        : await db.notificationRecord.deleteMany({ where: { sessionId } });
+        ? await db.chatMessage.deleteMany({ where: deleteScope })
+        : await db.notificationRecord.deleteMany({ where: deleteScope });
     return NextResponse.json({ ok: true, deleted: res.count });
   } catch (err) {
     console.error("[/api/sasi/state DELETE] clear failed:", err);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
+import { getAuthSession } from "@/lib/auth";
 import type {
   AppNotificationLiteDTO,
   ConversationDayDTO,
@@ -16,9 +17,11 @@ import type { AppNotification } from "@/lib/sasi/types";
      → { activeJourneys, savedItems, reminders,
          recentConversations, recentNotifications }
 
-   Every array is scoped to the caller's own session. When there is
-   nothing yet the arrays are EMPTY — SASI never fabricates rows to
-   make the page look alive.
+   Every array is scoped to the caller's own session PLUS (when a
+   NextAuth session is present) rows explicitly owned by that account
+   (userId stamped server-side at write time). Foreign accounts' rows
+   are never visible. When there is nothing yet the arrays are EMPTY —
+   SASI never fabricates rows to make the page look alive.
    ============================================================ */
 
 export const runtime = "nodejs";
@@ -44,31 +47,40 @@ export async function GET(req: Request) {
   }
 
   try {
+    /* ownership: rows claimed by the signed-in account travel with the
+       account (visible from any of its sessions); unclaimed rows stay
+       with the browser session; other accounts' rows are never read */
+    const me = await getAuthSession().catch(() => null);
+    const userId = me?.user?.id ?? null;
+    const mine = userId
+      ? { OR: [{ sessionId }, { userId }] }
+      : { sessionId };
+
     const [journeyRows, savedRows, reminderRows, chatRows, notificationRows] = await Promise.all([
       /* Continue: runs still in progress (ACTIVE or PAUSED) */
       db.journeyRun.findMany({
-        where: { sessionId, status: { in: ["ACTIVE", "PAUSED"] } },
+        where: { ...mine, status: { in: ["ACTIVE", "PAUSED"] } },
         orderBy: { updatedAt: "desc" },
         take: 12,
       }),
       db.savedItem.findMany({
-        where: { sessionId },
+        where: mine,
         orderBy: { createdAt: "desc" },
         take: 50,
       }),
       db.reminder.findMany({
-        where: { sessionId },
+        where: mine,
         orderBy: [{ done: "asc" }, { createdAt: "desc" }],
         take: 50,
       }),
       /* last 20 chat rows; grouped client-visibly by day below */
       db.chatMessage.findMany({
-        where: { sessionId, role: { in: ["user", "assistant"] } },
+        where: { ...mine, role: { in: ["user", "assistant"] } },
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
       db.notificationRecord.findMany({
-        where: { sessionId },
+        where: mine,
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
