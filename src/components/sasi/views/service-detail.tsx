@@ -44,6 +44,7 @@ import {
   TrustNotice,
 } from "@/components/sasi/primitives";
 import { CaseCard, IncidentCard } from "@/components/sasi/domain";
+import { ORGANISATIONS } from "@/lib/sasi/explore-data";
 import { cn } from "@/lib/utils";
 
 const OFFICIAL_PATHWAY_STEPS = [
@@ -548,6 +549,34 @@ function RegistrySections({ entry }: { entry: ServiceRegistryEntry }) {
           </TrustNotice>
         )}
       </div>
+
+      {/* organisation page — the knowledge network edge: Service → Organisation
+          (derived purely from the organisation registry's serviceSlugs) */}
+      {(() => {
+        const org = ORGANISATIONS.find((o) => o.serviceSlugs.includes(entry.slug));
+        if (!org) return null;
+        return (
+          <button
+            onClick={() => navigate("explore", `org:${org.id}`)}
+            className="sasi-card sasi-card-interactive group flex w-full items-center gap-3.5 p-4 text-left"
+            aria-label={`About ${org.name}`}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/[0.03]">
+              <Landmark className="h-5 w-5 text-zinc-300" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-medium text-white">{org.name}</span>
+              <span className="mt-0.5 block truncate text-[12px] text-zinc-500">
+                Responsibilities, verified website and related services
+              </span>
+            </span>
+            <ArrowRight
+              className="h-4 w-4 shrink-0 text-zinc-700 transition-all group-hover:translate-x-0.5 group-hover:text-[#e3c567]"
+              aria-hidden
+            />
+          </button>
+        );
+      })()}
 
       {entry.relatedServices.length > 0 ? (
         <div className="sasi-card p-5">

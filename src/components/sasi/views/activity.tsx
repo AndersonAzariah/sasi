@@ -19,6 +19,7 @@ import {
   BookmarkX,
   CalendarDays,
   Check,
+  FileText,
   MessageCircle,
   Plus,
   Radio,
@@ -45,6 +46,15 @@ import { NotificationRow } from "@/components/sasi/domain";
 import { EmptyState, GhostButton, SectionLabel, TrustNotice } from "@/components/sasi/primitives";
 
 type LoadState = "loading" | "ready" | "error";
+
+/** shape returned by GET /api/sasi/documents (metadata + analysis only) */
+interface MyDocumentLite {
+  id: string;
+  name: string;
+  createdAt: string;
+  summary: string | null;
+  analysisError: string | null;
+}
 
 const EMPTY: MySasiResponse = {
   activeJourneys: [],
@@ -88,6 +98,9 @@ export default function ActivityView() {
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [data, setData] = useState<MySasiResponse>(EMPTY);
+  /* Documents section (Task 30 P6) — metadata + analysis only, never
+     raw file contents; owned rows only via the session/account scope */
+  const [documents, setDocuments] = useState<MyDocumentLite[]>([]);
 
   /* ---------- reminder create form ---------- */
   const [reminderTitle, setReminderTitle] = useState("");
@@ -118,6 +131,25 @@ export default function ActivityView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /* documents load — best-effort alongside the aggregate; a failure
+     keeps the section honestly empty (it never blocks the page) */
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await fetch(
+          `/api/sasi/documents?sessionId=${encodeURIComponent(getSessionId())}`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) return;
+        const body = (await res.json()) as { documents?: MyDocumentLite[] };
+        setDocuments((body.documents ?? []).slice(0, 4));
+      } catch {
+        /* offline — leave the section empty */
+      }
+    };
+    void run();
+  }, []);
 
   /* ---------- saved: open / unsave ---------- */
   const openSaved = (item: SavedItemDTO) => {
@@ -514,6 +546,58 @@ export default function ActivityView() {
                     >
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* ============================================================ DOCUMENTS */}
+          <section className="mt-10" aria-labelledby="mysasi-documents-heading">
+            <SectionLabel className="sasi-eyebrow mb-3">Documents</SectionLabel>
+            <h2 id="mysasi-documents-heading" className="sr-only">
+              Recent document analyses
+            </h2>
+            {loadState === "loading" ? (
+              <SkeletonList rows={2} />
+            ) : documents.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No document analyses yet"
+                description="Upload a municipal bill, letter or notice and SASI explains what it says — analysis happens on your document only."
+                action={
+                  <GhostButton onClick={() => navigate("documents")}>
+                    Open Documents
+                  </GhostButton>
+                }
+              />
+            ) : (
+              <ul className="sasi-card divide-y divide-white/[0.04]">
+                {documents.map((d) => (
+                  <li key={d.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.03]">
+                      <FileText className="h-4 w-4 text-zinc-400" aria-hidden />
+                    </span>
+                    <button
+                      onClick={() => navigate("documents")}
+                      className="min-w-0 flex-1 text-left"
+                      aria-label={`Open ${d.name} in Documents`}
+                    >
+                      <span className="block truncate text-[13px] font-medium text-zinc-100">
+                        {d.name}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11.5px] text-zinc-600">
+                        {d.analysisError
+                          ? d.analysisError
+                          : d.summary
+                            ? d.summary
+                            : "Analysis unavailable — details in Documents."}
+                      </span>
+                    </button>
+                    <ArrowRight
+                      className="h-3.5 w-3.5 shrink-0 text-zinc-700"
+                      aria-hidden
+                    />
                   </li>
                 ))}
               </ul>

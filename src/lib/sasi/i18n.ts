@@ -88,7 +88,7 @@ const DICT: Dict = {
   "nav.journeys": { en: "Journeys", zu: "Izinhlelo zokuqhubeka", af: "Trajekte" },
   "nav.documents": { en: "Documents", zu: "Amadokhumenti", af: "Dokumente" },
   "nav.evidence.item": { en: "Evidence", zu: "Ubufakazi", af: "Bewys" },
-  "nav.activity": { en: "Activity", zu: "Umsebenzi", af: "Aktiwiteit" },
+  "nav.activity": { en: "My SASI", zu: "I-SASI yami", af: "My SASI" },
   "nav.notifications": {
     en: "Notifications",
     zu: "Izaziso",
