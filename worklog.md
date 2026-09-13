@@ -1188,3 +1188,25 @@ Stage Summary:
 - One system: ASK (OpenRouter) → SEARCH (deterministic) → EXPLORE (knowledge architecture) → services/journeys → MY SASI, all rows explicitly owned.
 - Deployment blockage identified for the user: Vercel DATABASE_URL must be the Supabase POOLER URL (IPv4); OPENROUTER_API_KEY + OPENROUTER_MODEL to be added by owner in Vercel.
 - Pending in this task: production build + browser QA + atomic commits + push + final report.
+
+---
+Task ID: 29 (complete)
+Agent: main
+Task: Task 29 final — QA, atomic commits, GitHub push, verification.
+
+Work Log:
+- Production build: `next build` PASS (all routes compiled; Prisma client generated).
+- Browser QA (agent-browser): landing renders instantly (no splash); Ctrl/Cmd+K opens Universal Search with grouped results + verified badges; "nearest clinic" -> Open Nearby map action; "is this message fake" -> Verify action; gibberish -> honest "Nothing matches" + Ask SASI row; Explore main page + org panel (org:home-affairs) render with verified external links; Ask SASI degrades honestly with 503 "SASI AI is temporarily unavailable. The platform's AI provider is not configured." (code: not_configured); golden-path login works against Postgres; sidebar shows Explore; 0px horizontal overflow at 390x844 and 1280x800; console clean (one benign Next dev-mode scroll-behavior hint).
+- Secret scan pre-push (§43): no real keys/passwords/tokens in any tracked file (only placeholder templates in .env.example/DEPLOY.md); .env gitignored.
+- Atomic commits + push to origin/main (verified via git ls-remote: remote == local HEAD):
+  - 4292117 feat: integrate OpenRouter AI provider
+  - d2eb7fb security: add explicit user ownership enforcement
+  - c30010d feat: add universal SASI search and civic Explore
+  - c4e0b59 test: harden ownership and AI flows
+  - 53bc9bf chore: finalize production configuration
+- Final gates at push time: tsc PASS, eslint clean, bun test 31/31 unit + 11/11 ownership (test:db).
+- Note: GitHub Actions run list not readable from this sandbox (API responses truncated anonymously); CI triggers on push to main and must be checked at github.com/AndersonAzariah/sasi/actions.
+
+Stage Summary:
+- Task 29 delivered: real OpenRouter provider abstraction (server-only, honest degradation), explicit row ownership with FK-backed userId on all ten user-owned tables + server-derived identity, universal deterministic search with intent routing, civic Explore with verified-only organisation data, boot splash removed, production build green, repo clean and pushed.
+- For the OWNER to do in Vercel (names only, no secrets here): DATABASE_URL (Supabase POOLER URL — IPv4 reachable; the direct db.…supabase.co host is why sign-in 401s), NEXTAUTH_SECRET, OPENROUTER_API_KEY, OPENROUTER_MODEL (optional), NEXTAUTH_URL (optional; auto-derived), Supabase keys as documented in DEPLOY.md.
