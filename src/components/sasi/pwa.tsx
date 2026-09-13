@@ -61,22 +61,41 @@ export function PwaRuntime() {
       setSwPhase("unsupported");
     } else {
       const isDev = process.env.NODE_ENV !== "production";
-      sw
-        .register(isDev ? "/sw.js?mode=dev" : "/sw.js")
-        .then((reg) => {
-          /* a worker already controlling this page → offline is live */
-          if (sw.controller || reg.active) setSwPhase("ready");
-          reg.addEventListener("updatefound", () => {
-            const next = reg.installing;
-            next?.addEventListener("statechange", () => {
-              /* installed & waiting while a page is controlled = update ready */
-              if (next.state === "installed" && sw.controller) {
-                usePwaStore.getState().setUpdateReady();
-              }
-            });
-          });
-        })
-        .catch(() => setSwPhase("failed"));
+      /* A PRODUCTION worker registered earlier (e.g. the browser profile
+         previously visited a built deployment on this origin) keeps its
+         app-shell caches and serves STALE assets over a dev server —
+         deep links and HMR silently break. In dev, replace it. */
+      const replaceStaleProdWorker = async () => {
+        if (!isDev) return;
+        const existing = await sw.getRegistration();
+        if (existing && !existing.active?.scriptURL.includes("mode=dev")) {
+          await existing.unregister();
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.filter((k) => k.startsWith("sasi-")).map((k) => caches.delete(k)));
+          }
+        }
+      };
+      replaceStaleProdWorker()
+        .catch(() => undefined)
+        .then(() =>
+          sw
+            .register(isDev ? "/sw.js?mode=dev" : "/sw.js")
+            .then((reg) => {
+              /* a worker already controlling this page → offline is live */
+              if (sw.controller || reg.active) setSwPhase("ready");
+              reg.addEventListener("updatefound", () => {
+                const next = reg.installing;
+                next?.addEventListener("statechange", () => {
+                  /* installed & waiting while a page is controlled = update ready */
+                  if (next.state === "installed" && sw.controller) {
+                    usePwaStore.getState().setUpdateReady();
+                  }
+                });
+              });
+            })
+            .catch(() => setSwPhase("failed"))
+        );
     }
 
     /* ---------- 3. install prompt capture ---------- */
