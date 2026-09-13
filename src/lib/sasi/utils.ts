@@ -283,7 +283,14 @@ export function getSessionId(): string {
     window.localStorage.setItem(SESSION_KEY, fresh);
     return fresh;
   } catch {
-    /* private mode / storage blocked — degrade to in-memory session */
-    return "sasi-anon";
+    /* private mode / storage blocked — NEVER fall back to a shared id:
+       every browser would then share one data bucket (a real
+       cross-user leak the server now rejects). A per-load random id
+       keeps this browser's tabs isolated AND server-accepted for the
+       life of the page; persistence across reloads honestly degrades. */
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 }

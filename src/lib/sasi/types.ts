@@ -321,6 +321,9 @@ export interface ChatMessage {
     /** reply proposes filing a report → chip deep-links into the report wizard */
     report?: boolean;
   };
+  /** Task 28-b Phase 6/7 — validated structured civic answer (live +
+      mirrored in session state; the server keeps PERSISTED history plain) */
+  structured?: import("./civic-ai").StructuredAnswer;
 }
 
 export type View =
