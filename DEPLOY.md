@@ -16,28 +16,39 @@ gives HTTPS + global CDN out of the box. Total time: ~5 minutes.
 1. Go to **https://vercel.com** → **Sign up with GitHub** (no credit card).
 2. **Add New… → Project** → import the repository **AndersonAzariah/sasi**.
 3. Vercel auto-detects Next.js. **Before clicking Deploy**, open
-   **Environment Variables** and add exactly these five:
+   **Environment Variables** and add exactly these:
 
    | Name | Value | Notes |
    |---|---|---|
-   | `NEXTAUTH_URL` | `https://<your-app>.vercel.app` | set AFTER you know the name (step 4); you can edit it later and redeploy |
+   | `DATABASE_URL` | `postgresql://postgres.<ref>:<PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require` | **Supabase POOLER (session pooler, port 5432) or transaction pooler (6543) — copy from Supabase dashboard → Connect.** Vercel serverless CANNOT reach the direct `db.…supabase.co:5432` host (it is IPv6-only). This is the single most common cause of "authentication not working" — every login must query the database. |
    | `NEXTAUTH_SECRET` | a long random string | generate: `openssl rand -base64 32` |
+   | `NEXTAUTH_URL` | `https://<your-app>.vercel.app` | OPTIONAL now — SASI auto-derives it from Vercel's own `VERCEL_PROJECT_PRODUCTION_URL`/`VERCEL_URL` when unset; set it explicitly only when using a custom domain |
    | `NEXT_PUBLIC_SUPABASE_URL` | `https://awcceckvuiarlbnzemsv.supabase.co` | safe to expose |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | your `sb_publishable_…` key | safe to expose (RLS denies it everything) |
-   | `DATABASE_URL` | `postgresql://postgres.<ref>:<PASSWORD>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1` | **Supabase pooler** — copy from Supabase dashboard → Connect ("Transaction pooler"); serverless needs the pooler, not the direct `db.…supabase.co:5432` address |
+   | `SUPABASE_SECRET_KEY` | your `sb_secret_…` key | SERVER ONLY — used for read-only health probes. Never prefix with `NEXT_PUBLIC_`. |
+   | `OPENROUTER_API_KEY` | your `sk-or-…` key | SERVER ONLY — the real AI provider (Ask SASI, briefings, document and photo analysis, address refinement). Never prefix with `NEXT_PUBLIC_`, never commit it. |
+   | `OPENROUTER_MODEL` | e.g. `openai/gpt-4o-mini` | OPTIONAL — server-side default exists; change it here to switch models without a code edit |
+   | `OPENROUTER_VISION_MODEL` | e.g. `openai/gpt-4o-mini` | OPTIONAL — used for photo/document-image analysis; defaults to `OPENROUTER_MODEL` |
 
-   The `SUPABASE_SECRET_KEY` is used only by the server for
-   read-only health probes (`/api/sasi/system-status`). If you add it,
-   add it with the name `SUPABASE_SECRET_KEY`. It must NEVER be
-   prefixed with `NEXT_PUBLIC_`.
+   When `OPENROUTER_API_KEY` is absent the app stays fully functional
+   (services, journeys, search, Explore, My SASI, documents storage)
+   and AI features honestly report "SASI AI is temporarily
+   unavailable. The platform's AI provider is not configured." — no
+   fake answers are ever shown.
 
 4. Under **Project → Settings → Domains**, pick a short name. Free
    options on `vercel.app` (first come, first served):
    `sasi.vercel.app` → if taken try `sasi-app.vercel.app`,
    `getsasi.vercel.app`, `sasi-za.vercel.app`.
-   Set `NEXTAUTH_URL` to the final URL and **redeploy** once.
+   Set `NEXTAUTH_URL` to the final URL (or leave it unset — it is
+   derived) and **redeploy** once if you changed it.
 
 5. **Deploy.** Every `git push` to `main` now auto-deploys.
+
+6. **Test SASI AI.** Ask SASI a question (e.g. "How do I apply for a
+   passport?") — you should get a real, structured answer routed
+   through OpenRouter. If you see "the platform's AI provider is not
+   configured", re-check `OPENROUTER_API_KEY` in Vercel and redeploy.
 
 ## One-time database sync (already automated)
 
@@ -64,7 +75,12 @@ paste and run `supabase/rls-hardening.sql`.
 - Settings → **App & offline** → the “Cloud database (Supabase)” row
   must say *“Supabase PostgreSQL — connected and answering queries”*.
 - `GET /api/sasi/system-status` must report
-  `supabase.schemaApplied: true` and `supabase.anonLocked: true`.
+  `database.ok: true`, `ai.configured: true` (after adding the
+  OpenRouter key), `supabase.schemaApplied: true` and
+  `supabase.anonLocked: true`.
+- If `database.ok` is `false`, the response includes a `database.hint`
+  explaining the likely cause (in practice: use the Supabase POOLER
+  URL, not the direct `db.…supabase.co` host).
 
 ## Alternatives if Vercel is not available
 
