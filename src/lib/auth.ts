@@ -115,19 +115,36 @@ export const authOptions: NextAuthOptions = {
         );
         if (!attempt.allowed) return null;
 
-        const user = await db.user.findUnique({ where: { email } });
+        /* NEVER THROW from authorize: NextAuth v4 embeds a thrown
+           error's raw message in the error-page redirect URL, which
+           leaked Prisma internals (including the database host) to the
+           browser during the production database outage. Expected
+           failures — unreachable database included — return null like
+           any other sign-in failure; the SPA's login view probes
+           /api/sasi/system-status separately to tell the resident the
+           honest "database unreachable" story. Unexpected errors are
+           logged server-side only. */
+        try {
+          const user = await db.user.findUnique({ where: { email } });
 
-        /* Constant-work comparison: when the account does not exist we
-           still burn one bcrypt compare against a fixed hash, so
-           response timing does not reveal whether an email is registered. */
-        const DUMMY_HASH = "$2a$12$C6UzMDM.H6dfI/f/IKcEeO7ZDZQj1Vp1p2b3E4fF5gG6hH7iI8jJk";
-        const hash = user?.passwordHash ?? DUMMY_HASH;
-        const valid = await bcrypt.compare(password, hash).catch(() => false);
+          /* Constant-work comparison: when the account does not exist we
+             still burn one bcrypt compare against a fixed hash, so
+             response timing does not reveal whether an email is registered. */
+          const DUMMY_HASH = "$2a$12$C6UzMDM.H6dfI/f/IKcEeO7ZDZQj1Vp1p2b3E4fF5gG6hH7iI8jJk";
+          const hash = user?.passwordHash ?? DUMMY_HASH;
+          const valid = await bcrypt.compare(password, hash).catch(() => false);
 
-        if (!user || !valid) return null;
+          if (!user || !valid) return null;
 
-        /* Only safe, non-secret fields ever leave this function. */
-        return { id: user.id, name: user.name, email: user.email };
+          /* Only safe, non-secret fields ever leave this function. */
+          return { id: user.id, name: user.name, email: user.email };
+        } catch (err) {
+          console.error(
+            "[auth] sign-in lookup failed:",
+            err instanceof Error ? err.message : err
+          );
+          return null;
+        }
       },
     }),
   ],
