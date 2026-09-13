@@ -33,3 +33,10 @@ jobs:
         env:
           DATABASE_URL: file:./db/ci.db
         run: bunx tsc --noEmit
+
+      # Unit tests (AI provider error mapping, search engine, structured-answer
+      # validation). DB/API-level ownership tests self-skip without RUN_DB_TESTS.
+      - name: Unit tests
+        env:
+          DATABASE_URL: file:./db/ci.db
+        run: bun test
