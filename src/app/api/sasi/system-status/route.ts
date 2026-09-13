@@ -33,6 +33,35 @@ import {
 
 export const dynamic = "force-dynamic";
 
+/* --------------------------------------------------------------
+   Deployment diagnostics — PRIORITY 0 (Task 30).
+   The single most common production failure is DATABASE_URL using
+   the DIRECT Supabase host (db.<ref>.supabase.co). That host is
+   IPv6-only, which Vercel serverless functions cannot reach, so
+   every database query — including every login — fails.
+   To make that misconfiguration impossible to miss, the status
+   classifies the configured host WITHOUT ever exposing the value:
+     "pooler"  → aws-*.pooler.supabase.com (the correct choice)
+     "direct"  → db.<ref>.supabase.co (unreachable from Vercel)
+     "local"   → file: / localhost / 127.0.0.1 (development)
+     "other"   → any other host
+   -------------------------------------------------------------- */
+
+function databaseHostClass(url: string): string {
+  if (!url) return "unset";
+  if (url.startsWith("file:")) return "local";
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return "other";
+  }
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return "local";
+  if (host.endsWith("pooler.supabase.com")) return "pooler";
+  if (/^db\..+\.supabase\.co$/.test(host)) return "direct";
+  return "other";
+}
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
@@ -64,16 +93,25 @@ function databaseHint(err: unknown): string | undefined {
     err && typeof err === "object" && "code" in err
       ? String((err as { code?: unknown }).code)
       : "";
+  const combined = `${msg} ${code}`;
   if (code === "ENOTFOUND" || /ENOTFOUND|getaddrinfo|ENOTDIR/i.test(msg)) {
     return "The database host could not be resolved. On Vercel, use the Supabase POOLER connection string (aws-*.pooler.supabase.com) — direct db.*.supabase.co hosts resolve only over IPv6, which serverless functions cannot use.";
   }
-  if (code === "ETIMEDOUT" || /timed?\s?out|ETIMEDOUT|ECONNREFUSED/i.test(msg + code)) {
-    return "The database did not answer in time. On Vercel, use the Supabase POOLER connection string; direct connections are frequently blocked from serverless networks.";
+  /* Prisma P1001 "Can't reach database server" and P2024 "timed out
+     fetching a connection" — the exact failures the direct host
+     produces from Vercel serverless. */
+  if (
+    code === "P1001" ||
+    code === "P2024" ||
+    code === "ETIMEDOUT" ||
+    /can'?t reach database|timed?\s?out|ETIMEDOUT|ECONNREFUSED|ECONNRESET|connection (closed|terminated|refused)/i.test(combined)
+  ) {
+    return "The database is unreachable from this environment. On Vercel, use the Supabase POOLER connection string (aws-*.pooler.supabase.com) — direct db.*.supabase.co hosts are IPv6-only and cannot be reached from serverless functions. Update DATABASE_URL, then redeploy.";
   }
   if (/password|authentication|10P-1|role .* does not exist/i.test(msg)) {
     return "The database rejected the credentials. Check the DATABASE_URL user/password in this environment.";
   }
-  if (/relation .* does not exist|P2021/i.test(msg)) {
+  if (/relation .* does not exist|P2021/i.test(combined)) {
     return "The database is reachable but the schema has not been applied yet. Run the schema sync (supabase-db workflow or prisma db push).";
   }
   return "The application database is unreachable from this environment.";
@@ -97,6 +135,7 @@ export async function GET(req: Request) {
   /* 1 — primary database (the one Prisma talks to) */
   const databaseUrl = process.env.DATABASE_URL ?? "";
   const provider = databaseUrl.startsWith("file:") ? "sqlite" : "postgres";
+  const hostClass = databaseHostClass(databaseUrl);
   let databaseOk = false;
   let databaseHintText: string | undefined;
   try {
@@ -105,6 +144,13 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("[system-status] primary database probe failed", err instanceof Error ? err.message : err);
     databaseHintText = databaseHint(err);
+    /* When the configured host is the direct Supabase database host,
+       say so explicitly — this is the known production killer and it
+       must be obvious without reading any secret value. */
+    if (hostClass === "direct") {
+      databaseHintText =
+        "This environment's DATABASE_URL points at the direct Supabase database host, which is IPv6-only and unreachable from Vercel serverless. Replace it with the Supabase POOLER connection string (aws-*.pooler.supabase.com) from Supabase → Connect, then redeploy.";
+    }
   }
 
   /* 2 — Supabase probes */
@@ -128,7 +174,12 @@ export async function GET(req: Request) {
 
   return NextResponse.json(
     {
-      database: { provider, ok: databaseOk, ...(databaseHintText ? { hint: databaseHintText } : {}) },
+      database: {
+        provider,
+        ok: databaseOk,
+        hostClass,
+        ...(databaseHintText ? { hint: databaseHintText } : {}),
+      },
       ai: getAIStatus(),
       supabase: {
         configured,

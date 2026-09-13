@@ -78,9 +78,36 @@ paste and run `supabase/rls-hardening.sql`.
   `database.ok: true`, `ai.configured: true` (after adding the
   OpenRouter key), `supabase.schemaApplied: true` and
   `supabase.anonLocked: true`.
-- If `database.ok` is `false`, the response includes a `database.hint`
-  explaining the likely cause (in practice: use the Supabase POOLER
-  URL, not the direct `db.…supabase.co` host).
+
+### Reading the status endpoint (no secrets are ever included)
+
+```jsonc
+{
+  "database": {
+    "provider": "postgres",
+    "ok": true,              // ← must be true; sign-in needs the DB
+    "hostClass": "pooler",   // ← "pooler" = correct for serverless
+    // "hint" only appears when ok is false — one honest reason
+  },
+  "ai": { "provider": "openrouter", "configured": true, "model": "…" },
+  "supabase": { "configured": true, "restReachable": true,
+                "schemaApplied": true, "anonLocked": true }
+}
+```
+
+`database.hostClass` classifies the configured DATABASE_URL host
+WITHOUT exposing any value:
+
+- `"pooler"` — `aws-*.pooler.supabase.com` (correct for Vercel)
+- `"direct"` — `db.<ref>.supabase.co` (IPv6-only; **unreachable from
+  Vercel serverless** — this is the known "authentication not working"
+  cause; replace DATABASE_URL with the pooler string and redeploy)
+- `"local"` — `file:` / localhost (development only)
+- `"other"` / `"unset"` — check the variable
+
+If `database.ok` is `false`, the response includes a `database.hint`
+explaining the likely cause, and the sign-in screen says SASI cannot
+reach its database instead of pretending the password was wrong.
 
 ## Alternatives if Vercel is not available
 

@@ -51,6 +51,24 @@ export default function LoginView() {
       });
       if (res?.error) {
         setLoading(false);
+        /* Distinguish "wrong credentials" from "infrastructure down":
+           when the database is unreachable (the known Vercel pooler
+           misconfiguration) telling the user their password is wrong
+           would be a lie. One status check makes the error honest. */
+        try {
+          const status = await fetch("/api/sasi/system-status", { cache: "no-store" });
+          const health: { database?: { ok?: boolean } } = await status
+            .json()
+            .catch(() => ({}));
+          if (health?.database?.ok === false) {
+            setError(
+              "SASI can't reach its database right now, so sign-in is unavailable. The platform owner may need to check the deployment configuration. Please try again shortly."
+            );
+            return;
+          }
+        } catch {
+          /* status probe failed — fall through to the standard message */
+        }
         setError(
           "That email and password don't match an account. Check them and try again."
         );
