@@ -471,7 +471,11 @@ function persistLocation(loc: SasiState["savedLocation"]) {
    fallbacks for stale/unknown detail params).
    ================================================================== */
 
-/** views reachable without a session (mirrors the old PUBLIC_VIEW_SET) */
+/** views reachable without a session (mirrors the old PUBLIC_VIEW_SET).
+    Ask SASI is public by design: the backend keeps a dedicated anonymous
+    ask tier (8/min per IP) and every signed-out entry point (landing
+    command bar, nav shortcuts) routes here — a deep link or Back press
+    must not bounce a visitor to login mid-conversation (Task 30). */
 const PUBLIC_VIEWS: ReadonlySet<string> = new Set<View>([
   "landing",
   "about",
@@ -485,6 +489,7 @@ const PUBLIC_VIEWS: ReadonlySet<string> = new Set<View>([
   "emergency",
   "get-app",
   "verify",
+  "ask-sasi",
   "login",
   "signup",
 ]);
