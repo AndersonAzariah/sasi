@@ -30,7 +30,6 @@ import { toast } from "sonner";
 import type { ChatMessage } from "@/lib/sasi/types";
 import { RichText } from "../rich-text";
 import { StructuredAnswerView } from "../ai/structured-answer";
-import { writeContextCookie } from "@/lib/sasi/context-metadata";
 import { SasiLogo } from "../primitives";
 
 /* ============================================================
@@ -438,7 +437,6 @@ export default function AskSasiView() {
   const draftReportFromChat = useSasiStore((s) => s.draftReportFromChat);
   const briefingBusy = useSasiStore((s) => s.briefingBusy);
   const briefingFromChat = useSasiStore((s) => s.briefingFromChat);
-  const view = useSasiStore((s) => s.view);
   const param = useSasiStore((s) => s.param);
 
   const [input, setInput] = useState("");
@@ -447,14 +445,11 @@ export default function AskSasiView() {
   const consumedPending = useRef(false);
   const [showJump, setShowJump] = useState(false);
 
-  /* ---------- Phase 10 — contextual AI ----------
-     Publish the resident's current view context in a short-lived
-     cookie so the /api/sasi/ask fetch attaches it automatically
-     ("What documents do I need?" while viewing a service resolves
-     "I" to THAT service). Sanitised again server-side. */
-  useEffect(() => {
-    writeContextCookie({ view, param: param ?? null });
-  }, [view, param]);
+  /* ---------- contextual AI note (Task 30) ----------
+     The view context cookie is written by the SHELL-level router
+     (sasi-app.tsx) on every navigation — deliberately NOT here, so
+     the cookie keeps describing the page the resident came FROM
+     (service page / journey) when the first chat question fires. */
 
   /* ---------- document intelligence hand-off (Task 28-d) ----------
      Documents view asks a question about a specific document: it

@@ -6,6 +6,7 @@ import { Toaster, toast } from "sonner";
 import { useSasiStore } from "@/lib/sasi/store";
 import { usePwaStore } from "@/lib/sasi/pwa-store";
 import { initDataSaver } from "@/lib/sasi/data-saver";
+import { writeContextCookie } from "@/lib/sasi/context-metadata";
 import type { View } from "@/lib/sasi/types";
 import { AppShell } from "./app-shell";
 import { PublicShell } from "./public-shell";
@@ -132,10 +133,22 @@ function ViewRenderer() {
 
 export function SasiApp() {
   const view = useSasiStore((s) => s.view);
+  const param = useSasiStore((s) => s.param);
   const authed = useSasiStore((s) => s.authed);
   const hydrate = useSasiStore((s) => s.hydrate);
   const updateReady = usePwaStore((s) => s.updateReady);
   const clearUpdateReady = usePwaStore((s) => s.clearUpdateReady);
+
+  /* ---------- Contextual AI (Task 30) ----------
+     The router publishes WHERE the resident is (service page, journey,
+     documents…) in the short-lived sasi_ctx cookie. Ask SASI deliberately
+     does NOT overwrite it: a question asked from the chat keeps the
+     context of the page it came from ("What documents do I need?" while
+     viewing Passport resolves to Passport). Sanitised again server-side. */
+  useEffect(() => {
+    if (view === "ask-sasi") return;
+    writeContextCookie({ view, param: param ?? null });
+  }, [view, param]);
 
   useEffect(() => {
     // restore persisted chat / cases / location in the background —

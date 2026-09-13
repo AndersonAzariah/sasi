@@ -29,7 +29,7 @@
    both the ask API route and the chat UI components.
    ============================================================ */
 
-import { SERVICE_REGISTRY } from "./services-registry";
+import { JOURNEY_ENTRIES, SERVICE_REGISTRY, journeyStepsFor } from "./services-registry";
 import { SERVICES } from "./utils";
 
 /* ------------------------------------------------------------
@@ -445,6 +445,46 @@ export function serviceDetailBlock(slug: string): string | null {
   }
   parts.push(
     "Anything this block does not list must not be invented — if unsure, say so in answer."
+  );
+  return parts.join("\n");
+}
+
+/** focus block when the resident is inside a guided journey (Task 30 —
+    contextual AI): grounds "what do I do now?" in the journey's own
+    registered service and steps — never generic advice */
+export function journeyFocusBlock(journeyId: string): string | null {
+  const clean = journeyId.toLowerCase().trim();
+  if (!clean || !SLUG_RE.test(clean)) return null;
+  const entry = JOURNEY_ENTRIES.find((e) => e.journeyId === clean);
+  if (!entry) return null;
+  const parts: string[] = [
+    `FOCUS JOURNEY (the resident is inside this checklist right now):`,
+    `- journeyId: ${entry.journeyId}`,
+    `- title: ${entry.title}`,
+    "- This is SASI's preparation checklist — NOT an official government application and never a submission.",
+  ];
+  const steps = journeyStepsFor(clean);
+  if (steps && steps.length) {
+    parts.push(
+      `- its registered steps (do not invent extra steps): ${steps
+        .slice(0, 12)
+        .map((s) => asString(s.title, 120))
+        .filter(Boolean)
+        .join(" | ")} `
+    );
+  }
+  const detail = serviceDetailBlock(entry.slug);
+  if (detail) {
+    /* reuse the full service grounding — requirements, documents, source */
+    parts.push(
+      detail.replace(
+        "FOCUS SERVICE (the resident is viewing this page right now):",
+        "THE SERVICE THIS JOURNEY PREPARES FOR:"
+      )
+    );
+  }
+  parts.push(
+    '"What do I do now?" answers with the CURRENT or NEXT step from the registered steps above and what it needs — nothing beyond them.'
   );
   return parts.join("\n");
 }

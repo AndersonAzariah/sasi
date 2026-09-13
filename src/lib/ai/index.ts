@@ -48,7 +48,9 @@ export interface AIHttpError {
   code: AIProviderError["code"];
 }
 
-/** One honest, user-safe message per failure mode. */
+/** One honest, user-safe message per failure mode — the exact UX copy
+    mandated by Task 30 §OPENROUTER ERROR UX. Raw provider errors,
+    request IDs and stack traces never reach the client. */
 export function aiHttpStatus(err: unknown, fallback: string): AIHttpError {
   if (err instanceof AIProviderError) {
     switch (err.code) {
@@ -56,29 +58,26 @@ export function aiHttpStatus(err: unknown, fallback: string): AIHttpError {
         return {
           status: 503,
           code: err.code,
-          message:
-            "SASI AI is temporarily unavailable. The platform's AI provider is not configured.",
+          message: "SASI AI is temporarily unavailable.",
         };
       case "rate_limited":
         return {
           status: 429,
           code: err.code,
           message:
-            "SASI's AI provider is busy right now. Please try again in a moment.",
+            "SASI is receiving too many requests right now. Please try again.",
         };
       case "timeout":
         return {
           status: 504,
           code: err.code,
-          message:
-            "SASI's AI took too long to answer. Please try again in a moment.",
+          message: "SASI took too long to respond. Please try again.",
         };
       case "invalid_request":
         return {
           status: 502,
           code: err.code,
-          message:
-            "SASI's AI provider rejected the request. The platform owner may need to check the AI configuration.",
+          message: "SASI AI configuration needs attention.",
         };
       case "malformed":
       case "upstream":
@@ -86,11 +85,15 @@ export function aiHttpStatus(err: unknown, fallback: string): AIHttpError {
         return {
           status: 502,
           code: err.code,
-          message: fallback,
+          message: "SASI AI is temporarily unavailable. Please try again.",
         };
     }
   }
-  return { status: 502, code: "upstream", message: fallback };
+  return {
+    status: 502,
+    code: "upstream",
+    message: "SASI AI is temporarily unavailable. Please try again.",
+  };
 }
 
 export { AIProviderError } from "./types";

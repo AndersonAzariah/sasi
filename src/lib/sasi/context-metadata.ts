@@ -90,18 +90,40 @@ export function writeContextCookie(ctx: ViewContext): void {
    ------------------------------------------------------------ */
 
 const VIEW_PHRASES: Record<string, string> = {
-  "ask-sasi": "the Ask SASI assistant (this conversation)",
+  landing: "the public landing page (no specific service context)",
+  about: "the About page",
+  "how-it-works": "the How SASI works page",
+  services: "the services directory",
   "service-detail": "a service detail page",
-  map: "the community map",
-  report: "the report-an-issue wizard",
+  explore: "the Explore discovery page",
+  security: "the Security page",
+  privacy: "the Privacy page",
+  terms: "the Terms page",
+  gov: "the government directory",
+  emergency: "the emergency numbers page",
+  "get-app": "the Get the app page",
+  verify: "the Verify screen (checking a suspicious message or claim)",
+  login: "the sign-in screen",
+  signup: "the sign-up screen",
+  "ask-sasi": "the Ask SASI assistant (this conversation)",
+  dashboard: "their dashboard",
   investigate: "an investigation workspace",
-  incidents: "the incidents tracker",
+  "start-investigation": "the start-an-investigation screen",
+  report: "the report-an-issue wizard",
   cases: "their case list",
+  "case-detail": "a case detail page",
+  incidents: "the incidents tracker",
+  "incident-detail": "an incident detail page",
+  map: "the community map (Nearby)",
+  evidence: "their evidence vault",
+  activity: "the activity centre",
   journeys: "the guided journeys list",
   journey: "a guided journey checklist",
   documents: "their documents workspace",
-  dashboard: "their dashboard",
+  notifications: "their notifications",
   settings: "the settings screen",
+  profile: "their profile",
+  admin: "the admin console",
 };
 
 function describeView(ctx: ViewContext): string {
@@ -153,6 +175,22 @@ export function buildContextBlock(
   if (clean.view === "service-detail" && clean.param) {
     lines.push(
       "If the FOCUS SERVICE block below covers this page, ground requirements and steps in it — never beyond it."
+    );
+  }
+  if (clean.view === "journey" && clean.param) {
+    lines.push(
+      `The resident is working through the "${clean.param}" journey. "What do I do now?" means the next step of THAT checklist — use the FOCUS JOURNEY block.`,
+      "Never describe the checklist as an official application or submission."
+    );
+  }
+  if (clean.view === "documents") {
+    lines.push(
+      'The resident is looking at a document they uploaded. "What does this mean?" refers to THAT document — answer only from what they provide or quote; never invent its contents.'
+    );
+  }
+  if (clean.view === "verify") {
+    lines.push(
+      'The resident is on the Verify screen. Treat "is this fake?" style questions as verification requests and stay honest about what cannot be confirmed.'
     );
   }
   return lines.join("\n");
