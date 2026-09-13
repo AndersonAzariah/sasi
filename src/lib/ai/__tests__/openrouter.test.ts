@@ -12,6 +12,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { OpenRouterProvider } from "../openrouter";
 import { AIProviderError } from "../types";
+import { aiHttpStatus } from "../index";
 
 const ORIGINAL_FETCH = globalThis.fetch;
 const ORIG_KEY = process.env.OPENROUTER_API_KEY;
@@ -208,5 +209,53 @@ describe("OpenRouterProvider", () => {
     await provider.complete({ messages: [{ role: "user", content: "hi" }] });
     const body = JSON.parse(String(mock.init?.body ?? "{}")) as { model?: string };
     expect(body.model).toBe("acme/test-model");
+  });
+});
+
+/* ============================================================
+   Task 30 — OpenRouter ERROR UX contract.
+   Every failure mode maps to ONE exact, user-safe message;
+   raw provider errors never surface.
+   ============================================================ */
+
+describe("aiHttpStatus — Task 30 error UX", () => {
+  test("missing API key → 'SASI AI is temporarily unavailable.'", () => {
+    const r = aiHttpStatus(
+      new AIProviderError("not_configured", "internal detail"),
+      "fallback"
+    );
+    expect(r.message).toBe("SASI AI is temporarily unavailable.");
+    expect(r.status).toBe(503);
+  });
+
+  test("rate limited → exact Task 30 copy", () => {
+    const r = aiHttpStatus(new AIProviderError("rate_limited", "429"), "fallback");
+    expect(r.message).toBe(
+      "SASI is receiving too many requests right now. Please try again."
+    );
+    expect(r.status).toBe(429);
+  });
+
+  test("provider unavailable → exact Task 30 copy", () => {
+    const r = aiHttpStatus(new AIProviderError("upstream", "500"), "fallback");
+    expect(r.message).toBe("SASI AI is temporarily unavailable. Please try again.");
+    expect(r.status).toBe(502);
+  });
+
+  test("invalid configuration → exact Task 30 copy", () => {
+    const r = aiHttpStatus(new AIProviderError("invalid_request", "404"), "fallback");
+    expect(r.message).toBe("SASI AI configuration needs attention.");
+  });
+
+  test("timeout → exact Task 30 copy", () => {
+    const r = aiHttpStatus(new AIProviderError("timeout", "abort"), "fallback");
+    expect(r.message).toBe("SASI took too long to respond. Please try again.");
+    expect(r.status).toBe(504);
+  });
+
+  test("unknown error → generic honest message (no internals)", () => {
+    const r = aiHttpStatus(new Error("postgres connection string leaked"), "fb");
+    expect(r.message).toBe("SASI AI is temporarily unavailable. Please try again.");
+    expect(r.message).not.toContain("postgres");
   });
 });
